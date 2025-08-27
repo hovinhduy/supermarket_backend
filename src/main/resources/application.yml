@@ -1,0 +1,128 @@
+spring:
+  # Cấu hình datasource cho MySQL
+  datasource:
+    url: jdbc:mysql://localhost:3306/supermarket_db?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # Cấu hình JPA/Hibernate
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true # Hiển thị SQL queries trong console
+    format-sql: true # Format SQL cho dễ đọc
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          time_zone: Asia/Ho_Chi_Minh
+    open-in-view: false # Tắt để tránh lazy loading issues
+
+  # Cấu hình Jackson cho JSON
+  jackson:
+    time-zone: Asia/Ho_Chi_Minh
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+  flyway:
+    enabled: false
+
+# Cấu hình logging
+logging:
+  level:
+    org.hibernate.SQL: DEBUG # Log SQL statements
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE # Log SQL parameters
+    org.springframework.web: DEBUG # Log web requests
+    iuh.fit.supermarket: DEBUG # Log application packages
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/supermarket.log
+
+# Cấu hình server
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# Cấu hình management endpoints (Actuator)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+
+
+---
+# Profile cho development
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:mysql://localhost:3306/supermarket_dev?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: root
+    password: # Development password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+logging:
+  level:
+    root: INFO
+    iuh.fit.supermarket: DEBUG
+
+---
+# Profile cho testing
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  h2:
+    console:
+      enabled: true
+logging:
+  level:
+    root: WARN
+    iuh.fit.supermarket: INFO
+
+---
+# Profile cho production
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:mysql://localhost:3306/supermarket_prod?useSSL=true&serverTimezone=Asia/Ho_Chi_Minh
+    username: ${DB_USERNAME:supermarket_user}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+logging:
+  level:
+    root: WARN
+    iuh.fit.supermarket: INFO
+  file:
+    name: /var/log/supermarket/application.log
