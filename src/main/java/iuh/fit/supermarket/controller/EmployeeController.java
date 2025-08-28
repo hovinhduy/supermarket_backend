@@ -1,5 +1,12 @@
 package iuh.fit.supermarket.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
 import iuh.fit.supermarket.entity.Employee;
@@ -22,6 +29,8 @@ import java.util.Optional;
 @RequestMapping("/employees")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Employee Management", description = "API quản lý nhân viên")
+@SecurityRequirement(name = "Bearer Authentication")
 public class EmployeeController {
 
     private final EmployeeService employeeService;
@@ -29,6 +38,11 @@ public class EmployeeController {
     /**
      * Lấy danh sách tất cả nhân viên (chỉ ADMIN và MANAGER)
      */
+    @Operation(summary = "Lấy danh sách tất cả nhân viên", description = "Lấy danh sách tất cả nhân viên trong hệ thống. Chỉ ADMIN và MANAGER mới có quyền truy cập.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công", content = @Content(schema = @Schema(implementation = EmployeeDto.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
     @GetMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<List<EmployeeDto>>> getAllEmployees() {
@@ -77,9 +91,16 @@ public class EmployeeController {
     /**
      * Tạo nhân viên mới (chỉ ADMIN)
      */
+    @Operation(summary = "Tạo nhân viên mới", description = "Tạo một nhân viên mới trong hệ thống. Chỉ ADMIN mới có quyền thực hiện.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Tạo nhân viên thành công", content = @Content(schema = @Schema(implementation = EmployeeDto.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<EmployeeDto>> createEmployee(@RequestBody Employee employee) {
+    public ResponseEntity<ApiResponse<EmployeeDto>> createEmployee(
+            @Parameter(description = "Thông tin nhân viên mới", required = true) @RequestBody Employee employee) {
         log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", employee.getEmail());
 
         try {

@@ -74,6 +74,21 @@ jwt:
   secret: supermarket-secret-key-for-jwt-token-generation-2024-very-long-secret-key
   expiration: 86400000 # 24 hours in milliseconds
 
+# Cấu hình Swagger/OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true
+    filter: true
+  show-actuator: true
+  packages-to-scan: iuh.fit.supermarket.controller
+  paths-to-exclude: /error
+
 ---
 # Profile cho development
 spring:
