@@ -9,7 +9,7 @@ spring:
   # Cấu hình JPA/Hibernate
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: none
     show-sql: true # Hiển thị SQL queries trong console
     format-sql: true # Format SQL cho dễ đọc
     properties:
@@ -29,6 +29,12 @@ spring:
       write-dates-as-timestamps: false
   flyway:
     enabled: false
+
+  # Cấu hình SQL initialization
+  # sql:
+  #   init:
+  #     mode: always # Chạy data.sql mỗi lần khởi động
+  #     data-locations: classpath:data.sql
 
 # Cấu hình logging
 logging:
@@ -63,6 +69,10 @@ management:
     health:
       show-details: when-authorized
 
+# Cấu hình JWT
+jwt:
+  secret: supermarket-secret-key-for-jwt-token-generation-2024-very-long-secret-key
+  expiration: 86400000 # 24 hours in milliseconds
 
 ---
 # Profile cho development

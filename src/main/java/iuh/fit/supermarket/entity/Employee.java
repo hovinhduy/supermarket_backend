@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,47 +79,55 @@ public class Employee {
      * Danh sách đơn hàng được xử lý bởi nhân viên này
      */
     @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Order> orders;
 
     /**
      * Danh sách lịch sử giá được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<PriceHistory> priceHistories;
 
     /**
      * Danh sách chuyển động kho được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<StockMovement> stockMovements;
 
     /**
      * Danh sách phiếu nhập được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Import> imports;
 
     /**
      * Danh sách hóa đơn bán hàng được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<SaleInvoiceHeader> saleInvoices;
 
     /**
      * Danh sách phiếu trả hàng được xử lý bởi nhân viên này
      */
     @OneToMany(mappedBy = "employee", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<ReturnInvoiceHeader> returnInvoices;
 
     /**
      * Danh sách phiếu kiểm kê được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Stocktake> createdStocktakes;
 
     /**
      * Danh sách phiếu kiểm kê được hoàn thành bởi nhân viên này
      */
     @OneToMany(mappedBy = "completedBy", fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Stocktake> completedStocktakes;
 }
