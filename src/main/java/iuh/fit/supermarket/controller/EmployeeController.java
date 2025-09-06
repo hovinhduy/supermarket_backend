@@ -26,7 +26,7 @@ import java.util.Optional;
  * Controller xử lý các API liên quan đến nhân viên
  */
 @RestController
-@RequestMapping("/employees")
+@RequestMapping("/api/employees")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Employee Management", description = "API quản lý nhân viên")

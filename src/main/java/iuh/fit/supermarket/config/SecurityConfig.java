@@ -54,7 +54,7 @@ public class SecurityConfig {
                 // Cấu hình authorization
                 .authorizeHttpRequests(authz -> authz
                         // Public endpoints
-                        .requestMatchers("/auth/login", "/auth/validate").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/validate").permitAll()
                         .requestMatchers("/public/**").permitAll()
                         .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()

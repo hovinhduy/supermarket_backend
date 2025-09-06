@@ -27,12 +27,6 @@ public class Inventory {
     private Integer inventoryId;
 
     /**
-     * ID kho hàng
-     */
-    @Column(name = "warehouse_id")
-    private Integer warehouseId = 1;
-
-    /**
      * Số lượng tồn kho hiện tại
      */
     @Column(name = "quantity_on_hand", nullable = false)

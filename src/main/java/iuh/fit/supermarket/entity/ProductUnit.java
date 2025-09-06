@@ -16,7 +16,7 @@ import java.util.List;
  * Entity đại diện cho đơn vị đóng gói sản phẩm trong hệ thống
  */
 @Entity
-@Table(name = "product_units", uniqueConstraints = @UniqueConstraint(columnNames = { "product_id", "name" }))
+@Table(name = "product_units")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -27,66 +27,71 @@ public class ProductUnit {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "unit_id")
-    private Integer unitId;
+    @Column(name = "id")
+    private Long id;
 
     /**
-     * Tên đơn vị (ví dụ: "Lon", "Chai 390ml", "Lốc 6", "Thùng 24")
+     * Mã đơn vị (duy nhất)
      */
-    @Column(name = "name", length = 100, nullable = false)
-    private String name;
+    @Column(name = "code", length = 50, unique = true)
+    private String code;
 
     /**
-     * Hệ số quy đổi so với đơn vị cơ bản
-     * Ví dụ: Lon=1, Lốc=6, Thùng=24
+     * Mã vạch của đơn vị
      */
-    @Column(name = "conversion_factor", nullable = false)
-    private Integer conversionFactor = 1;
+    @Column(name = "barcode", length = 100)
+    private String barcode;
 
     /**
-     * Trọng lượng (bao gồm bao bì)
+     * Tên đơn vị (ví dụ: "lon", "lốc", "thùng")
      */
-    @Column(name = "weight", precision = 10, scale = 3)
-    private BigDecimal weight;
+    @Column(name = "unit", length = 50, nullable = false)
+    private String unit;
 
     /**
-     * Đơn vị trọng lượng
+     * Giá bán cơ bản của đơn vị này
      */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "weight_unit")
-    private WeightUnit weightUnit;
+    @Column(name = "base_price", precision = 18, scale = 2)
+    private BigDecimal basePrice;
 
     /**
-     * Chiều dài (cm)
+     * Tỷ lệ quy đổi so với đơn vị cơ bản
+     * Ví dụ: lon=1, lốc=6, thùng=24
      */
-    @Column(name = "length", precision = 8, scale = 2)
-    private BigDecimal length;
+    @Column(name = "conversion_value", nullable = false)
+    private Integer conversionValue = 1;
 
     /**
-     * Chiều rộng (cm)
+     * Cho phép bán hay không
      */
-    @Column(name = "width", precision = 8, scale = 2)
-    private BigDecimal width;
+    @Column(name = "allows_sale")
+    private Boolean allowsSale = true;
 
     /**
-     * Chiều cao (cm)
+     * Giá nhập gần nhất
      */
-    @Column(name = "height", precision = 8, scale = 2)
-    private BigDecimal height;
+    @Column(name = "latest_purchase_price", precision = 18, scale = 2)
+    private BigDecimal latestPurchasePrice;
+
+    /**
+     * ID đơn vị chính để clone
+     */
+    @Column(name = "master_unit_id_clone")
+    private Long masterUnitIdClone;
 
     /**
      * Thời gian tạo
      */
     @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    @Column(name = "created_date")
+    private LocalDateTime createdDate;
 
     /**
      * Thời gian cập nhật
      */
     @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    @Column(name = "modified_date")
+    private LocalDateTime modifiedDate;
 
     /**
      * Sản phẩm mà đơn vị này thuộc về
@@ -100,10 +105,4 @@ public class ProductUnit {
      */
     @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY)
     private List<ProductVariant> variants;
-
-    /**
-     * Danh sách sản phẩm sử dụng đơn vị này làm đơn vị cơ bản
-     */
-    @OneToMany(mappedBy = "baseUnit", fetch = FetchType.LAZY)
-    private List<Product> productsAsBaseUnit;
 }

@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
  * Controller xử lý các API liên quan đến authentication
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Authentication", description = "API xác thực và quản lý phiên đăng nhập")

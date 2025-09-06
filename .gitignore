@@ -40,3 +40,8 @@ document/
 logs/
 
 DemoController.java
+.cursor/
+
+AGENTS.md
+
+GEMINI.md
