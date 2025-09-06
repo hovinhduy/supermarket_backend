@@ -93,3 +93,5 @@ product:
     max-size: 5MB
     allowed-types: image/jpeg,image/png,image/gif,image/webp
     max-count: 5
+#Cấu hình aws
+

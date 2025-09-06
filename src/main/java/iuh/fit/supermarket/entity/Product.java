@@ -1,6 +1,5 @@
 package iuh.fit.supermarket.entity;
 
-import iuh.fit.supermarket.enums.ProductStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
