@@ -26,6 +26,19 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     /**
+     * Xử lý ngoại lệ liên quan đến danh mục
+     */
+    @ExceptionHandler(CategoryException.class)
+    public ResponseEntity<ApiResponse<String>> handleCategoryException(
+            CategoryException ex) {
+        
+        log.warn("Category exception: {}", ex.getMessage());
+        
+        return ResponseEntity.badRequest()
+            .body(ApiResponse.error(ex.getMessage()));
+    }
+    
+    /**
      * Xử lý validation errors
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)

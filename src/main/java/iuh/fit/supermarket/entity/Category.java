@@ -61,6 +61,12 @@ public class Category {
     private LocalDateTime updatedAt;
 
     /**
+     * Cấp độ của danh mục trong cây phân cấp (0 = gốc, 1 = cấp 1, ...)
+     */
+    @Column(name = "level", nullable = false)
+    private Integer level = 0;
+
+    /**
      * Danh mục cha (tự tham chiếu)
      */
     @ManyToOne(fetch = FetchType.LAZY)
