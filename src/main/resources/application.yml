@@ -29,12 +29,11 @@ spring:
       write-dates-as-timestamps: false
   flyway:
     enabled: false
-
-  # Cấu hình SQL initialization
-  # sql:
-  #   init:
-  #     mode: always # Chạy data.sql mỗi lần khởi động
-  #     data-locations: classpath:data.sql
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 5MB
 
 # Cấu hình logging
 logging:
@@ -88,65 +87,9 @@ springdoc:
   packages-to-scan: iuh.fit.supermarket.controller
   paths-to-exclude: /error
 
----
-# Profile cho development
-spring:
-  config:
-    activate:
-      on-profile: dev
-  datasource:
-    url: jdbc:mysql://localhost:3306/supermarket_dev?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: # Development password
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-logging:
-  level:
-    root: INFO
-    iuh.fit.supermarket: DEBUG
-
----
-# Profile cho testing
-spring:
-  config:
-    activate:
-      on-profile: test
-  datasource:
-    url: jdbc:h2:mem:testdb
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: false
-  h2:
-    console:
-      enabled: true
-logging:
-  level:
-    root: WARN
-    iuh.fit.supermarket: INFO
-
----
-# Profile cho production
-spring:
-  config:
-    activate:
-      on-profile: prod
-  datasource:
-    url: jdbc:mysql://localhost:3306/supermarket_prod?useSSL=true&serverTimezone=Asia/Ho_Chi_Minh
-    username: ${DB_USERNAME:supermarket_user}
-    password: ${DB_PASSWORD}
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-logging:
-  level:
-    root: WARN
-    iuh.fit.supermarket: INFO
-  file:
-    name: /var/log/supermarket/application.log
+# Cấu hình ảnh sản phẩm
+product:
+  image:
+    max-size: 5MB
+    allowed-types: image/jpeg,image/png,image/gif,image/webp
+    max-count: 5
