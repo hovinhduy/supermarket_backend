@@ -332,4 +332,110 @@ public class ProductController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+
+    /**
+     * Lấy thông tin biến thể theo ID
+     */
+    @GetMapping("/variants/{variantId}")
+    @Operation(summary = "Lấy thông tin biến thể", description = "Lấy thông tin chi tiết biến thể theo ID")
+    public ResponseEntity<ApiResponse<ProductVariantDto>> getProductVariantById(
+            @PathVariable Long variantId) {
+
+        log.info("API lấy thông tin biến thể ID: {}", variantId);
+
+        try {
+            ProductVariantDto variant = productService.getProductVariantById(variantId);
+
+            ApiResponse<ProductVariantDto> response = ApiResponse.success(variant);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy thông tin biến thể: ", e);
+
+            ApiResponse<ProductVariantDto> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Cập nhật thông tin biến thể
+     */
+    @PutMapping("/variants/{variantId}")
+    @Operation(summary = "Cập nhật biến thể", description = "Cập nhật thông tin biến thể sản phẩm")
+    public ResponseEntity<ApiResponse<ProductVariantDto>> updateProductVariant(
+            @PathVariable Long variantId,
+            @RequestBody ProductVariantUpdateRequest request) {
+
+        log.info("API cập nhật biến thể ID: {}", variantId);
+
+        try {
+            ProductVariantDto variant = productService.updateProductVariant(variantId, request);
+
+            ApiResponse<ProductVariantDto> response = ApiResponse.success("Cập nhật biến thể thành công", variant);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi cập nhật biến thể: ", e);
+
+            ApiResponse<ProductVariantDto> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Xóa một biến thể
+     */
+    @DeleteMapping("/variants/{variantId}")
+    @Operation(summary = "Xóa biến thể", description = "Xóa một biến thể sản phẩm (soft delete)")
+    public ResponseEntity<ApiResponse<String>> deleteProductVariant(
+            @PathVariable Long variantId) {
+
+        log.info("API xóa biến thể ID: {}", variantId);
+
+        try {
+            productService.deleteProductVariant(variantId);
+
+            ApiResponse<String> response = ApiResponse.success("Xóa biến thể thành công", (String) null);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa biến thể: ", e);
+
+            ApiResponse<String> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Xóa nhiều biến thể cùng lúc
+     */
+    @DeleteMapping("/variants/bulk")
+    @Operation(summary = "Xóa nhiều biến thể", description = "Xóa nhiều biến thể sản phẩm cùng lúc (soft delete). Nhận vào mảng các ID biến thể cần xóa.")
+    public ResponseEntity<ApiResponse<String>> deleteProductVariants(
+            @RequestBody List<Long> variantIds) {
+
+        log.info("API xóa nhiều biến thể với {} ID: {}", variantIds != null ? variantIds.size() : 0, variantIds);
+
+        try {
+            productService.deleteProductVariants(variantIds);
+
+            String message = String.format("Xóa %d biến thể thành công", variantIds != null ? variantIds.size() : 0);
+            ApiResponse<String> response = ApiResponse.success(message, (String) null);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa nhiều biến thể: ", e);
+
+            ApiResponse<String> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
 }

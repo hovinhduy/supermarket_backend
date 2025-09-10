@@ -4,6 +4,7 @@ import iuh.fit.supermarket.dto.product.*;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.ProductService;
+import iuh.fit.supermarket.service.VariantAttributeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ public class ProductServiceImpl implements ProductService {
     private final VariantAttributeRepository variantAttributeRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
+    private final VariantAttributeService variantAttributeService;
 
     /**
      * Tạo sản phẩm mới
@@ -856,6 +858,159 @@ public class ProductServiceImpl implements ProductService {
         // TODO: Implement image mapping if needed
 
         return dto;
+    }
+
+    /**
+     * Cập nhật thông tin biến thể sản phẩm
+     */
+    @Override
+    public ProductVariantDto updateProductVariant(Long variantId, ProductVariantUpdateRequest request) {
+        log.info("Cập nhật biến thể sản phẩm ID: {}", variantId);
+
+        // Kiểm tra biến thể tồn tại
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
+
+        // Cập nhật thông tin cơ bản
+        if (request.getVariantName() != null) {
+            variant.setVariantName(request.getVariantName());
+        }
+
+        if (request.getBarcode() != null) {
+            // Kiểm tra barcode đã tồn tại chưa (ngoại trừ biến thể hiện tại)
+            Optional<ProductVariant> existingVariant = productVariantRepository.findByBarcode(request.getBarcode());
+            if (existingVariant.isPresent() && !existingVariant.get().getVariantId().equals(variantId)) {
+                throw new RuntimeException("Mã vạch đã tồn tại: " + request.getBarcode());
+            }
+            variant.setBarcode(request.getBarcode());
+        }
+
+        if (request.getCostPrice() != null) {
+            variant.setCostPrice(request.getCostPrice());
+        }
+
+        if (request.getBasePrice() != null) {
+            variant.setBasePrice(request.getBasePrice());
+        }
+
+        if (request.getQuantityOnHand() != null) {
+            variant.setQuantityOnHand(request.getQuantityOnHand());
+        }
+
+        if (request.getQuantityReserved() != null) {
+            variant.setQuantityReserved(request.getQuantityReserved());
+        }
+
+        if (request.getMinQuantity() != null) {
+            variant.setMinQuantity(request.getMinQuantity());
+        }
+
+        if (request.getAllowsSale() != null) {
+            variant.setAllowsSale(request.getAllowsSale());
+        }
+
+        if (request.getIsActive() != null) {
+            variant.setIsActive(request.getIsActive());
+        }
+
+        // Cập nhật đơn vị nếu có
+        if (request.getUnitId() != null) {
+            ProductUnit unit = productUnitRepository.findById(request.getUnitId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn vị với ID: " + request.getUnitId()));
+
+            // Kiểm tra đơn vị có thuộc về cùng sản phẩm không
+            if (!unit.getProduct().getId().equals(variant.getProduct().getId())) {
+                throw new RuntimeException("Đơn vị không thuộc về sản phẩm này");
+            }
+
+            variant.setUnit(unit);
+        }
+
+        // Lưu biến thể đã cập nhật
+        variant = productVariantRepository.save(variant);
+        log.info("Đã cập nhật biến thể với ID: {}", variantId);
+
+        // Cập nhật thuộc tính biến thể nếu có
+        if (request.getAttributeValueIds() != null && !request.getAttributeValueIds().isEmpty()) {
+            variantAttributeService.updateVariantAttributes(variantId, request.getAttributeValueIds());
+            log.info("Đã cập nhật {} thuộc tính cho biến thể", request.getAttributeValueIds().size());
+        }
+
+        return mapToProductVariantDto(variant);
+    }
+
+    /**
+     * Lấy thông tin biến thể theo ID
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductVariantDto getProductVariantById(Long variantId) {
+        log.info("Lấy thông tin biến thể ID: {}", variantId);
+
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
+
+        return mapToProductVariantDto(variant);
+    }
+
+    /**
+     * Xóa nhiều biến thể cùng lúc (soft delete)
+     */
+    @Override
+    public void deleteProductVariants(List<Long> variantIds) {
+        log.info("Xóa {} biến thể với IDs: {}", variantIds != null ? variantIds.size() : 0, variantIds);
+
+        if (variantIds == null || variantIds.isEmpty()) {
+            throw new RuntimeException("Danh sách ID biến thể không được rỗng");
+        }
+
+        // Lấy tất cả biến thể cần xóa
+        List<ProductVariant> variants = productVariantRepository.findAllById(variantIds);
+
+        if (variants.isEmpty()) {
+            throw new RuntimeException("Không tìm thấy biến thể nào với các ID đã cho");
+        }
+
+        // Kiểm tra nếu có ID không tồn tại
+        List<Long> foundIds = variants.stream()
+                .map(ProductVariant::getVariantId)
+                .collect(Collectors.toList());
+
+        List<Long> notFoundIds = variantIds.stream()
+                .filter(id -> !foundIds.contains(id))
+                .collect(Collectors.toList());
+
+        if (!notFoundIds.isEmpty()) {
+            log.warn("Một số ID biến thể không tồn tại: {}", notFoundIds);
+        }
+
+        // Xóa mềm các biến thể
+        variants.forEach(variant -> {
+            variant.setIsDeleted(true);
+            variant.setIsActive(false);
+        });
+
+        productVariantRepository.saveAll(variants);
+
+        log.info("Đã xóa {} biến thể thành công", variants.size());
+    }
+
+    /**
+     * Xóa một biến thể (soft delete)
+     */
+    @Override
+    public void deleteProductVariant(Long variantId) {
+        log.info("Xóa biến thể ID: {}", variantId);
+
+        ProductVariant variant = productVariantRepository.findById(variantId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
+
+        // Xóa mềm biến thể
+        variant.setIsDeleted(true);
+        variant.setIsActive(false);
+        productVariantRepository.save(variant);
+
+        log.info("Đã xóa biến thể thành công");
     }
 
     /**

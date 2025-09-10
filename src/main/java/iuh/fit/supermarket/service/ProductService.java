@@ -112,4 +112,35 @@ public interface ProductService {
      * @return mã sản phẩm mới
      */
     String generateProductCode();
+
+    /**
+     * Cập nhật thông tin biến thể sản phẩm
+     * 
+     * @param variantId ID biến thể
+     * @param request   thông tin cập nhật biến thế
+     * @return thông tin biến thể đã cập nhật
+     */
+    ProductVariantDto updateProductVariant(Long variantId, ProductVariantUpdateRequest request);
+
+    /**
+     * Lấy thông tin biến thể theo ID
+     * 
+     * @param variantId ID biến thể
+     * @return thông tin biến thể
+     */
+    ProductVariantDto getProductVariantById(Long variantId);
+
+    /**
+     * Xóa nhiều biến thể cùng lúc (soft delete)
+     * 
+     * @param variantIds Danh sách ID biến thể cần xóa
+     */
+    void deleteProductVariants(List<Long> variantIds);
+
+    /**
+     * Xóa một biến thể (soft delete)
+     * 
+     * @param variantId ID biến thể cần xóa
+     */
+    void deleteProductVariant(Long variantId);
 }
