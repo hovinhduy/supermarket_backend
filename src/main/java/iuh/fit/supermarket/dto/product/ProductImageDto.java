@@ -47,5 +47,5 @@ public class ProductImageDto {
     /**
      * ID biến thể (nếu có)
      */
-    private Integer variantId;
+    private Long variantId;
 }

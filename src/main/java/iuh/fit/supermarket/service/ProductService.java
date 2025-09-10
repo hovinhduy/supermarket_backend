@@ -44,12 +44,27 @@ public interface ProductService {
     void deleteProduct(Long id);
 
     /**
+     * Xóa nhiều sản phẩm cùng lúc (soft delete)
+     * 
+     * @param ids Danh sách ID sản phẩm cần xóa
+     */
+    void deleteProducts(List<Long> ids);
+
+    /**
      * Lấy danh sách sản phẩm với phân trang
      * 
      * @param pageable thông tin phân trang
      * @return danh sách sản phẩm
      */
     Page<ProductResponse> getProducts(Pageable pageable);
+
+    /**
+     * Lấy danh sách sản phẩm với filtering, searching và sorting nâng cao
+     * 
+     * @param request thông tin phân trang, filtering và sorting
+     * @return danh sách sản phẩm
+     */
+    Page<ProductResponse> getProductsAdvanced(ProductPageableRequest request);
 
     /**
      * Tìm kiếm sản phẩm theo từ khóa
@@ -82,6 +97,14 @@ public interface ProductService {
      * @return danh sách sản phẩm
      */
     List<ProductResponse> getLowStockProducts();
+
+    /**
+     * Tạo sản phẩm mới với nhiều biến thể cùng lúc
+     * 
+     * @param request thông tin sản phẩm và các biến thể
+     * @return thông tin sản phẩm đã tạo
+     */
+    ProductResponse createProductWithVariants(ProductCreateWithVariantsRequest request);
 
     /**
      * Tạo mã sản phẩm tự động

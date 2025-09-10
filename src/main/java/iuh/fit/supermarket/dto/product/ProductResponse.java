@@ -2,7 +2,6 @@ package iuh.fit.supermarket.dto.product;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -53,71 +52,6 @@ public class ProductResponse {
     private Integer variantCount;
 
     /**
-     * Giá gốc
-     */
-    private BigDecimal basePrice;
-
-    /**
-     * Giá vốn
-     */
-    private BigDecimal cost;
-
-    /**
-     * Giá nhập gần nhất
-     */
-    private BigDecimal latestPurchasePrice;
-
-    /**
-     * Đơn vị cơ bản
-     */
-    private String unit;
-
-    /**
-     * Giá trị quy đổi
-     */
-    private Integer conversionValue;
-
-    /**
-     * Số lượng tồn kho
-     */
-    private BigDecimal onHand;
-
-    /**
-     * Số lượng đang đặt hàng
-     */
-    private BigDecimal onOrder;
-
-    /**
-     * Số lượng đã đặt trước
-     */
-    private BigDecimal reserved;
-
-    /**
-     * Số lượng tối thiểu
-     */
-    private BigDecimal minQuantity;
-
-    /**
-     * Số lượng tối đa
-     */
-    private BigDecimal maxQuantity;
-
-    /**
-     * Mã vạch
-     */
-    private String barcode;
-
-    /**
-     * Tên thương hiệu
-     */
-    private String tradeMarkName;
-
-    /**
-     * Cho phép bán hay không
-     */
-    private Boolean allowsSale;
-
-    /**
      * Trạng thái hoạt động
      */
     private Boolean isActive;
@@ -138,14 +72,9 @@ public class ProductResponse {
     private CategoryDto category;
 
     /**
-     * Danh sách đơn vị sản phẩm
+     * Danh sách biến thể sản phẩm
      */
-    private List<ProductUnitDto> productUnits;
-
-    /**
-     * Danh sách thuộc tính
-     */
-    private List<ProductAttributeDto> attributes;
+    private List<ProductVariantDto> variants;
 
     /**
      * DTO cho thông tin danh mục
@@ -154,38 +83,5 @@ public class ProductResponse {
     public static class CategoryDto {
         private Long id;
         private String name;
-    }
-
-    /**
-     * DTO cho đơn vị sản phẩm
-     */
-    @Data
-    public static class ProductUnitDto {
-        private Long id;
-        private String code;
-        private String unit;
-        private BigDecimal basePrice;
-        private Integer conversionValue;
-        private Boolean allowsSale;
-        private String barcode;
-    }
-
-    /**
-     * DTO cho thuộc tính sản phẩm
-     */
-    @Data
-    public static class ProductAttributeDto {
-        private Long id;
-        private String attributeName;
-        private String value;
-    }
-
-    /**
-     * DTO cho vị trí kho
-     */
-    @Data
-    public static class ProductShelfDto {
-        private Long id;
-        private String shelfName;
     }
 }

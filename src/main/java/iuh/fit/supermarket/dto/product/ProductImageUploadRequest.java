@@ -24,7 +24,7 @@ public class ProductImageUploadRequest {
     /**
      * ID biến thể (tùy chọn - nếu có thì ảnh thuộc về biến thể cụ thể)
      */
-    private Integer variantId;
+    private Long variantId;
 
     /**
      * Văn bản thay thế cho hình ảnh

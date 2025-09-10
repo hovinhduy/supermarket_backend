@@ -14,6 +14,7 @@ import java.util.List;
 
 /**
  * Entity đại diện cho đơn vị đóng gói sản phẩm trong hệ thống
+ * Chỉ định nghĩa đơn vị và tỷ lệ quy đổi, không chứa thông tin giá
  */
 @Entity
 @Table(name = "product_units")
@@ -49,12 +50,6 @@ public class ProductUnit {
     private String unit;
 
     /**
-     * Giá bán cơ bản của đơn vị này
-     */
-    @Column(name = "base_price", precision = 18, scale = 2)
-    private BigDecimal basePrice;
-
-    /**
      * Tỷ lệ quy đổi so với đơn vị cơ bản
      * Ví dụ: lon=1, lốc=6, thùng=24
      */
@@ -62,22 +57,16 @@ public class ProductUnit {
     private Integer conversionValue = 1;
 
     /**
-     * Cho phép bán hay không
+     * Thứ tự sắp xếp hiển thị
      */
-    @Column(name = "allows_sale")
-    private Boolean allowsSale = true;
+    @Column(name = "sort_order")
+    private Integer sortOrder = 0;
 
     /**
-     * Giá nhập gần nhất
+     * Trạng thái hoạt động
      */
-    @Column(name = "latest_purchase_price", precision = 18, scale = 2)
-    private BigDecimal latestPurchasePrice;
-
-    /**
-     * ID đơn vị chính để clone
-     */
-    @Column(name = "master_unit_id_clone")
-    private Long masterUnitIdClone;
+    @Column(name = "is_active")
+    private Boolean isActive = true;
 
     /**
      * Thời gian tạo

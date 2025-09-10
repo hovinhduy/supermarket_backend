@@ -33,7 +33,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
      * @return danh sách hình ảnh của biến thể
      */
     @Query("SELECT pi FROM ProductImage pi WHERE pi.variant.variantId = :variantId ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
-    List<ProductImage> findByVariantIdOrderBySortOrder(@Param("variantId") Integer variantId);
+    List<ProductImage> findByVariantIdOrderBySortOrder(@Param("variantId") Long variantId);
 
     /**
      * Tìm hình ảnh chính của sản phẩm (sortOrder = 0 hoặc thấp nhất)
@@ -68,7 +68,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
      * @return số lượng hình ảnh
      */
     @Query("SELECT COUNT(pi) FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    long countByVariantId(@Param("variantId") Integer variantId);
+    long countByVariantId(@Param("variantId") Long variantId);
 
     /**
      * Xóa tất cả hình ảnh của một sản phẩm
@@ -88,7 +88,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
     @Modifying
     @Transactional
     @Query("DELETE FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    void deleteByVariantId(@Param("variantId") Integer variantId);
+    void deleteByVariantId(@Param("variantId") Long variantId);
 
     /**
      * Tìm hình ảnh chung của sản phẩm (không thuộc về biến thể nào)
@@ -115,5 +115,5 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
      * @return thứ tự sắp xếp lớn nhất
      */
     @Query("SELECT COALESCE(MAX(pi.sortOrder), 0) FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    Integer findMaxSortOrderByVariantId(@Param("variantId") Integer variantId);
+    Integer findMaxSortOrderByVariantId(@Param("variantId") Long variantId);
 }

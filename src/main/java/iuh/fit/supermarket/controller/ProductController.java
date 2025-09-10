@@ -29,37 +29,6 @@ public class ProductController {
     private final ProductService productService;
 
     /**
-     * Tạo sản phẩm mới
-     */
-    @PostMapping
-    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo sản phẩm mới với thông tin đầy đủ")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createProduct(
-            @RequestBody ProductCreateRequest request) {
-
-        log.info("API tạo sản phẩm mới được gọi: {}", request.getName());
-
-        try {
-            ProductResponse product = productService.createProduct(request);
-
-            Map<String, Object> responseData = Map.of(
-                    "id", product.getId(),
-                    "code", product.getCode(),
-                    "message", "Tạo sản phẩm thành công");
-
-            ApiResponse<Map<String, Object>> response = ApiResponse.success(responseData);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
-        } catch (Exception e) {
-            log.error("Lỗi khi tạo sản phẩm: ", e);
-
-            ApiResponse<Map<String, Object>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    /**
      * Lấy thông tin sản phẩm theo ID
      */
     @GetMapping("/{id}")
@@ -113,10 +82,10 @@ public class ProductController {
     }
 
     /**
-     * Xóa sản phẩm
+     * Xóa một sản phẩm
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Xóa sản phẩm", description = "Xóa sản phẩm (soft delete)")
+    @Operation(summary = "Xóa sản phẩm", description = "Xóa một sản phẩm (soft delete)")
     public ResponseEntity<ApiResponse<String>> deleteProduct(
             @PathVariable Long id) {
 
@@ -125,7 +94,8 @@ public class ProductController {
         try {
             productService.deleteProduct(id);
 
-            ApiResponse<String> response = ApiResponse.success("Xóa sản phẩm thành công", (String) null);
+            ApiResponse<String> response = ApiResponse.success("Xóa sản phẩm và các biến thể thành công",
+                    (String) null);
 
             return ResponseEntity.ok(response);
 
@@ -139,14 +109,42 @@ public class ProductController {
     }
 
     /**
-     * Lấy danh sách sản phẩm với phân trang
+     * Xóa nhiều sản phẩm cùng lúc
+     */
+    @DeleteMapping("/bulk")
+    @Operation(summary = "Xóa nhiều sản phẩm", description = "Xóa nhiều sản phẩm cùng lúc (soft delete). Nhận vào mảng các ID sản phẩm cần xóa.")
+    public ResponseEntity<ApiResponse<String>> deleteProducts(
+            @RequestBody List<Long> ids) {
+
+        log.info("API xóa nhiều sản phẩm với {} ID: {}", ids != null ? ids.size() : 0, ids);
+
+        try {
+            productService.deleteProducts(ids);
+
+            String message = String.format("Xóa %d sản phẩm và các biến thể thành công", ids != null ? ids.size() : 0);
+            ApiResponse<String> response = ApiResponse.success(message, (String) null);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa nhiều sản phẩm: ", e);
+
+            ApiResponse<String> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Lấy danh sách sản phẩm với phân trang (API cũ - deprecated)
      */
     @GetMapping
-    @Operation(summary = "Lấy danh sách sản phẩm", description = "Lấy danh sách sản phẩm với phân trang")
+    @Operation(summary = "Lấy danh sách sản phẩm (deprecated)", description = "API cũ - sử dụng POST /api/products/search")
+    @Deprecated
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProducts(
             Pageable pageable) {
 
-        log.info("API lấy danh sách sản phẩm với phân trang");
+        log.info("API lấy danh sách sản phẩm với phân trang (deprecated)");
 
         try {
             Page<ProductResponse> products = productService.getProducts(pageable);
@@ -157,6 +155,33 @@ public class ProductController {
 
         } catch (Exception e) {
             log.error("Lỗi khi lấy danh sách sản phẩm: ", e);
+
+            ApiResponse<Page<ProductResponse>> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Lấy danh sách sản phẩm với filtering, searching và sorting
+     */
+    @PostMapping("/list")
+    @Operation(summary = "Lấy danh sách sản phẩm nâng cao", description = "Lấy danh sách sản phẩm với filtering, searching và sorting")
+    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProductsAdvanced(
+            @RequestBody ProductPageableRequest request) {
+
+        log.info("API lấy danh sách sản phẩm nâng cao: page={}, limit={}, search={}, isActive={}",
+                request.getPage(), request.getLimit(), request.getSearchTerm(), request.getIsActive());
+
+        try {
+            Page<ProductResponse> products = productService.getProductsAdvanced(request);
+
+            ApiResponse<Page<ProductResponse>> response = ApiResponse.success(products);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy danh sách sản phẩm nâng cao: ", e);
 
             ApiResponse<Page<ProductResponse>> response = ApiResponse.error(e.getMessage());
 
@@ -263,6 +288,46 @@ public class ProductController {
             log.error("Lỗi khi lấy sản phẩm tồn kho thấp: ", e);
 
             ApiResponse<List<ProductResponse>> response = ApiResponse.error(e.getMessage());
+
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * Tạo sản phẩm mới
+     */
+    @PostMapping
+    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo sản phẩm mới với thông tin đầy đủ và biến thể")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> createProduct(
+            @RequestBody ProductCreateWithVariantsRequest request) {
+
+        log.info("API tạo sản phẩm mới được gọi: {}", request.getName());
+
+        try {
+            ProductResponse product = productService.createProductWithVariants(request);
+
+            // Tính tổng số variants thực tế (mỗi SKU có thể có nhiều units)
+            int totalVariants = request.getVariants().stream()
+                    .mapToInt(v -> v.getUnits() != null ? v.getUnits().size() : 0)
+                    .sum();
+
+            Map<String, Object> responseData = Map.of(
+                    "id", product.getId(),
+                    "code", product.getCode(),
+                    "skuCount", request.getVariants().size(),
+                    "variantCount", totalVariants,
+                    "message",
+                    "Tạo sản phẩm thành công với " + totalVariants + " biến thể (từ " + request.getVariants().size()
+                            + " SKUs)");
+
+            ApiResponse<Map<String, Object>> response = ApiResponse.success(responseData);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo sản phẩm: ", e);
+
+            ApiResponse<Map<String, Object>> response = ApiResponse.error(e.getMessage());
 
             return ResponseEntity.badRequest().body(response);
         }

@@ -28,7 +28,7 @@ public interface ProductImageService {
      * @param files     danh sách file ảnh
      * @return danh sách thông tin ảnh đã upload
      */
-    List<ProductImageUploadResponse> uploadMultipleImages(Long productId, Integer variantId, List<MultipartFile> files);
+    List<ProductImageUploadResponse> uploadMultipleImages(Long productId, Long variantId, List<MultipartFile> files);
 
     /**
      * Lấy tất cả hình ảnh của sản phẩm
@@ -44,7 +44,7 @@ public interface ProductImageService {
      * @param variantId ID biến thể
      * @return danh sách hình ảnh của biến thể
      */
-    List<ProductImageDto> getVariantImages(Integer variantId);
+    List<ProductImageDto> getVariantImages(Long variantId);
 
     /**
      * Lấy hình ảnh chính của sản phẩm
@@ -76,7 +76,7 @@ public interface ProductImageService {
      * @param variantId ID biến thể
      * @return số lượng ảnh đã xóa
      */
-    int deleteAllVariantImages(Integer variantId);
+    int deleteAllVariantImages(Long variantId);
 
     /**
      * Cập nhật thứ tự sắp xếp hình ảnh
@@ -110,5 +110,5 @@ public interface ProductImageService {
      * @param variantId ID biến thể
      * @return số lượng hình ảnh
      */
-    long countVariantImages(Integer variantId);
+    long countVariantImages(Long variantId);
 }

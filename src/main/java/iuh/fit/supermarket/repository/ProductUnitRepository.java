@@ -25,10 +25,9 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
      */
     Optional<ProductUnit> findByCode(String code);
 
-    /**
-     * Tìm đơn vị theo mã vạch
-     */
-    Optional<ProductUnit> findByBarcode(String barcode);
+    // Method findByBarcode đã được chuyển sang
+    // ProductVariantRepository.findByBarcode()
+    // vì barcode giờ nằm trong ProductVariant entity
 
     /**
      * Kiểm tra sự tồn tại của mã đơn vị
@@ -41,10 +40,11 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
     Optional<ProductUnit> findByProductIdAndUnit(Long productId, String unit);
 
     /**
-     * Lấy danh sách đơn vị cho phép bán theo productId
+     * Lấy danh sách đơn vị hoạt động theo productId
+     * (Logic "cho phép bán" đã được chuyển sang ProductVariant.allowsSale)
      */
-    @Query("SELECT pu FROM ProductUnit pu WHERE pu.product.id = :productId AND pu.allowsSale = true")
-    List<ProductUnit> findSaleableUnitsByProductId(@Param("productId") Long productId);
+    @Query("SELECT pu FROM ProductUnit pu WHERE pu.product.id = :productId AND pu.isActive = true ORDER BY pu.sortOrder ASC")
+    List<ProductUnit> findActiveUnitsByProductId(@Param("productId") Long productId);
 
     /**
      * Xóa tất cả đơn vị theo productId

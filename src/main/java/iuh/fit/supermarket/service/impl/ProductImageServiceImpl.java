@@ -5,7 +5,6 @@ import iuh.fit.supermarket.dto.product.ProductImageUploadRequest;
 import iuh.fit.supermarket.dto.product.ProductImageUploadResponse;
 import iuh.fit.supermarket.entity.Product;
 import iuh.fit.supermarket.entity.ProductImage;
-import iuh.fit.supermarket.entity.ProductVariant;
 import iuh.fit.supermarket.repository.ProductImageRepository;
 import iuh.fit.supermarket.repository.ProductRepository;
 import iuh.fit.supermarket.service.ProductImageService;
@@ -73,6 +72,10 @@ public class ProductImageServiceImpl implements ProductImageService {
             // Xử lý variant nếu có
             if (request.getVariantId() != null) {
                 // TODO: Tìm variant và set vào productImage
+                // ProductVariant variant =
+                // productVariantRepository.findById(request.getVariantId())
+                // .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " +
+                // request.getVariantId()));
                 // productImage.setVariant(variant);
             }
 
@@ -109,7 +112,7 @@ public class ProductImageServiceImpl implements ProductImageService {
      * Upload nhiều hình ảnh cho sản phẩm
      */
     @Override
-    public List<ProductImageUploadResponse> uploadMultipleImages(Long productId, Integer variantId,
+    public List<ProductImageUploadResponse> uploadMultipleImages(Long productId, Long variantId,
             List<MultipartFile> files) {
         log.info("Bắt đầu upload {} ảnh cho sản phẩm ID: {}", files.size(), productId);
 
@@ -154,7 +157,7 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     @Override
     @Transactional(readOnly = true)
-    public List<ProductImageDto> getVariantImages(Integer variantId) {
+    public List<ProductImageDto> getVariantImages(Long variantId) {
         log.info("Lấy danh sách ảnh của biến thể ID: {}", variantId);
 
         List<ProductImage> images = productImageRepository.findByVariantIdOrderBySortOrder(variantId);
@@ -234,7 +237,7 @@ public class ProductImageServiceImpl implements ProductImageService {
      * Xóa tất cả hình ảnh của biến thể
      */
     @Override
-    public int deleteAllVariantImages(Integer variantId) {
+    public int deleteAllVariantImages(Long variantId) {
         log.info("Xóa tất cả ảnh của biến thể ID: {}", variantId);
 
         List<ProductImage> images = productImageRepository.findByVariantIdOrderBySortOrder(variantId);
@@ -298,7 +301,7 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     @Override
     @Transactional(readOnly = true)
-    public long countVariantImages(Integer variantId) {
+    public long countVariantImages(Long variantId) {
         return productImageRepository.countByVariantId(variantId);
     }
 

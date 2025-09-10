@@ -62,8 +62,14 @@ public class AttributeValue {
     private Attribute attribute;
 
     /**
-     * Danh sách các thuộc tính sản phẩm sử dụng giá trị này
+     * Danh sách các thuộc tính sản phẩm sử dụng giá trị này (legacy)
      */
     @OneToMany(mappedBy = "attributeValue", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ProductAttribute> productAttributes;
+
+    /**
+     * Danh sách các biến thể sử dụng giá trị thuộc tính này
+     */
+    @OneToMany(mappedBy = "attributeValue", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<VariantAttribute> variantAttributes;
 }

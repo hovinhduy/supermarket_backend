@@ -72,82 +72,10 @@ public class Product {
     private Integer variantCount = 0;
 
     /**
-     * Giá gốc
-     */
-    @Column(name = "base_price", precision = 18, scale = 2)
-    private BigDecimal basePrice;
-
-    /**
-     * Giá vốn
-     */
-    @Column(name = "cost", precision = 18, scale = 2)
-    private BigDecimal cost;
-
-    /**
-     * Giá nhập gần nhất
-     */
-    @Column(name = "latest_purchase_price", precision = 18, scale = 2)
-    private BigDecimal latestPurchasePrice;
-
-    /**
-     * Đơn vị cơ bản
-     */
-    @Column(name = "unit", length = 50)
-    private String unit;
-
-    /**
-     * Giá trị quy đổi
-     */
-    @Column(name = "conversion_value")
-    private Integer conversionValue = 1;
-
-    /**
-     * Số lượng tồn kho
-     */
-    @Column(name = "on_hand", precision = 18, scale = 2)
-    private BigDecimal onHand = BigDecimal.ZERO;
-
-    /**
-     * Số lượng đang đặt hàng
-     */
-    @Column(name = "on_order", precision = 18, scale = 2)
-    private BigDecimal onOrder = BigDecimal.ZERO;
-
-    /**
-     * Số lượng đã đặt trước
-     */
-    @Column(name = "reserved", precision = 18, scale = 2)
-    private BigDecimal reserved = BigDecimal.ZERO;
-
-    /**
-     * Số lượng tối thiểu
-     */
-    @Column(name = "min_quantity", precision = 18, scale = 2)
-    private BigDecimal minQuantity = BigDecimal.ZERO;
-
-    /**
-     * Số lượng tối đa
-     */
-    @Column(name = "max_quantity", precision = 18, scale = 2)
-    private BigDecimal maxQuantity = new BigDecimal("999999999");
-
-    /**
-     * Mã vạch
-     */
-    @Column(name = "barcode", length = 100)
-    private String barcode;
-
-    /**
      * Tên thương hiệu
      */
     @Column(name = "trade_mark_name", length = 255)
     private String tradeMarkName;
-
-    /**
-     * Cho phép bán hay không
-     */
-    @Column(name = "allows_sale")
-    private Boolean allowsSale = true;
 
     /**
      * Trạng thái hoạt động
