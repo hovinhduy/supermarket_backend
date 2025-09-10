@@ -28,10 +28,10 @@ public class ProductAttribute {
     private Long id;
 
     /**
-     * Giá trị của thuộc tính
+     * Số lượng của thuộc tính này cho sản phẩm (tùy chọn)
      */
-    @Column(name = "value", length = 255, nullable = false)
-    private String value;
+    @Column(name = "quantity")
+    private Integer quantity;
 
     /**
      * Thời gian tạo
@@ -55,9 +55,9 @@ public class ProductAttribute {
     private Product product;
 
     /**
-     * Thuộc tính được sử dụng
+     * Giá trị thuộc tính được sử dụng
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "attribute_id", nullable = false)
-    private Attribute attribute;
+    @JoinColumn(name = "attribute_value_id", nullable = false)
+    private AttributeValue attributeValue;
 }

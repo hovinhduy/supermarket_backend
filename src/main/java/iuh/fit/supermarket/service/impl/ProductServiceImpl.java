@@ -27,6 +27,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final ProductUnitRepository productUnitRepository;
     private final AttributeRepository attributeRepository;
+    private final AttributeValueRepository attributeValueRepository;
     private final ProductAttributeRepository productAttributeRepository;
 
     /**
@@ -300,16 +301,28 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * Tạo thuộc tính sản phẩm
+     * Tạo thuộc tính sản phẩm với AttributeValue
      */
     private void createProductAttribute(Product product, Long attributeId, String value) {
+        // Tìm hoặc tạo AttributeValue
+        AttributeValue attributeValue = attributeValueRepository.findByValueAndAttributeId(value, attributeId)
+                .orElseGet(() -> {
+                    // Kiểm tra thuộc tính có tồn tại
+                    Attribute attribute = attributeRepository.findById(attributeId)
+                            .orElseThrow(
+                                    () -> new RuntimeException("Không tìm thấy thuộc tính với ID: " + attributeId));
+
+                    // Tạo AttributeValue mới
+                    AttributeValue newAttributeValue = new AttributeValue();
+                    newAttributeValue.setValue(value);
+                    newAttributeValue.setAttribute(attribute);
+                    return attributeValueRepository.save(newAttributeValue);
+                });
+
+        // Tạo ProductAttribute
         ProductAttribute productAttribute = new ProductAttribute();
         productAttribute.setProduct(product);
-
-        Attribute attribute = attributeRepository.findById(attributeId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thuộc tính với ID: " + attributeId));
-        productAttribute.setAttribute(attribute);
-        productAttribute.setValue(value);
+        productAttribute.setAttributeValue(attributeValue);
 
         productAttributeRepository.save(productAttribute);
     }
@@ -368,7 +381,6 @@ public class ProductServiceImpl implements ProductService {
             response.setAttributes(attrDtos);
         }
 
-
         return response;
     }
 
@@ -393,9 +405,14 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponse.ProductAttributeDto mapToProductAttributeDto(ProductAttribute attr) {
         ProductResponse.ProductAttributeDto dto = new ProductResponse.ProductAttributeDto();
         dto.setId(attr.getId());
-        dto.setAttributeName(attr.getAttribute().getName());
-        dto.setValue(attr.getValue());
+
+        // Lấy thông tin từ AttributeValue
+        if (attr.getAttributeValue() != null) {
+            dto.setAttributeName(attr.getAttributeValue().getAttribute().getName());
+            dto.setValue(attr.getAttributeValue().getValue());
+        }
+
         return dto;
     }
-  
+
 }

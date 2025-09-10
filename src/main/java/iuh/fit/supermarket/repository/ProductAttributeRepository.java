@@ -21,9 +21,17 @@ public interface ProductAttributeRepository extends JpaRepository<ProductAttribu
     List<ProductAttribute> findByProductId(Long productId);
 
     /**
-     * Tìm thuộc tính sản phẩm theo productId và attributeId
+     * Tìm thuộc tính sản phẩm theo productId và attributeValueId
      */
-    Optional<ProductAttribute> findByProductIdAndAttributeId(Long productId, Long attributeId);
+    Optional<ProductAttribute> findByProductIdAndAttributeValueId(Long productId, Long attributeValueId);
+
+    /**
+     * Tìm thuộc tính sản phẩm theo productId và attribute.id thông qua
+     * attributeValue
+     */
+    @Query("SELECT pa FROM ProductAttribute pa WHERE pa.product.id = :productId AND pa.attributeValue.attribute.id = :attributeId")
+    List<ProductAttribute> findByProductIdAndAttributeId(@Param("productId") Long productId,
+            @Param("attributeId") Long attributeId);
 
     /**
      * Xóa tất cả thuộc tính theo productId
@@ -31,9 +39,14 @@ public interface ProductAttributeRepository extends JpaRepository<ProductAttribu
     void deleteByProductId(Long productId);
 
     /**
-     * Tìm sản phẩm theo thuộc tính và giá trị
+     * Tìm sản phẩm theo thuộc tính và giá trị thông qua AttributeValue
      */
-    @Query("SELECT pa FROM ProductAttribute pa WHERE pa.attribute.name = :attributeName AND pa.value = :value")
+    @Query("SELECT pa FROM ProductAttribute pa WHERE pa.attributeValue.attribute.name = :attributeName AND pa.attributeValue.value = :value")
     List<ProductAttribute> findByAttributeNameAndValue(@Param("attributeName") String attributeName,
             @Param("value") String value);
+
+    /**
+     * Tìm thuộc tính sản phẩm theo attributeValue ID
+     */
+    List<ProductAttribute> findByAttributeValueId(Long attributeValueId);
 }

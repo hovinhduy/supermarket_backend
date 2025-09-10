@@ -50,8 +50,8 @@ public class Attribute {
     private LocalDateTime modifiedDate;
 
     /**
-     * Danh sách thuộc tính sản phẩm sử dụng thuộc tính này
+     * Danh sách giá trị thuộc tính thuộc loại thuộc tính này
      */
     @OneToMany(mappedBy = "attribute", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ProductAttribute> productAttributes;
+    private List<AttributeValue> attributeValues;
 }
