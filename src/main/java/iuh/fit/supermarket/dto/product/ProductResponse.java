@@ -72,6 +72,11 @@ public class ProductResponse {
     private CategoryDto category;
 
     /**
+     * Thương hiệu sản phẩm
+     */
+    private BrandDto brand;
+
+    /**
      * Danh sách biến thể sản phẩm
      */
     private List<ProductVariantDto> variants;
@@ -81,6 +86,15 @@ public class ProductResponse {
      */
     @Data
     public static class CategoryDto {
+        private Long id;
+        private String name;
+    }
+
+    /**
+     * Dto Thương hiệu sản phẩm
+     */
+    @Data
+    public static class BrandDto {
         private Long id;
         private String name;
     }

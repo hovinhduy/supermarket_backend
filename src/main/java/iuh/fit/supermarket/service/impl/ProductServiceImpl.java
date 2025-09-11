@@ -530,6 +530,15 @@ public class ProductServiceImpl implements ProductService {
             response.setCategory(categoryDto);
         }
 
+        // Map brand nếu có
+        if (product.getBrand() != null) {
+            ProductResponse.BrandDto brandDto = new ProductResponse.BrandDto();
+            // Brand entity dùng Integer ID tương tự Category
+            brandDto.setId(product.getBrand().getBrandId().longValue());
+            brandDto.setName(product.getBrand().getName());
+            response.setBrand(brandDto);
+        }
+
         // Map variants (biến thể sản phẩm)
         List<ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
         if (variants != null && !variants.isEmpty()) {

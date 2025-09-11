@@ -40,6 +40,15 @@ public class CategoryServiceImpl implements CategoryService {
         if (categoryRepository.existsByName(request.getName())) {
             throw new CategoryException("Danh mục với tên '" + request.getName() + "' đã tồn tại");
         }
+        // Kiểm tra nếu là danh mục con thì không được đặt làm danh mục cha
+        if (request.getParentId() != null) {
+            Category parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new CategoryException(
+                            "Không tìm thấy danh mục cha với ID: " + request.getParentId()));
+            if (parent.getParent() != null) {
+                throw new CategoryException("Không thể đặt danh mục con làm cha");
+            }
+        }
 
         // Tạo entity Category
         Category category = new Category();
@@ -50,13 +59,14 @@ public class CategoryServiceImpl implements CategoryService {
         // Thiết lập danh mục cha và level nếu có
         if (request.getParentId() != null) {
             Category parent = categoryRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new CategoryException("Không tìm thấy danh mục cha với ID: " + request.getParentId()));
+                    .orElseThrow(() -> new CategoryException(
+                            "Không tìm thấy danh mục cha với ID: " + request.getParentId()));
             category.setParent(parent);
             // Tính toán level dựa trên danh mục cha
-            category.setLevel(parent.getLevel() + 1);
+            // category.setLevel(parent.getLevel() + 1);
         } else {
             // Danh mục gốc có level = 0
-            category.setLevel(0);
+            // category.setLevel(0);
         }
 
         // Lưu danh mục
@@ -97,6 +107,15 @@ public class CategoryServiceImpl implements CategoryService {
             }
             category.setName(request.getName());
         }
+        // Kiểm tra nếu là danh mục con thì không được đặt làm danh mục cha
+        if (request.getParentId() != null) {
+            Category parent = categoryRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new CategoryException(
+                            "Không tìm thấy danh mục cha với ID: " + request.getParentId()));
+            if (parent.getParent() != null) {
+                throw new CategoryException("Không thể đặt danh mục con làm cha");
+            }
+        }
 
         // Cập nhật các trường khác
         if (request.getDescription() != null) {
@@ -113,21 +132,22 @@ public class CategoryServiceImpl implements CategoryService {
             if (request.getParentId().equals(id)) {
                 throw new CategoryException("Không thể đặt danh mục làm cha của chính nó");
             }
-            
+
             // Kiểm tra không cho phép đặt con của nó làm cha (tránh vòng lặp)
             checkCyclicReference(id, request.getParentId());
-            
+
             Category parent = categoryRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new CategoryException("Không tìm thấy danh mục cha với ID: " + request.getParentId()));
+                    .orElseThrow(() -> new CategoryException(
+                            "Không tìm thấy danh mục cha với ID: " + request.getParentId()));
             category.setParent(parent);
             // Cập nhật level dựa trên danh mục cha mới
-            category.setLevel(parent.getLevel() + 1);
-            // Cập nhật level cho tất cả danh mục con
+            // category.setLevel(parent.getLevel() + 1);
+            // Cập nhật level cho tất cả danh mục con_
             updateChildrenLevels(category);
         } else if (request.getParentId() == null && category.getParent() != null) {
             // Nếu parentId = null và hiện tại có parent, thì gỡ bỏ parent và đặt level = 0
             category.setParent(null);
-            category.setLevel(0);
+            // category.setLevel(0);
             // Cập nhật level cho tất cả danh mục con
             updateChildrenLevels(category);
         }
@@ -242,7 +262,7 @@ public class CategoryServiceImpl implements CategoryService {
         dto.setName(category.getName());
         dto.setDescription(category.getDescription());
         dto.setIsActive(category.getIsActive());
-        dto.setLevel(category.getLevel());
+        // dto.setLevel(category.getLevel());
         dto.setCreatedAt(category.getCreatedAt());
         dto.setUpdatedAt(category.getUpdatedAt());
 
@@ -280,7 +300,7 @@ public class CategoryServiceImpl implements CategoryService {
     private void updateChildrenLevels(Category parentCategory) {
         List<Category> children = categoryRepository.findByParent_CategoryId(parentCategory.getCategoryId());
         for (Category child : children) {
-            child.setLevel(parentCategory.getLevel() + 1);
+            // child.setLevel(parentCategory.getLevel() + 1);
             categoryRepository.save(child);
             // Đệ quy cập nhật cho danh mục con của con
             updateChildrenLevels(child);
