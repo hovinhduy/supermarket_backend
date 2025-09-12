@@ -94,4 +94,8 @@ product:
     allowed-types: image/jpeg,image/png,image/gif,image/webp
     max-count: 5
 #Cấu hình aws
-
+aws:
+  accessKeyId: ${ACCESS_KEY_ID}
+  secretAccessKey: ${SECRET_ACCESS_KEY}
+  region: ap-southeast-1
+  bucketName: ${BUCKET_NAME}
