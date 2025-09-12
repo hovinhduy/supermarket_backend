@@ -1,6 +1,5 @@
 package iuh.fit.supermarket.entity;
 
-import iuh.fit.supermarket.enums.WeightUnit;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,7 +7,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -61,6 +59,13 @@ public class ProductUnit {
      */
     @Column(name = "sort_order")
     private Integer sortOrder = 0;
+
+    /**
+     * Đánh dấu đơn vị cơ bản của sản phẩm
+     * Chỉ có một đơn vị cơ bản cho mỗi sản phẩm
+     */
+    @Column(name = "is_base_unit")
+    private Boolean isBaseUnit = false;
 
     /**
      * Trạng thái hoạt động

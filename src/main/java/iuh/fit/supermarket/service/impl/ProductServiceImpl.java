@@ -72,7 +72,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         // Tạo đơn vị cơ bản và variant mặc định
-        ProductUnit baseUnit = createProductUnit(product, request.getBaseUnit().getUnit(), 1);
+        ProductUnit baseUnit = createProductUnit(product, request.getBaseUnit().getUnit(), 1, true);
 
         // Tạo variant cơ bản với đơn vị này
         createDefaultProductVariant(product, baseUnit, request.getBaseUnit(), request.getInventory(),
@@ -468,10 +468,18 @@ public class ProductServiceImpl implements ProductService {
      * Tạo đơn vị sản phẩm (không chứa giá)
      */
     private ProductUnit createProductUnit(Product product, String unit, Integer conversionValue) {
+        return createProductUnit(product, unit, conversionValue, false);
+    }
+
+    /**
+     * Tạo đơn vị sản phẩm với khả năng đánh dấu là đơn vị cơ bản
+     */
+    private ProductUnit createProductUnit(Product product, String unit, Integer conversionValue, Boolean isBaseUnit) {
         ProductUnit productUnit = new ProductUnit();
         productUnit.setProduct(product);
         productUnit.setUnit(unit);
         productUnit.setConversionValue(conversionValue);
+        productUnit.setIsBaseUnit(isBaseUnit != null ? isBaseUnit : false);
         productUnit.setIsActive(true);
         productUnit.setSortOrder(0);
 
@@ -618,8 +626,23 @@ public class ProductServiceImpl implements ProductService {
         for (int i = 0; i < variantDto.getUnits().size(); i++) {
             ProductCreateWithVariantsRequest.VariantUnitDto unitDto = variantDto.getUnits().get(i);
 
+            // Đảm bảo chỉ có một base unit cho mỗi sản phẩm
+            boolean baseUnitExists = productUnitRepository.findByProductIdAndIsBaseUnit(product.getId(), true)
+                    .isPresent();
+
+            // Ưu tiên cờ isBaseUnit từ request; nếu null thì chỉ gán base unit cho đơn vị
+            // đầu tiên nếu chưa tồn tại
+            Boolean isBaseUnit = unitDto.getIsBaseUnit() != null ? unitDto.getIsBaseUnit()
+                    : (!baseUnitExists && i == 0);
+
+            // Nếu đã có base unit, không gán thêm base unit cho các đơn vị khác
+            if (baseUnitExists && Boolean.TRUE.equals(isBaseUnit)) {
+                isBaseUnit = false;
+            }
+
             // Tìm hoặc tạo ProductUnit cho đơn vị này
-            ProductUnit productUnit = findOrCreateProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue());
+            ProductUnit productUnit = findOrCreateProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue(),
+                    isBaseUnit);
 
             // Tạo variant code tự động tăng dần (SP000001, SP000002...)
             String variantCode = generateGlobalVariantCode();
@@ -655,6 +678,14 @@ public class ProductServiceImpl implements ProductService {
      * Tìm hoặc tạo ProductUnit
      */
     private ProductUnit findOrCreateProductUnit(Product product, String unitName, Integer conversionValue) {
+        return findOrCreateProductUnit(product, unitName, conversionValue, false);
+    }
+
+    /**
+     * Tìm hoặc tạo ProductUnit với khả năng đánh dấu là đơn vị cơ bản
+     */
+    private ProductUnit findOrCreateProductUnit(Product product, String unitName, Integer conversionValue,
+            Boolean isBaseUnit) {
         // Kiểm tra xem ProductUnit đã tồn tại chưa
         Optional<ProductUnit> existingUnit = productUnitRepository.findByProductIdAndUnit(product.getId(), unitName);
 
@@ -668,13 +699,15 @@ public class ProductServiceImpl implements ProductService {
         productUnit.setProduct(product);
         productUnit.setUnit(unitName);
         productUnit.setConversionValue(conversionValue != null ? conversionValue : 1);
+        productUnit.setIsBaseUnit(isBaseUnit != null ? isBaseUnit : false);
         productUnit.setIsActive(true);
 
         // Tạo code cho unit
         productUnit.setCode(product.getCode() + "-" + unitName);
 
         ProductUnit savedUnit = productUnitRepository.save(productUnit);
-        log.info("Đã tạo ProductUnit mới: {} cho sản phẩm: {}", unitName, product.getCode());
+        log.info("Đã tạo ProductUnit mới: {} cho sản phẩm: {} (isBaseUnit: {})",
+                unitName, product.getCode(), isBaseUnit);
 
         return savedUnit;
     }
@@ -851,6 +884,7 @@ public class ProductServiceImpl implements ProductService {
             unitDto.setCode(variant.getUnit().getCode());
             unitDto.setUnit(variant.getUnit().getUnit());
             unitDto.setConversionValue(variant.getUnit().getConversionValue());
+            unitDto.setIsBaseUnit(variant.getUnit().getIsBaseUnit());
             dto.setUnit(unitDto);
         }
 

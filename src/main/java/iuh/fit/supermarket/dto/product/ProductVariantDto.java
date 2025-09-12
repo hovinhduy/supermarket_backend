@@ -111,5 +111,6 @@ public class ProductVariantDto {
         private String code;
         private String unit;
         private Integer conversionValue;
+        private Boolean isBaseUnit;
     }
 }

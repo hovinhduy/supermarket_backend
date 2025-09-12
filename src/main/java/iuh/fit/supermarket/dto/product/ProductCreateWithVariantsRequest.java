@@ -117,5 +117,10 @@ public class ProductCreateWithVariantsRequest {
          * Mã barcode
          */
         private String barcode;
+
+        /**
+         * Đánh dấu đơn vị này là đơn vị cơ bản của sản phẩm
+         */
+        private Boolean isBaseUnit;
     }
 }
