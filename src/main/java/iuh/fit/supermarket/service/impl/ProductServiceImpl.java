@@ -5,6 +5,8 @@ import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.ProductService;
 import iuh.fit.supermarket.service.VariantAttributeService;
+import iuh.fit.supermarket.service.InventoryService;
+import iuh.fit.supermarket.service.BaseUnitInventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +40,8 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final VariantAttributeService variantAttributeService;
+    private final InventoryService inventoryService;
+    private final BaseUnitInventoryService baseUnitInventoryService;
 
     /**
      * Tạo sản phẩm mới
@@ -306,19 +310,19 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * Lấy danh sách sản phẩm có tồn kho thấp (thông qua biến thể)
+     * Lấy danh sách sản phẩm có tồn kho thấp (thông qua InventoryService)
      */
     @Override
     @Transactional(readOnly = true)
     public List<ProductResponse> getLowStockProducts() {
         log.info("Lấy danh sách sản phẩm tồn kho thấp");
 
-        // Lấy danh sách biến thể có tồn kho thấp
-        List<ProductVariant> lowStockVariants = productVariantRepository.findLowStockVariants();
+        // Lấy danh sách tồn kho thấp từ InventoryService
+        List<Inventory> lowStockInventories = inventoryService.getLowStockInventories();
 
         // Chuyển đổi sang ProductResponse và loại bỏ trùng lặp theo productId
-        return lowStockVariants.stream()
-                .map(variant -> variant.getProduct()) // Lấy Product từ ProductVariant
+        return lowStockInventories.stream()
+                .map(inventory -> inventory.getVariant().getProduct()) // Lấy Product từ Inventory -> ProductVariant
                 .distinct() // Loại bỏ sản phẩm trùng lặp
                 .map(this::mapToProductResponse)
                 .collect(Collectors.toList());
@@ -431,24 +435,8 @@ public class ProductServiceImpl implements ProductService {
             variant.setBarcode(baseUnitDto.getBarcode());
         }
 
-        // Thiết lập số lượng tồn kho từ inventory info nếu có
-        if (inventoryDto != null) {
-            if (inventoryDto.getOnHand() != null) {
-                variant.setQuantityOnHand(inventoryDto.getOnHand());
-            } else {
-                variant.setQuantityOnHand(BigDecimal.ZERO);
-            }
-
-            if (inventoryDto.getMinQuantity() != null) {
-                variant.setMinQuantity(inventoryDto.getMinQuantity());
-            } else {
-                variant.setMinQuantity(BigDecimal.ZERO);
-            }
-        } else {
-            variant.setQuantityOnHand(BigDecimal.ZERO);
-            variant.setMinQuantity(BigDecimal.ZERO);
-        }
-        variant.setQuantityReserved(BigDecimal.ZERO);
+        // Số lượng tồn kho sẽ được quản lý thông qua InventoryService
+        // Không cần thiết lập trực tiếp trong ProductVariant nữa
 
         // Thiết lập trạng thái cho phép bán từ request hoặc mặc định
         if (allowsSale != null) {
@@ -626,18 +614,28 @@ public class ProductServiceImpl implements ProductService {
         for (int i = 0; i < variantDto.getUnits().size(); i++) {
             ProductCreateWithVariantsRequest.VariantUnitDto unitDto = variantDto.getUnits().get(i);
 
-            // Đảm bảo chỉ có một base unit cho mỗi sản phẩm
-            boolean baseUnitExists = productUnitRepository.findByProductIdAndIsBaseUnit(product.getId(), true)
-                    .isPresent();
+            // Kiểm tra xem đã có base unit cho loại đơn vị này chưa
+            Optional<ProductUnit> existingBaseUnit = productUnitRepository
+                    .findByProductIdAndUnitAndIsBaseUnit(product.getId(), unitDto.getUnit(), true);
 
             // Ưu tiên cờ isBaseUnit từ request; nếu null thì chỉ gán base unit cho đơn vị
-            // đầu tiên nếu chưa tồn tại
-            Boolean isBaseUnit = unitDto.getIsBaseUnit() != null ? unitDto.getIsBaseUnit()
-                    : (!baseUnitExists && i == 0);
+            // đầu tiên nếu chưa tồn tại base unit nào cho sản phẩm
+            Boolean isBaseUnit;
+            if (unitDto.getIsBaseUnit() != null) {
+                isBaseUnit = unitDto.getIsBaseUnit();
+            } else {
+                // Nếu không chỉ định, chỉ gán base unit cho đơn vị đầu tiên của variant đầu
+                // tiên
+                boolean anyBaseUnitExists = productUnitRepository.findByProductIdAndIsBaseUnit(product.getId(), true)
+                        .isPresent();
+                isBaseUnit = !anyBaseUnitExists && i == 0;
+            }
 
-            // Nếu đã có base unit, không gán thêm base unit cho các đơn vị khác
-            if (baseUnitExists && Boolean.TRUE.equals(isBaseUnit)) {
-                isBaseUnit = false;
+            // Nếu đã có base unit cho loại đơn vị này, sử dụng lại
+            if (existingBaseUnit.isPresent() && Boolean.TRUE.equals(isBaseUnit)) {
+                log.info("Sử dụng lại base unit đã tồn tại: {} cho sản phẩm: {}",
+                        unitDto.getUnit(), product.getCode());
+                // Không cần tạo mới, sẽ sử dụng lại trong findOrCreateProductUnit
             }
 
             // Tìm hoặc tạo ProductUnit cho đơn vị này
@@ -655,7 +653,6 @@ public class ProductServiceImpl implements ProductService {
             productVariant.setUnit(productUnit);
             productVariant.setBasePrice(unitDto.getBasePrice());
             productVariant.setCostPrice(unitDto.getCost() != null ? unitDto.getCost() : BigDecimal.ZERO);
-            productVariant.setQuantityOnHand(unitDto.getOnHand() != null ? unitDto.getOnHand() : BigDecimal.ZERO);
             productVariant.setBarcode(unitDto.getBarcode());
             productVariant.setIsActive(true);
             productVariant.setIsDeleted(false);
@@ -664,6 +661,18 @@ public class ProductServiceImpl implements ProductService {
             // Lưu ProductVariant
             productVariant = productVariantRepository.save(productVariant);
             log.info("Đã tạo ProductVariant với code: {} cho đơn vị: {}", variantCode, unitDto.getUnit());
+
+            // Chỉ tạo tồn kho ban đầu cho biến thể có đơn vị cơ bản
+            if (Boolean.TRUE.equals(productUnit.getIsBaseUnit())) {
+                Integer initialQuantity = unitDto.getOnHand() != null ? unitDto.getOnHand().intValue() : 0;
+                BigDecimal costPrice = unitDto.getCost() != null ? unitDto.getCost() : BigDecimal.ZERO;
+                inventoryService.createInventoryForVariant(productVariant, initialQuantity, costPrice,
+                        "Tồn kho ban đầu khi tạo biến thể sản phẩm");
+                log.info("Đã tạo tồn kho ban đầu {} cho biến thể {} (đơn vị cơ bản)", initialQuantity, variantCode);
+            } else {
+                log.info("Bỏ qua tạo tồn kho cho biến thể {} vì không phải đơn vị cơ bản ({})",
+                        variantCode, unitDto.getUnit());
+            }
 
             // Tạo thuộc tính cho tất cả các biến thể (vì mỗi unit là 1 variant riêng)
             if (variantDto.getAttributes() != null && !variantDto.getAttributes().isEmpty()) {
@@ -867,13 +876,22 @@ public class ProductServiceImpl implements ProductService {
         dto.setBarcode(variant.getBarcode());
         dto.setCostPrice(variant.getCostPrice());
         dto.setBasePrice(variant.getBasePrice());
-        dto.setQuantityOnHand(variant.getQuantityOnHand());
-        dto.setQuantityReserved(variant.getQuantityReserved());
-        dto.setAvailableQuantity(variant.getAvailableQuantity());
-        dto.setMinQuantity(variant.getMinQuantity());
+
+        // Lấy thông tin tồn kho từ BaseUnitInventoryService (tính toán đúng cho các
+        // unit khác)
+        Integer totalQuantity = baseUnitInventoryService.getTotalQuantityOnHandForVariant(variant.getVariantId());
+        Integer availableQuantity = baseUnitInventoryService
+                .getTotalAvailableQuantityForVariant(variant.getVariantId());
+        Boolean needsReorder = baseUnitInventoryService.needsReorderForVariant(variant.getVariantId());
+
+        dto.setQuantityOnHand(BigDecimal.valueOf(totalQuantity != null ? totalQuantity : 0));
+        dto.setQuantityReserved(BigDecimal
+                .valueOf(totalQuantity != null && availableQuantity != null ? totalQuantity - availableQuantity : 0));
+        dto.setAvailableQuantity(BigDecimal.valueOf(availableQuantity != null ? availableQuantity : 0));
+        dto.setMinQuantity(BigDecimal.ZERO); // Sẽ được lấy từ Inventory sau
         dto.setAllowsSale(variant.getAllowsSale());
         dto.setIsActive(variant.getIsActive());
-        dto.setNeedsReorder(variant.needsReorder());
+        dto.setNeedsReorder(needsReorder != null ? needsReorder : false);
         dto.setCreatedAt(variant.getCreatedAt());
         dto.setUpdatedAt(variant.getUpdatedAt());
 
@@ -936,17 +954,9 @@ public class ProductServiceImpl implements ProductService {
             variant.setBasePrice(request.getBasePrice());
         }
 
-        if (request.getQuantityOnHand() != null) {
-            variant.setQuantityOnHand(request.getQuantityOnHand());
-        }
-
-        if (request.getQuantityReserved() != null) {
-            variant.setQuantityReserved(request.getQuantityReserved());
-        }
-
-        if (request.getMinQuantity() != null) {
-            variant.setMinQuantity(request.getMinQuantity());
-        }
+        // Cập nhật số lượng tồn kho thông qua InventoryService
+        // Không cập nhật trực tiếp trong ProductVariant nữa
+        // TODO: Implement inventory update logic through InventoryService if needed
 
         if (request.getAllowsSale() != null) {
             variant.setAllowsSale(request.getAllowsSale());
@@ -994,6 +1004,26 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
 
         return mapToProductVariantDto(variant);
+    }
+
+    /**
+     * Lấy danh sách biến thể theo ID sản phẩm
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductVariantDto> getProductVariantsByProductId(Long productId) {
+        log.info("Lấy danh sách biến thể cho sản phẩm ID: {}", productId);
+
+        // Kiểm tra sản phẩm tồn tại
+        productRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + productId));
+
+        // Lấy danh sách biến thể
+        List<ProductVariant> variants = productVariantRepository.findByProductId(productId);
+
+        return variants.stream()
+                .map(this::mapToProductVariantDto)
+                .collect(Collectors.toList());
     }
 
     /**

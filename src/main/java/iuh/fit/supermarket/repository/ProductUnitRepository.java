@@ -55,4 +55,9 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
      * Tìm đơn vị theo productId và cờ isBaseUnit
      */
     Optional<ProductUnit> findByProductIdAndIsBaseUnit(Long productId, Boolean isBaseUnit);
+
+    /**
+     * Tìm đơn vị theo productId, tên đơn vị và cờ isBaseUnit
+     */
+    Optional<ProductUnit> findByProductIdAndUnitAndIsBaseUnit(Long productId, String unit, Boolean isBaseUnit);
 }

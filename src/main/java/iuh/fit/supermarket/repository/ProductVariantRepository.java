@@ -20,12 +20,31 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     /**
      * Tìm tất cả biến thể của một sản phẩm
-     * 
+     *
      * @param productId ID của sản phẩm
      * @return danh sách biến thể của sản phẩm
      */
     @Query("SELECT pv FROM ProductVariant pv WHERE pv.product.id = :productId AND pv.isDeleted = false")
     List<ProductVariant> findByProductId(@Param("productId") Long productId);
+
+    /**
+     * Tìm tất cả biến thể của một sản phẩm (không bao gồm đã xóa)
+     *
+     * @param productId ID của sản phẩm
+     * @return danh sách biến thể của sản phẩm
+     */
+    List<ProductVariant> findByProductIdAndIsDeletedFalse(Long productId);
+
+    /**
+     * Tìm biến thể có đơn vị cơ bản của một sản phẩm
+     * Lấy biến thể đầu tiên nếu có nhiều biến thể base unit (để tránh lỗi
+     * NonUniqueResultException)
+     *
+     * @param productId ID của sản phẩm
+     * @return biến thể có đơn vị cơ bản
+     */
+    @Query("SELECT pv FROM ProductVariant pv WHERE pv.product.id = :productId AND pv.unit.isBaseUnit = true AND pv.isDeleted = false ORDER BY pv.variantId ASC")
+    List<ProductVariant> findByProductIdAndUnitIsBaseUnitTrueAndIsDeletedFalse(@Param("productId") Long productId);
 
     /**
      * Tìm tất cả biến thể của một sản phẩm (bao gồm cả đã xóa)
@@ -81,11 +100,16 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> findSaleableByProductId(@Param("productId") Long productId);
 
     /**
-     * Tìm biến thể có tồn kho thấp (dưới mức tối thiểu)
-     * 
-     * @return danh sách biến thể cần bổ sung
+     * Tìm biến thể có tồn kho thấp (deprecated - sử dụng
+     * InventoryService.getLowStockInventories())
+     * Phương thức này đã được deprecated vì thông tin tồn kho được quản lý trong
+     * Inventory entity
+     *
+     * @return danh sách rỗng (deprecated)
+     * @deprecated Sử dụng InventoryService.getLowStockInventories() thay thế
      */
-    @Query("SELECT pv FROM ProductVariant pv WHERE pv.quantityOnHand <= pv.minQuantity AND pv.isActive = true AND pv.isDeleted = false")
+    @Deprecated
+    @Query("SELECT pv FROM ProductVariant pv WHERE pv.isActive = true AND pv.isDeleted = false AND 1=0")
     List<ProductVariant> findLowStockVariants();
 
     /**
@@ -130,22 +154,32 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     boolean existsByBarcode(String barcode);
 
     /**
-     * Cập nhật số lượng tồn kho của biến thể
-     * 
+     * Cập nhật số lượng tồn kho của biến thể (deprecated - sử dụng
+     * InventoryService)
+     *
      * @param variantId   ID của biến thể
      * @param newQuantity số lượng mới
+     * @deprecated Sử dụng InventoryService.updateInventory() thay thế
      */
-    @Query("UPDATE ProductVariant pv SET pv.quantityOnHand = :newQuantity WHERE pv.variantId = :variantId")
-    void updateQuantityOnHand(@Param("variantId") Long variantId, @Param("newQuantity") BigDecimal newQuantity);
+    @Deprecated
+    default void updateQuantityOnHand(@Param("variantId") Long variantId,
+            @Param("newQuantity") BigDecimal newQuantity) {
+        // Deprecated - không thực hiện gì
+    }
 
     /**
-     * Cập nhật số lượng đặt trước của biến thể
-     * 
+     * Cập nhật số lượng đặt trước của biến thể (deprecated - sử dụng
+     * InventoryService)
+     *
      * @param variantId   ID của biến thể
      * @param newReserved số lượng đặt trước mới
+     * @deprecated Sử dụng InventoryService.updateInventory() thay thế
      */
-    @Query("UPDATE ProductVariant pv SET pv.quantityReserved = :newReserved WHERE pv.variantId = :variantId")
-    void updateQuantityReserved(@Param("variantId") Long variantId, @Param("newReserved") BigDecimal newReserved);
+    @Deprecated
+    default void updateQuantityReserved(@Param("variantId") Long variantId,
+            @Param("newReserved") BigDecimal newReserved) {
+        // Deprecated - không thực hiện gì
+    }
 
     /**
      * Tìm biến thể theo giá bán trong khoảng

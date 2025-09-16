@@ -41,22 +41,29 @@ public class ProductVariantUpdateRequest {
     @Schema(description = "Giá bán cơ bản của biến thể", example = "200000")
     private BigDecimal basePrice;
 
+    // Các trường số lượng tồn kho đã được chuyển sang quản lý thông qua
+    // InventoryService
+    // Để cập nhật tồn kho, sử dụng các API riêng biệt cho quản lý kho
+
     /**
-     * Số lượng tồn kho
+     * Số lượng tồn kho (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
-    @Schema(description = "Số lượng tồn kho hiện tại", example = "100")
+    @Deprecated
+    @Schema(description = "Số lượng tồn kho hiện tại (deprecated - sử dụng InventoryService)", example = "100")
     private BigDecimal quantityOnHand;
 
     /**
-     * Số lượng đã đặt trước
+     * Số lượng đã đặt trước (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
-    @Schema(description = "Số lượng đã được đặt trước", example = "10")
+    @Deprecated
+    @Schema(description = "Số lượng đã được đặt trước (deprecated - sử dụng InventoryService)", example = "10")
     private BigDecimal quantityReserved;
 
     /**
-     * Số lượng tối thiểu cảnh báo
+     * Số lượng tối thiểu cảnh báo (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
-    @Schema(description = "Số lượng tối thiểu để cảnh báo hết hàng", example = "20")
+    @Deprecated
+    @Schema(description = "Số lượng tối thiểu để cảnh báo hết hàng (deprecated - sử dụng InventoryService)", example = "20")
     private BigDecimal minQuantity;
 
     /**

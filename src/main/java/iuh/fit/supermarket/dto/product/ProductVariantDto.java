@@ -43,17 +43,19 @@ public class ProductVariantDto {
     private BigDecimal basePrice;
 
     /**
-     * Số lượng tồn kho
+     * Số lượng tồn kho (tính toán dựa trên đơn vị cơ bản)
+     * Nếu là đơn vị cơ bản: lấy trực tiếp từ Inventory
+     * Nếu không phải đơn vị cơ bản: tính = baseQuantity / conversionValue
      */
     private BigDecimal quantityOnHand;
 
     /**
-     * Số lượng đã đặt trước
+     * Số lượng đã đặt trước (tính toán dựa trên đơn vị cơ bản)
      */
     private BigDecimal quantityReserved;
 
     /**
-     * Số lượng có thể bán
+     * Số lượng có thể bán (tính toán dựa trên đơn vị cơ bản)
      */
     private BigDecimal availableQuantity;
 

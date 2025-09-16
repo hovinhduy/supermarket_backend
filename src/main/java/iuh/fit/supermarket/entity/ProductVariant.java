@@ -63,23 +63,8 @@ public class ProductVariant {
     @Column(name = "base_price", precision = 18, scale = 2, nullable = false)
     private BigDecimal basePrice;
 
-    /**
-     * Số lượng tồn kho hiện tại của biến thể này
-     */
-    @Column(name = "quantity_on_hand", precision = 18, scale = 2)
-    private BigDecimal quantityOnHand = BigDecimal.ZERO;
-
-    /**
-     * Số lượng đã được đặt trước
-     */
-    @Column(name = "quantity_reserved", precision = 18, scale = 2)
-    private BigDecimal quantityReserved = BigDecimal.ZERO;
-
-    /**
-     * Số lượng tối thiểu cảnh báo hết hàng
-     */
-    @Column(name = "min_quantity", precision = 18, scale = 2)
-    private BigDecimal minQuantity = BigDecimal.ZERO;
+    // Đã chuyển quản lý số lượng tồn kho sang Inventory entity
+    // Các trường quantity_on_hand, quantity_reserved, min_quantity đã được loại bỏ
 
     /**
      * Cho phép bán hay không
@@ -175,21 +160,7 @@ public class ProductVariant {
     @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)
     private List<OrderDetail> orderDetails;
 
-    /**
-     * Tính số lượng có thể bán
-     * 
-     * @return số lượng có thể bán (tồn kho - đã đặt trước)
-     */
-    public BigDecimal getAvailableQuantity() {
-        return quantityOnHand.subtract(quantityReserved);
-    }
-
-    /**
-     * Kiểm tra có cần đặt hàng lại không
-     * 
-     * @return true nếu cần đặt hàng lại
-     */
-    public Boolean needsReorder() {
-        return quantityOnHand.compareTo(minQuantity) <= 0;
-    }
+    // Các phương thức getAvailableQuantity() và needsReorder() đã được chuyển sang
+    // InventoryService
+    // để tính toán dựa trên dữ liệu từ Inventory entity
 }

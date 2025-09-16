@@ -124,11 +124,19 @@ public interface ProductService {
 
     /**
      * Lấy thông tin biến thể theo ID
-     * 
+     *
      * @param variantId ID biến thể
      * @return thông tin biến thể
      */
     ProductVariantDto getProductVariantById(Long variantId);
+
+    /**
+     * Lấy danh sách biến thể theo ID sản phẩm
+     *
+     * @param productId ID sản phẩm
+     * @return danh sách biến thể của sản phẩm
+     */
+    List<ProductVariantDto> getProductVariantsByProductId(Long productId);
 
     /**
      * Xóa nhiều biến thể cùng lúc (soft delete)
