@@ -13,7 +13,7 @@ public interface ProductService {
 
     /**
      * Tạo sản phẩm mới
-     * 
+     *
      * @param request thông tin sản phẩm cần tạo
      * @return thông tin sản phẩm đã tạo
      */
@@ -91,12 +91,6 @@ public interface ProductService {
      */
     ProductResponse createProductVariant(Long productId, ProductVariantCreateRequest request);
 
-    /**
-     * Lấy danh sách sản phẩm có tồn kho thấp
-     * 
-     * @return danh sách sản phẩm
-     */
-    List<ProductResponse> getLowStockProducts();
 
     /**
      * Tạo sản phẩm mới với nhiều biến thể cùng lúc
@@ -106,12 +100,7 @@ public interface ProductService {
      */
     ProductResponse createProductWithVariants(ProductCreateWithVariantsRequest request);
 
-    /**
-     * Tạo mã sản phẩm tự động
-     * 
-     * @return mã sản phẩm mới
-     */
-    String generateProductCode();
+
 
     /**
      * Cập nhật thông tin biến thể sản phẩm

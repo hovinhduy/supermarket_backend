@@ -182,13 +182,16 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     }
 
     /**
-     * Tìm biến thể theo giá bán trong khoảng
-     * 
+     * Tìm biến thể theo giá bán trong khoảng (deprecated - giá đã được chuyển sang
+     * hệ thống giá riêng)
+     *
      * @param minPrice giá tối thiểu
      * @param maxPrice giá tối đa
-     * @return danh sách biến thể trong khoảng giá
+     * @return danh sách rỗng (deprecated)
+     * @deprecated Sử dụng PriceService để tìm kiếm theo giá
      */
-    @Query("SELECT pv FROM ProductVariant pv WHERE pv.basePrice BETWEEN :minPrice AND :maxPrice AND pv.isDeleted = false")
+    @Deprecated
+    @Query("SELECT pv FROM ProductVariant pv WHERE pv.isDeleted = false AND 1=0")
     List<ProductVariant> findByPriceRange(@Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice);
 }

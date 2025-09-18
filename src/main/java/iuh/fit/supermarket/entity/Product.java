@@ -30,22 +30,11 @@ public class Product {
     private Long id;
 
     /**
-     * Mã sản phẩm (duy nhất)
-     */
-    @Column(name = "code", length = 50, nullable = false, unique = true)
-    private String code;
-
-    /**
      * Tên sản phẩm
      */
     @Column(name = "name", length = 255, nullable = false)
     private String name;
 
-    /**
-     * Tên đầy đủ của sản phẩm
-     */
-    @Column(name = "full_name", length = 500)
-    private String fullName;
 
     /**
      * Mô tả sản phẩm
@@ -53,17 +42,6 @@ public class Product {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    /**
-     * Loại sản phẩm: 1-Đơn giản, 2-Có biến thể
-     */
-    @Column(name = "product_type", nullable = false)
-    private Integer productType = 1;
-
-    /**
-     * Có biến thể hay không
-     */
-    @Column(name = "has_variants")
-    private Boolean hasVariants = false;
 
     /**
      * Số lượng biến thể
@@ -71,11 +49,7 @@ public class Product {
     @Column(name = "variant_count")
     private Integer variantCount = 0;
 
-    /**
-     * Tên thương hiệu
-     */
-    @Column(name = "trade_mark_name", length = 255)
-    private String tradeMarkName;
+
 
     /**
      * Trạng thái hoạt động
@@ -89,11 +63,7 @@ public class Product {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
-    /**
-     * Kiểm soát lô/serial
-     */
-    @Column(name = "is_lot_serial_control")
-    private Boolean isLotSerialControl = false;
+
 
     /**
      * Có tích điểm thưởng không
@@ -101,11 +71,6 @@ public class Product {
     @Column(name = "is_reward_point")
     private Boolean isRewardPoint = false;
 
-    /**
-     * Kiểm soát hạn sử dụng theo lô
-     */
-    @Column(name = "is_batch_expire_control")
-    private Boolean isBatchExpireControl = false;
 
     /**
      * Thời gian tạo

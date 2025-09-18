@@ -7,13 +7,12 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Entity đại diện cho biến thể sản phẩm (SKU) trong hệ thống
- * Đây là trung tâm của hệ thống với đầy đủ thông tin để bán hàng và quản lý kho
+ * Chỉ chứa thông tin cơ bản của biến thể.
  */
 @Entity
 @Table(name = "product_variants", uniqueConstraints = {
@@ -50,21 +49,6 @@ public class ProductVariant {
      */
     @Column(name = "barcode", length = 100)
     private String barcode;
-
-    /**
-     * Giá vốn của biến thể này
-     */
-    @Column(name = "cost_price", precision = 18, scale = 2)
-    private BigDecimal costPrice;
-
-    /**
-     * Giá bán chính thức của biến thể này
-     */
-    @Column(name = "base_price", precision = 18, scale = 2, nullable = false)
-    private BigDecimal basePrice;
-
-    // Đã chuyển quản lý số lượng tồn kho sang Inventory entity
-    // Các trường quantity_on_hand, quantity_reserved, min_quantity đã được loại bỏ
 
     /**
      * Cho phép bán hay không
@@ -159,8 +143,4 @@ public class ProductVariant {
      */
     @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)
     private List<OrderDetail> orderDetails;
-
-    // Các phương thức getAvailableQuantity() và needsReorder() đã được chuyển sang
-    // InventoryService
-    // để tính toán dựa trên dữ liệu từ Inventory entity
 }

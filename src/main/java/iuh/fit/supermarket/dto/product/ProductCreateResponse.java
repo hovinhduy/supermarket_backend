@@ -16,11 +16,6 @@ public class ProductCreateResponse {
     private Long id;
 
     /**
-     * Mã sản phẩm đã tạo
-     */
-    private String code;
-
-    /**
      * Tên sản phẩm đã tạo
      */
     private String name;

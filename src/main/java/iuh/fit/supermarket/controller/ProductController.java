@@ -4,7 +4,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.product.*;
-import iuh.fit.supermarket.service.BaseUnitInventoryService;
 import iuh.fit.supermarket.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Controller xử lý các API liên quan đến quản lý sản phẩm
@@ -28,7 +26,6 @@ import java.util.Map;
 public class ProductController {
 
     private final ProductService productService;
-    private final BaseUnitInventoryService baseUnitInventoryService;
 
     /**
      * Lấy thông tin sản phẩm theo ID
@@ -271,35 +268,10 @@ public class ProductController {
     }
 
     /**
-     * Lấy sản phẩm tồn kho thấp
-     */
-    @GetMapping("/low-stock")
-    @Operation(summary = "Lấy sản phẩm tồn kho thấp", description = "Lấy danh sách sản phẩm có tồn kho thấp")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts() {
-
-        log.info("API lấy sản phẩm tồn kho thấp");
-
-        try {
-            List<ProductResponse> products = productService.getLowStockProducts();
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.success(products);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Lỗi khi lấy sản phẩm tồn kho thấp: ", e);
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    /**
      * Tạo sản phẩm mới
      */
     @PostMapping
-    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo sản phẩm mới với thông tin đầy đủ và biến thể")
+    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo sản phẩm mới với thông tin cơ bản và biến thể (không bao gồm giá và tồn kho)")
     public ResponseEntity<ApiResponse<ProductCreateResponse>> createProduct(
             @RequestBody ProductCreateWithVariantsRequest request) {
 
@@ -317,12 +289,11 @@ public class ProductController {
             // Tạo response với danh sách biến thể đã tạo
             ProductCreateResponse responseData = new ProductCreateResponse();
             responseData.setId(product.getId());
-            responseData.setCode(product.getCode());
             responseData.setName(product.getName());
             responseData.setSkuCount(request.getVariants().size());
             responseData.setVariantCount(totalVariants);
             responseData.setMessage("Tạo sản phẩm thành công với " + totalVariants + " biến thể (từ "
-                    + request.getVariants().size() + " SKUs)");
+                    + request.getVariants().size() + " SKUs) - chỉ thông tin cơ bản");
             responseData.setVariants(createdVariants);
 
             ApiResponse<ProductCreateResponse> response = ApiResponse.success("Thành công", responseData);
@@ -439,36 +410,6 @@ public class ProductController {
             log.error("Lỗi khi xóa nhiều biến thể: ", e);
 
             ApiResponse<String> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    /**
-     * Lấy thông tin tồn kho của tất cả biến thể trong sản phẩm
-     */
-    @GetMapping("/{productId}/inventory")
-    @Operation(summary = "Lấy tồn kho tất cả biến thể", description = "Lấy thông tin tồn kho của tất cả biến thể trong sản phẩm dựa trên đơn vị cơ bản")
-    public ResponseEntity<ApiResponse<List<BaseUnitInventoryService.VariantInventoryInfo>>> getProductInventory(
-            @PathVariable Long productId,
-            @RequestParam(required = false) Integer warehouseId) {
-
-        log.info("API lấy tồn kho tất cả biến thể cho sản phẩm {} tại kho {}", productId, warehouseId);
-
-        try {
-            List<BaseUnitInventoryService.VariantInventoryInfo> inventories = baseUnitInventoryService
-                    .getVariantInventoriesForProduct(productId, warehouseId);
-
-            ApiResponse<List<BaseUnitInventoryService.VariantInventoryInfo>> response = ApiResponse
-                    .success(inventories);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Lỗi khi lấy tồn kho tất cả biến thể: ", e);
-
-            ApiResponse<List<BaseUnitInventoryService.VariantInventoryInfo>> response = ApiResponse
-                    .error(e.getMessage());
 
             return ResponseEntity.badRequest().body(response);
         }

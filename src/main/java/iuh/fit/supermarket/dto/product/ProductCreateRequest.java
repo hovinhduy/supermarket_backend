@@ -22,11 +22,6 @@ public class ProductCreateRequest {
     private Long categoryId;
 
     /**
-     * Loại sản phẩm: 1-Đơn giản, 2-Có biến thể
-     */
-    private Integer productType;
-
-    /**
      * Thông tin đơn vị cơ bản
      */
     private BaseUnitDto baseUnit;
@@ -40,11 +35,6 @@ public class ProductCreateRequest {
      * Danh sách thuộc tính
      */
     private List<ProductAttributeDto> attributes;
-
-    /**
-     * Thông tin tồn kho
-     */
-    private InventoryDto inventory;
 
     /**
      * Cho phép bán hay không
@@ -62,8 +52,6 @@ public class ProductCreateRequest {
     @Data
     public static class BaseUnitDto {
         private String unit;
-        private BigDecimal basePrice;
-        private BigDecimal cost;
         private String barcode;
     }
 
@@ -73,7 +61,6 @@ public class ProductCreateRequest {
     @Data
     public static class AdditionalUnitDto {
         private String unit;
-        private BigDecimal basePrice;
         private Integer conversionValue;
         private String barcode;
     }
@@ -87,13 +74,4 @@ public class ProductCreateRequest {
         private String value;
     }
 
-    /**
-     * DTO cho thông tin tồn kho
-     */
-    @Data
-    public static class InventoryDto {
-        private BigDecimal minQuantity;
-        private BigDecimal maxQuantity;
-        private BigDecimal onHand;
-    }
 }

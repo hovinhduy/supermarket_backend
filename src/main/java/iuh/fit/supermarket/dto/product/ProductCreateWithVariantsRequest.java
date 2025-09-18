@@ -27,11 +27,6 @@ public class ProductCreateWithVariantsRequest {
     private Long brandId;
 
     /**
-     * Loại sản phẩm: 1-Đơn giản, 2-Có biến thể
-     */
-    private Integer productType;
-
-    /**
      * Mô tả sản phẩm
      */
     private String description;
@@ -92,21 +87,6 @@ public class ProductCreateWithVariantsRequest {
          * Tên đơn vị
          */
         private String unit;
-
-        /**
-         * Giá cơ bản
-         */
-        private BigDecimal basePrice;
-
-        /**
-         * Giá cost
-         */
-        private BigDecimal cost;
-
-        /**
-         * Số lượng tồn kho
-         */
-        private BigDecimal onHand;
 
         /**
          * Giá trị chuyển đổi

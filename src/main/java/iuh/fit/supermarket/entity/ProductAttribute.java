@@ -26,13 +26,6 @@ public class ProductAttribute {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
-
-    /**
-     * Số lượng của thuộc tính này cho sản phẩm (tùy chọn)
-     */
-    @Column(name = "quantity")
-    private Integer quantity;
-
     /**
      * Thời gian tạo
      */

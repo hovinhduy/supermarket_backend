@@ -2,7 +2,6 @@ package iuh.fit.supermarket.dto.product;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -16,10 +15,7 @@ public class ProductVariantCreateRequest {
      */
     private List<VariantAttributeDto> attributes;
 
-    /**
-     * Thông tin giá cả
-     */
-    private PricingDto pricing;
+    // Đã loại bỏ thông tin giá - sẽ được quản lý riêng trong hệ thống giá
 
     /**
      * Danh sách đơn vị cho biến thể
@@ -36,21 +32,11 @@ public class ProductVariantCreateRequest {
     }
 
     /**
-     * DTO cho thông tin giá
-     */
-    @Data
-    public static class PricingDto {
-        private BigDecimal basePrice;
-        private BigDecimal cost;
-    }
-
-    /**
-     * DTO cho đơn vị biến thể
+     * DTO cho đơn vị biến thể (chỉ thông tin đơn vị, không có giá)
      */
     @Data
     public static class VariantUnitDto {
         private String unit;
-        private BigDecimal basePrice;
         private Integer conversionValue;
         private String barcode;
     }

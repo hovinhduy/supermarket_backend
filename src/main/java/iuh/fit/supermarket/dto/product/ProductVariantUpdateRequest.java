@@ -30,22 +30,6 @@ public class ProductVariantUpdateRequest {
     private String barcode;
 
     /**
-     * Giá vốn
-     */
-    @Schema(description = "Giá vốn của biến thể", example = "150000")
-    private BigDecimal costPrice;
-
-    /**
-     * Giá bán cơ bản
-     */
-    @Schema(description = "Giá bán cơ bản của biến thể", example = "200000")
-    private BigDecimal basePrice;
-
-    // Các trường số lượng tồn kho đã được chuyển sang quản lý thông qua
-    // InventoryService
-    // Để cập nhật tồn kho, sử dụng các API riêng biệt cho quản lý kho
-
-    /**
      * Số lượng tồn kho (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
     @Deprecated

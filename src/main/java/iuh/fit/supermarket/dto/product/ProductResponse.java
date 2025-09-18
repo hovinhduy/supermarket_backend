@@ -15,36 +15,15 @@ public class ProductResponse {
      * ID sản phẩm
      */
     private Long id;
-
-    /**
-     * Mã sản phẩm
-     */
-    private String code;
-
     /**
      * Tên sản phẩm
      */
     private String name;
 
     /**
-     * Tên đầy đủ của sản phẩm
-     */
-    private String fullName;
-
-    /**
      * Mô tả sản phẩm
      */
     private String description;
-
-    /**
-     * Loại sản phẩm: 1-Đơn giản, 2-Có biến thể
-     */
-    private Integer productType;
-
-    /**
-     * Có biến thể hay không
-     */
-    private Boolean hasVariants;
 
     /**
      * Số lượng biến thể

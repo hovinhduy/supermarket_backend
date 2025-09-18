@@ -5,8 +5,6 @@ import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.ProductService;
 import iuh.fit.supermarket.service.VariantAttributeService;
-import iuh.fit.supermarket.service.InventoryService;
-import iuh.fit.supermarket.service.BaseUnitInventoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -40,8 +38,6 @@ public class ProductServiceImpl implements ProductService {
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final VariantAttributeService variantAttributeService;
-    private final InventoryService inventoryService;
-    private final BaseUnitInventoryService baseUnitInventoryService;
 
     /**
      * Tạo sản phẩm mới
@@ -50,19 +46,13 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse createProduct(ProductCreateRequest request) {
         log.info("Bắt đầu tạo sản phẩm mới: {}", request.getName());
 
-        // Tạo mã sản phẩm tự động nếu chưa có
-        String productCode = generateProductCode();
 
         // Tạo entity Product (chỉ thông tin chung)
         Product product = new Product();
-        product.setCode(productCode);
         product.setName(request.getName());
-        // Thiết lập productType = 1 (sản phẩm đơn giản) mặc định
-        product.setProductType(1);
         product.setDescription(request.getDescription());
         product.setIsActive(true);
         product.setIsDeleted(false);
-        product.setHasVariants(false);
         product.setVariantCount(1); // Mặc định có 1 variant cơ bản
 
         // Lưu sản phẩm
@@ -79,8 +69,7 @@ public class ProductServiceImpl implements ProductService {
         ProductUnit baseUnit = createProductUnit(product, request.getBaseUnit().getUnit(), 1, true);
 
         // Tạo variant cơ bản với đơn vị này
-        createDefaultProductVariant(product, baseUnit, request.getBaseUnit(), request.getInventory(),
-                request.getAllowsSale());
+        createDefaultProductVariant(product, baseUnit, request.getBaseUnit(), request.getAllowsSale());
 
         // Tạo các đơn vị bổ sung
         if (request.getAdditionalUnits() != null) {
@@ -96,7 +85,7 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        log.info("Tạo sản phẩm thành công với mã: {}", productCode);
+        log.info("Tạo sản phẩm thành công với mã: {}");
         return mapToProductResponse(product);
     }
 
@@ -127,15 +116,10 @@ public class ProductServiceImpl implements ProductService {
         // Cập nhật thông tin cơ bản (chỉ thông tin chung)
         if (request.getName() != null)
             product.setName(request.getName());
-        if (request.getFullName() != null)
-            product.setFullName(request.getFullName());
         if (request.getDescription() != null)
             product.setDescription(request.getDescription());
         if (request.getCategoryId() != null) {
-            // TODO: Validate category exists và set category
         }
-        if (request.getTradeMarkName() != null)
-            product.setTradeMarkName(request.getTradeMarkName());
         if (request.getIsActive() != null)
             product.setIsActive(request.getIsActive());
 
@@ -310,48 +294,6 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * Lấy danh sách sản phẩm có tồn kho thấp (thông qua InventoryService)
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductResponse> getLowStockProducts() {
-        log.info("Lấy danh sách sản phẩm tồn kho thấp");
-
-        // Lấy danh sách tồn kho thấp từ InventoryService
-        List<Inventory> lowStockInventories = inventoryService.getLowStockInventories();
-
-        // Chuyển đổi sang ProductResponse và loại bỏ trùng lặp theo productId
-        return lowStockInventories.stream()
-                .map(inventory -> inventory.getVariant().getProduct()) // Lấy Product từ Inventory -> ProductVariant
-                .distinct() // Loại bỏ sản phẩm trùng lặp
-                .map(this::mapToProductResponse)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Tạo mã sản phẩm tự động
-     */
-    @Override
-    public String generateProductCode() {
-        log.info("Tạo mã sản phẩm tự động");
-
-        List<String> maxCodes = productRepository.findMaxProductCode();
-
-        if (maxCodes.isEmpty()) {
-            return "SP000001";
-        }
-
-        String maxCode = maxCodes.get(0);
-        try {
-            int number = Integer.parseInt(maxCode.substring(2)) + 1;
-            return String.format("SP%06d", number);
-        } catch (Exception e) {
-            log.warn("Lỗi khi parse mã sản phẩm: {}", maxCode);
-            return "SP000001";
-        }
-    }
-
-    /**
      * Tạo mã variant tự động cho sản phẩm đơn giản (theo product)
      */
     private String generateVariantCode(String productCode) {
@@ -399,9 +341,8 @@ public class ProductServiceImpl implements ProductService {
      */
     private void createDefaultProductVariant(Product product, ProductUnit unit,
             ProductCreateRequest.BaseUnitDto baseUnitDto,
-            ProductCreateRequest.InventoryDto inventoryDto,
             Boolean allowsSale) {
-        log.info("Tạo variant mặc định cho sản phẩm: {}", product.getCode());
+        log.info("Tạo variant mặc định cho sản phẩm: {}", product.getId());
 
         ProductVariant variant = new ProductVariant();
 
@@ -417,26 +358,10 @@ public class ProductServiceImpl implements ProductService {
         variant.setProduct(product);
         variant.setUnit(unit);
 
-        // Thiết lập giá từ request hoặc mặc định
-        if (baseUnitDto.getBasePrice() != null) {
-            variant.setBasePrice(baseUnitDto.getBasePrice());
-        } else {
-            variant.setBasePrice(BigDecimal.ZERO);
-        }
-
-        if (baseUnitDto.getCost() != null) {
-            variant.setCostPrice(baseUnitDto.getCost());
-        } else {
-            variant.setCostPrice(BigDecimal.ZERO);
-        }
-
         // Thiết lập barcode nếu có
         if (baseUnitDto.getBarcode() != null && !baseUnitDto.getBarcode().trim().isEmpty()) {
             variant.setBarcode(baseUnitDto.getBarcode());
         }
-
-        // Số lượng tồn kho sẽ được quản lý thông qua InventoryService
-        // Không cần thiết lập trực tiếp trong ProductVariant nữa
 
         // Thiết lập trạng thái cho phép bán từ request hoặc mặc định
         if (allowsSale != null) {
@@ -449,7 +374,7 @@ public class ProductServiceImpl implements ProductService {
 
         // Lưu variant
         productVariantRepository.save(variant);
-        log.info("Đã tạo variant mặc định với mã: {}", variantCode);
+        log.info("Đã tạo variant mặc định với mã: {} (chỉ thông tin cơ bản)", variantCode);
     }
 
     /**
@@ -507,12 +432,8 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponse mapToProductResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
-        response.setCode(product.getCode());
         response.setName(product.getName());
-        response.setFullName(product.getFullName());
         response.setDescription(product.getDescription());
-        response.setProductType(product.getProductType());
-        response.setHasVariants(product.getHasVariants());
         response.setVariantCount(product.getVariantCount());
         response.setIsActive(product.getIsActive());
         response.setCreatedDate(product.getCreatedDate());
@@ -566,20 +487,16 @@ public class ProductServiceImpl implements ProductService {
             brand = validateAndGetBrand(request.getBrandId());
         }
 
-        // Tạo mã sản phẩm tự động
-        String productCode = generateProductCode();
+
 
         // Tạo entity Product
         Product product = new Product();
-        product.setCode(productCode);
         product.setName(request.getName());
-        product.setProductType(request.getProductType());
         product.setDescription(request.getDescription());
         product.setCategory(category);
         product.setBrand(brand);
         product.setIsActive(true);
         product.setIsDeleted(false);
-        product.setHasVariants(request.getVariants().size() > 1);
         product.setVariantCount(request.getVariants().size());
 
         // Lưu sản phẩm
@@ -594,8 +511,8 @@ public class ProductServiceImpl implements ProductService {
             totalVariants += variantDto.getUnits() != null ? variantDto.getUnits().size() : 0;
         }
 
-        log.info("Tạo sản phẩm với {} biến thể (từ {} SKUs) thành công với mã: {}",
-                totalVariants, request.getVariants().size(), productCode);
+        log.info("Tạo sản phẩm với {} biến thể (từ {} SKUs) thành công với mã: {} (chỉ thông tin cơ bản)",
+                totalVariants, request.getVariants().size());
         return mapToProductResponse(product);
     }
 
@@ -634,7 +551,7 @@ public class ProductServiceImpl implements ProductService {
             // Nếu đã có base unit cho loại đơn vị này, sử dụng lại
             if (existingBaseUnit.isPresent() && Boolean.TRUE.equals(isBaseUnit)) {
                 log.info("Sử dụng lại base unit đã tồn tại: {} cho sản phẩm: {}",
-                        unitDto.getUnit(), product.getCode());
+                        unitDto.getUnit());
                 // Không cần tạo mới, sẽ sử dụng lại trong findOrCreateProductUnit
             }
 
@@ -651,8 +568,6 @@ public class ProductServiceImpl implements ProductService {
             productVariant.setVariantCode(variantCode);
             productVariant.setVariantName(generateVariantNameWithUnit(product, variantDto, unitDto.getUnit()));
             productVariant.setUnit(productUnit);
-            productVariant.setBasePrice(unitDto.getBasePrice());
-            productVariant.setCostPrice(unitDto.getCost() != null ? unitDto.getCost() : BigDecimal.ZERO);
             productVariant.setBarcode(unitDto.getBarcode());
             productVariant.setIsActive(true);
             productVariant.setIsDeleted(false);
@@ -660,19 +575,8 @@ public class ProductServiceImpl implements ProductService {
 
             // Lưu ProductVariant
             productVariant = productVariantRepository.save(productVariant);
-            log.info("Đã tạo ProductVariant với code: {} cho đơn vị: {}", variantCode, unitDto.getUnit());
-
-            // Chỉ tạo tồn kho ban đầu cho biến thể có đơn vị cơ bản
-            if (Boolean.TRUE.equals(productUnit.getIsBaseUnit())) {
-                Integer initialQuantity = unitDto.getOnHand() != null ? unitDto.getOnHand().intValue() : 0;
-                BigDecimal costPrice = unitDto.getCost() != null ? unitDto.getCost() : BigDecimal.ZERO;
-                inventoryService.createInventoryForVariant(productVariant, initialQuantity, costPrice,
-                        "Tồn kho ban đầu khi tạo biến thể sản phẩm");
-                log.info("Đã tạo tồn kho ban đầu {} cho biến thể {} (đơn vị cơ bản)", initialQuantity, variantCode);
-            } else {
-                log.info("Bỏ qua tạo tồn kho cho biến thể {} vì không phải đơn vị cơ bản ({})",
-                        variantCode, unitDto.getUnit());
-            }
+            log.info("Đã tạo ProductVariant với code: {} cho đơn vị: {} (chỉ thông tin cơ bản)", variantCode,
+                    unitDto.getUnit());
 
             // Tạo thuộc tính cho tất cả các biến thể (vì mỗi unit là 1 variant riêng)
             if (variantDto.getAttributes() != null && !variantDto.getAttributes().isEmpty()) {
@@ -699,7 +603,7 @@ public class ProductServiceImpl implements ProductService {
         Optional<ProductUnit> existingUnit = productUnitRepository.findByProductIdAndUnit(product.getId(), unitName);
 
         if (existingUnit.isPresent()) {
-            log.info("ProductUnit đã tồn tại: {} cho sản phẩm: {}", unitName, product.getCode());
+            log.info("ProductUnit đã tồn tại: {} cho sản phẩm: {}", unitName, product.getId());
             return existingUnit.get();
         }
 
@@ -712,11 +616,11 @@ public class ProductServiceImpl implements ProductService {
         productUnit.setIsActive(true);
 
         // Tạo code cho unit
-        productUnit.setCode(product.getCode() + "-" + unitName);
+        productUnit.setCode(product.getId() + "-" + unitName);
 
         ProductUnit savedUnit = productUnitRepository.save(productUnit);
         log.info("Đã tạo ProductUnit mới: {} cho sản phẩm: {} (isBaseUnit: {})",
-                unitName, product.getCode(), isBaseUnit);
+                unitName, product.getId(), isBaseUnit);
 
         return savedUnit;
     }
@@ -820,10 +724,6 @@ public class ProductServiceImpl implements ProductService {
             throw new RuntimeException("Cần ít nhất một biến thể để tạo sản phẩm");
         }
 
-        // Kiểm tra productType hợp lệ
-        if (request.getProductType() == null || (request.getProductType() != 1 && request.getProductType() != 2)) {
-            throw new RuntimeException("Loại sản phẩm (productType) phải là 1 (đơn giản) hoặc 2 (có biến thể)");
-        }
     }
 
     /**
@@ -874,24 +774,9 @@ public class ProductServiceImpl implements ProductService {
         dto.setVariantName(variant.getVariantName());
         dto.setVariantCode(variant.getVariantCode());
         dto.setBarcode(variant.getBarcode());
-        dto.setCostPrice(variant.getCostPrice());
-        dto.setBasePrice(variant.getBasePrice());
-
-        // Lấy thông tin tồn kho từ BaseUnitInventoryService (tính toán đúng cho các
-        // unit khác)
-        Integer totalQuantity = baseUnitInventoryService.getTotalQuantityOnHandForVariant(variant.getVariantId());
-        Integer availableQuantity = baseUnitInventoryService
-                .getTotalAvailableQuantityForVariant(variant.getVariantId());
-        Boolean needsReorder = baseUnitInventoryService.needsReorderForVariant(variant.getVariantId());
-
-        dto.setQuantityOnHand(BigDecimal.valueOf(totalQuantity != null ? totalQuantity : 0));
-        dto.setQuantityReserved(BigDecimal
-                .valueOf(totalQuantity != null && availableQuantity != null ? totalQuantity - availableQuantity : 0));
-        dto.setAvailableQuantity(BigDecimal.valueOf(availableQuantity != null ? availableQuantity : 0));
-        dto.setMinQuantity(BigDecimal.ZERO); // Sẽ được lấy từ Inventory sau
         dto.setAllowsSale(variant.getAllowsSale());
         dto.setIsActive(variant.getIsActive());
-        dto.setNeedsReorder(needsReorder != null ? needsReorder : false);
+
         dto.setCreatedAt(variant.getCreatedAt());
         dto.setUpdatedAt(variant.getUpdatedAt());
 
@@ -944,14 +829,6 @@ public class ProductServiceImpl implements ProductService {
                 throw new RuntimeException("Mã vạch đã tồn tại: " + request.getBarcode());
             }
             variant.setBarcode(request.getBarcode());
-        }
-
-        if (request.getCostPrice() != null) {
-            variant.setCostPrice(request.getCostPrice());
-        }
-
-        if (request.getBasePrice() != null) {
-            variant.setBasePrice(request.getBasePrice());
         }
 
         // Cập nhật số lượng tồn kho thông qua InventoryService
@@ -1153,9 +1030,6 @@ public class ProductServiceImpl implements ProductService {
             case "isactive":
             case "is_active":
                 return "isActive";
-            case "producttype":
-            case "product_type":
-                return "productType";
             case "variantcount":
             case "variant_count":
                 return "variantCount";

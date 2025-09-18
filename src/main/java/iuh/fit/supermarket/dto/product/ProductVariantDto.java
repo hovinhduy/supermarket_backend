@@ -33,38 +33,6 @@ public class ProductVariantDto {
     private String barcode;
 
     /**
-     * Giá vốn
-     */
-    private BigDecimal costPrice;
-
-    /**
-     * Giá bán cơ bản
-     */
-    private BigDecimal basePrice;
-
-    /**
-     * Số lượng tồn kho (tính toán dựa trên đơn vị cơ bản)
-     * Nếu là đơn vị cơ bản: lấy trực tiếp từ Inventory
-     * Nếu không phải đơn vị cơ bản: tính = baseQuantity / conversionValue
-     */
-    private BigDecimal quantityOnHand;
-
-    /**
-     * Số lượng đã đặt trước (tính toán dựa trên đơn vị cơ bản)
-     */
-    private BigDecimal quantityReserved;
-
-    /**
-     * Số lượng có thể bán (tính toán dựa trên đơn vị cơ bản)
-     */
-    private BigDecimal availableQuantity;
-
-    /**
-     * Số lượng tối thiểu
-     */
-    private BigDecimal minQuantity;
-
-    /**
      * Cho phép bán hay không
      */
     private Boolean allowsSale;
@@ -73,12 +41,6 @@ public class ProductVariantDto {
      * Trạng thái hoạt động
      */
     private Boolean isActive;
-
-    /**
-     * Cần đặt hàng lại hay không
-     */
-    private Boolean needsReorder;
-
     /**
      * Thời gian tạo
      */

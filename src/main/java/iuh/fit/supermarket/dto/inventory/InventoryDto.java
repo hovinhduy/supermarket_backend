@@ -46,24 +46,9 @@ public class InventoryDto {
     private Integer quantityOnHand;
 
     /**
-     * Số lượng đã được đặt trước
-     */
-    private Integer quantityReserved;
-
-    /**
      * Số lượng có thể bán
      */
     private Integer availableQuantity;
-
-    /**
-     * Điểm đặt hàng lại
-     */
-    private Integer reorderPoint;
-
-    /**
-     * Cần đặt hàng lại hay không
-     */
-    private Boolean needsReorder;
 
     /**
      * Thời gian cập nhật
