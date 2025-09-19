@@ -53,6 +53,10 @@ public class ProductCreateRequest {
     public static class BaseUnitDto {
         private String unit;
         private String barcode;
+        /**
+         * Mã SKU của biến thể (tùy chọn, sẽ tự động tạo nếu không cung cấp)
+         */
+        private String variantCode;
     }
 
     /**
@@ -63,6 +67,10 @@ public class ProductCreateRequest {
         private String unit;
         private Integer conversionValue;
         private String barcode;
+        /**
+         * Mã SKU của biến thể (tùy chọn, sẽ tự động tạo nếu không cung cấp)
+         */
+        private String variantCode;
     }
 
     /**

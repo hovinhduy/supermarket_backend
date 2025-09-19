@@ -46,7 +46,6 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse createProduct(ProductCreateRequest request) {
         log.info("Bắt đầu tạo sản phẩm mới: {}", request.getName());
 
-
         // Tạo entity Product (chỉ thông tin chung)
         Product product = new Product();
         product.setName(request.getName());
@@ -337,6 +336,34 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
+     * Tạo hoặc sử dụng mã variant từ request
+     * Nếu variantCode từ request không null và không trống, kiểm tra tính duy nhất
+     * và sử dụng
+     * Nếu variantCode trùng lặp, báo lỗi
+     * Nếu không có variantCode, tự động tạo mã variant mới
+     */
+    private String generateOrUseVariantCode(String requestedVariantCode) {
+        // Nếu có variantCode từ request và không trống
+        if (requestedVariantCode != null && !requestedVariantCode.trim().isEmpty()) {
+            String trimmedCode = requestedVariantCode.trim();
+
+            // Kiểm tra mã variant đã tồn tại chưa
+            if (productVariantRepository.existsByVariantCode(trimmedCode)) {
+                log.error("Mã variant {} đã tồn tại trong hệ thống", trimmedCode);
+                throw new RuntimeException(
+                        "Mã variant '" + trimmedCode + "' đã tồn tại trong hệ thống. Vui lòng sử dụng mã khác.");
+            }
+
+            log.info("Sử dụng mã variant từ request: {}", trimmedCode);
+            return trimmedCode;
+        }
+
+        // Nếu không có variantCode từ request, tạo tự động
+        log.info("Không có mã variant từ request, tạo mã tự động");
+        return generateGlobalVariantCode();
+    }
+
+    /**
      * Tạo variant mặc định cho sản phẩm đơn giản
      */
     private void createDefaultProductVariant(Product product, ProductUnit unit,
@@ -346,8 +373,8 @@ public class ProductServiceImpl implements ProductService {
 
         ProductVariant variant = new ProductVariant();
 
-        // Tạo mã variant tự động toàn cục
-        String variantCode = generateGlobalVariantCode();
+        // Tạo variant code: sử dụng từ request nếu có, nếu không thì tự động tạo
+        String variantCode = generateOrUseVariantCode(baseUnitDto.getVariantCode());
         variant.setVariantCode(variantCode);
 
         // Tạo tên variant: Tên sản phẩm + Đơn vị
@@ -487,8 +514,6 @@ public class ProductServiceImpl implements ProductService {
             brand = validateAndGetBrand(request.getBrandId());
         }
 
-
-
         // Tạo entity Product
         Product product = new Product();
         product.setName(request.getName());
@@ -559,8 +584,8 @@ public class ProductServiceImpl implements ProductService {
             ProductUnit productUnit = findOrCreateProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue(),
                     isBaseUnit);
 
-            // Tạo variant code tự động tăng dần (SP000001, SP000002...)
-            String variantCode = generateGlobalVariantCode();
+            // Tạo variant code: sử dụng từ request nếu có, nếu không thì tự động tạo
+            String variantCode = generateOrUseVariantCode(unitDto.getVariantCode());
 
             // Tạo ProductVariant
             ProductVariant productVariant = new ProductVariant();

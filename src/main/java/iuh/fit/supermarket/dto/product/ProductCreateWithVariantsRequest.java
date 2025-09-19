@@ -46,10 +46,6 @@ public class ProductCreateWithVariantsRequest {
      */
     @Data
     public static class VariantDto {
-        /**
-         * Mã SKU của biến thể
-         */
-        private String sku;
 
         /**
          * Danh sách thuộc tính phân biệt biến thể
@@ -97,6 +93,10 @@ public class ProductCreateWithVariantsRequest {
          * Mã barcode
          */
         private String barcode;
+        /**
+         * Mã SKU của biến thể
+         */
+        private String variantCode;
 
         /**
          * Đánh dấu đơn vị này là đơn vị cơ bản của sản phẩm
