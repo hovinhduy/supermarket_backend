@@ -15,8 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -749,6 +748,52 @@ public class ProductServiceImpl implements ProductService {
             throw new RuntimeException("Cần ít nhất một biến thể để tạo sản phẩm");
         }
 
+        // Kiểm tra trùng lặp attributeId trong mỗi variant
+        validateVariantAttributes(request.getVariants());
+    }
+
+    /**
+     * Kiểm tra trùng lặp attributeId trong danh sách thuộc tính của mỗi variant
+     */
+    private void validateVariantAttributes(List<ProductCreateWithVariantsRequest.VariantDto> variants) {
+        for (int variantIndex = 0; variantIndex < variants.size(); variantIndex++) {
+            ProductCreateWithVariantsRequest.VariantDto variant = variants.get(variantIndex);
+
+            // Bỏ qua nếu variant không có attributes
+            if (variant.getAttributes() == null || variant.getAttributes().isEmpty()) {
+                continue;
+            }
+
+            // Kiểm tra giới hạn tối đa 3 thuộc tính
+            if (variant.getAttributes().size() > 3) {
+                throw new RuntimeException(String.format(
+                        "Variant thứ %d có %d thuộc tính, vượt quá giới hạn tối đa 3 thuộc tính cho mỗi variant",
+                        variantIndex + 1, variant.getAttributes().size()));
+            }
+
+            // Sử dụng Set để theo dõi các attributeId đã xuất hiện
+            Set<Long> seenAttributeIds = new HashSet<>();
+
+            for (int attrIndex = 0; attrIndex < variant.getAttributes().size(); attrIndex++) {
+                ProductCreateWithVariantsRequest.VariantAttributeDto attribute = variant.getAttributes().get(attrIndex);
+
+                // Kiểm tra attributeId không được null
+                if (attribute.getAttributeId() == null) {
+                    throw new RuntimeException(String.format(
+                            "AttributeId không được để trống tại variant thứ %d, thuộc tính thứ %d",
+                            variantIndex + 1, attrIndex + 1));
+                }
+
+                // Kiểm tra trùng lặp attributeId
+                if (seenAttributeIds.contains(attribute.getAttributeId())) {
+                    throw new RuntimeException(String.format(
+                            "Phát hiện trùng lặp attributeId %d trong variant thứ %d. Mỗi thuộc tính chỉ được xuất hiện một lần trong cùng một variant",
+                            attribute.getAttributeId(), variantIndex + 1));
+                }
+
+                seenAttributeIds.add(attribute.getAttributeId());
+            }
+        }
     }
 
     /**
