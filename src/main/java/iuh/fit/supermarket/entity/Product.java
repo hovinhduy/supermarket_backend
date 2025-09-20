@@ -35,21 +35,17 @@ public class Product {
     @Column(name = "name", length = 255, nullable = false)
     private String name;
 
-
     /**
      * Mô tả sản phẩm
      */
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-
     /**
      * Số lượng biến thể
      */
     @Column(name = "variant_count")
     private Integer variantCount = 0;
-
-
 
     /**
      * Trạng thái hoạt động
@@ -63,14 +59,11 @@ public class Product {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
-
-
     /**
      * Có tích điểm thưởng không
      */
     @Column(name = "is_reward_point")
     private Boolean isRewardPoint = false;
-
 
     /**
      * Thời gian tạo
@@ -83,8 +76,8 @@ public class Product {
      * Thời gian cập nhật
      */
     @UpdateTimestamp
-    @Column(name = "modified_date")
-    private LocalDateTime modifiedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     /**
      * Thương hiệu của sản phẩm

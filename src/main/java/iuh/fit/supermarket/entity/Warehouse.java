@@ -4,23 +4,25 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.UpdateTimestamp;
 
-import java.util.List;
+import java.time.LocalDateTime;
 
 /**
- * Entity đại diện cho kho hàng trong hệ thống
- * Quản lý nhiều kho/cửa hàng
- * Theo database schema mới: warehouse_id, name, address
+ * Entity đại diện cho kho hàng và tồn kho sản phẩm trong hệ thống
+ * CHỈ LƯU TỒN KHO CHO BIẾN THỂ CÓ ĐỚN VỊ CƠ BẢN (isBaseUnit = true)
+ * Số lượng của các biến thể khác được tính toán dựa trên conversionValue
+ * Hệ thống chỉ có 1 kho duy nhất
  */
 @Entity
-@Table(name = "Warehouses")
+@Table(name = "warehouses", uniqueConstraints = @UniqueConstraint(columnNames = { "variant_id" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Warehouse {
 
     /**
-     * ID duy nhất của kho hàng
+     * ID duy nhất của bản ghi kho hàng
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,26 +30,22 @@ public class Warehouse {
     private Integer warehouseId;
 
     /**
-     * Tên kho hàng (bắt buộc)
+     * Số lượng tồn kho hiện tại
      */
-    @Column(name = "name", nullable = false, length = 255)
-    private String name;
+    @Column(name = "quantity_on_hand", nullable = false)
+    private Integer quantityOnHand = 0;
 
     /**
-     * Địa chỉ kho hàng
+     * Thời gian cập nhật
      */
-    @Column(name = "address", columnDefinition = "TEXT")
-    private String address;
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     /**
-     * Danh sách tồn kho tại kho này
+     * Biến thể sản phẩm
      */
-    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Inventory> inventories;
-
-    /**
-     * Danh sách giao dịch kho tại kho này
-     */
-    @OneToMany(mappedBy = "warehouse", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<InventoryTransaction> inventoryTransactions;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "variant_id", nullable = false)
+    private ProductVariant variant;
 }

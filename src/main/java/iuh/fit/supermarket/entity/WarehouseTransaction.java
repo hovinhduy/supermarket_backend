@@ -13,13 +13,14 @@ import java.time.LocalDateTime;
  * Entity đại diện cho lịch sử giao dịch kho trong hệ thống
  * "Sổ cái" ghi lại TOÀN BỘ thay đổi về số lượng tồn kho
  * Đây là nguồn dữ liệu gốc, không bao giờ xóa
+ * Hệ thống chỉ có 1 kho duy nhất nên không cần trường warehouse_id
  */
 @Entity
-@Table(name = "InventoryTransactions")
+@Table(name = "warehouse_transactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class InventoryTransaction {
+public class WarehouseTransaction {
 
     /**
      * ID duy nhất của giao dịch kho
@@ -41,12 +42,6 @@ public class InventoryTransaction {
      */
     @Column(name = "new_quantity", nullable = false)
     private Integer newQuantity;
-
-    /**
-     * Giá vốn đơn vị tại thời điểm giao dịch
-     */
-    @Column(name = "unit_cost_price", precision = 15, scale = 2)
-    private BigDecimal unitCostPrice;
 
     /**
      * Loại giao dịch
@@ -80,13 +75,6 @@ public class InventoryTransaction {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "variant_id", nullable = false)
     private ProductVariant variant;
-
-    /**
-     * Kho hàng
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "warehouse_id", nullable = false)
-    private Warehouse warehouse;
 
     /**
      * Enum cho loại giao dịch

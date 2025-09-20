@@ -43,7 +43,7 @@ public class ProductResponse {
     /**
      * Thời gian cập nhật
      */
-    private LocalDateTime modifiedDate;
+    private LocalDateTime updatedAt;
 
     /**
      * Thông tin danh mục

@@ -33,21 +33,21 @@ public class ProductVariantUpdateRequest {
      * Số lượng tồn kho (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
     @Deprecated
-    @Schema(description = "Số lượng tồn kho hiện tại (deprecated - sử dụng InventoryService)", example = "100")
+    @Schema(description = "Số lượng tồn kho hiện tại (deprecated - sử dụng WarehouseService)", example = "100")
     private BigDecimal quantityOnHand;
 
     /**
      * Số lượng đã đặt trước (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
     @Deprecated
-    @Schema(description = "Số lượng đã được đặt trước (deprecated - sử dụng InventoryService)", example = "10")
+    @Schema(description = "Số lượng đã được đặt trước (deprecated - sử dụng WarehouseService)", example = "10")
     private BigDecimal quantityReserved;
 
     /**
      * Số lượng tối thiểu cảnh báo (deprecated - chỉ để tương thích, sẽ được bỏ qua)
      */
     @Deprecated
-    @Schema(description = "Số lượng tối thiểu để cảnh báo hết hàng (deprecated - sử dụng InventoryService)", example = "20")
+    @Schema(description = "Số lượng tối thiểu để cảnh báo hết hàng (deprecated - sử dụng WarehouseService)", example = "20")
     private BigDecimal minQuantity;
 
     /**

@@ -121,7 +121,7 @@ public class AttributeServiceImpl implements AttributeService {
         dto.setId(attribute.getId());
         dto.setName(attribute.getName());
         dto.setCreatedDate(attribute.getCreatedDate());
-        dto.setModifiedDate(attribute.getModifiedDate());
+        dto.setUpdatedAt(attribute.getUpdatedAt());
         return dto;
     }
 }

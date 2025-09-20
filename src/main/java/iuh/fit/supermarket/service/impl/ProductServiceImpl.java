@@ -463,7 +463,7 @@ public class ProductServiceImpl implements ProductService {
         response.setVariantCount(product.getVariantCount());
         response.setIsActive(product.getIsActive());
         response.setCreatedDate(product.getCreatedDate());
-        response.setModifiedDate(product.getModifiedDate());
+        response.setUpdatedAt(product.getUpdatedAt());
 
         // Map category nếu có
         if (product.getCategory() != null) {
@@ -901,9 +901,9 @@ public class ProductServiceImpl implements ProductService {
             variant.setBarcode(request.getBarcode());
         }
 
-        // Cập nhật số lượng tồn kho thông qua InventoryService
+        // Cập nhật số lượng tồn kho thông qua WarehouseService
         // Không cập nhật trực tiếp trong ProductVariant nữa
-        // TODO: Implement inventory update logic through InventoryService if needed
+        // TODO: Implement warehouse update logic through WarehouseService if needed
 
         if (request.getAllowsSale() != null) {
             variant.setAllowsSale(request.getAllowsSale());
@@ -1094,9 +1094,9 @@ public class ProductServiceImpl implements ProductService {
             case "createdate":
             case "created_date":
                 return "createdDate";
-            case "modifieddate":
-            case "modified_date":
-                return "modifiedDate";
+            case "updatedAt":
+            case "updated_at":
+                return "updatedAt";
             case "isactive":
             case "is_active":
                 return "isActive";

@@ -28,5 +28,5 @@ public class AttributeDto {
     /**
      * Thời gian cập nhật
      */
-    private LocalDateTime modifiedDate;
+    private LocalDateTime updatedAt;
 }

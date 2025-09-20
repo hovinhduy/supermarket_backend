@@ -101,12 +101,12 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     /**
      * Tìm biến thể có tồn kho thấp (deprecated - sử dụng
-     * InventoryService.getLowStockInventories())
+     * WarehouseService.getLowStockWarehouses())
      * Phương thức này đã được deprecated vì thông tin tồn kho được quản lý trong
-     * Inventory entity
+     * Warehouse entity
      *
      * @return danh sách rỗng (deprecated)
-     * @deprecated Sử dụng InventoryService.getLowStockInventories() thay thế
+     * @deprecated Sử dụng WarehouseService.getLowStockWarehouses() thay thế
      */
     @Deprecated
     @Query("SELECT pv FROM ProductVariant pv WHERE pv.isActive = true AND pv.isDeleted = false AND 1=0")
@@ -155,11 +155,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     /**
      * Cập nhật số lượng tồn kho của biến thể (deprecated - sử dụng
-     * InventoryService)
+     * WarehouseService)
      *
      * @param variantId   ID của biến thể
      * @param newQuantity số lượng mới
-     * @deprecated Sử dụng InventoryService.updateInventory() thay thế
+     * @deprecated Sử dụng WarehouseService.updateWarehouse() thay thế
      */
     @Deprecated
     default void updateQuantityOnHand(@Param("variantId") Long variantId,
@@ -169,11 +169,11 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
 
     /**
      * Cập nhật số lượng đặt trước của biến thể (deprecated - sử dụng
-     * InventoryService)
+     * WarehouseService)
      *
      * @param variantId   ID của biến thể
      * @param newReserved số lượng đặt trước mới
-     * @deprecated Sử dụng InventoryService.updateInventory() thay thế
+     * @deprecated Sử dụng WarehouseService.updateWarehouse() thay thế
      */
     @Deprecated
     default void updateQuantityReserved(@Param("variantId") Long variantId,

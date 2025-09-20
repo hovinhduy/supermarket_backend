@@ -118,7 +118,7 @@ public class ProductVariant {
      * Thông tin tồn kho
      */
     @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Inventory> inventories;
+    private List<Warehouse> warehouses;
 
     /**
      * Lịch sử xuất nhập kho

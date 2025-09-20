@@ -46,8 +46,8 @@ public class Attribute {
      * Thời gian cập nhật
      */
     @UpdateTimestamp
-    @Column(name = "modified_date")
-    private LocalDateTime modifiedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     /**
      * Danh sách giá trị thuộc tính thuộc loại thuộc tính này

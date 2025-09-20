@@ -38,5 +38,5 @@ public class AttributeValueDto {
     /**
      * Thời gian cập nhật
      */
-    private LocalDateTime modifiedDate;
+    private LocalDateTime updatedAt;
 }

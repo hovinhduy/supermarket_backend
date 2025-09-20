@@ -54,7 +54,7 @@ public class ProductPageableRequest {
          * Tên trường cần sắp xếp
          */
         @Schema(description = "Tên trường cần sắp xếp", example = "name", allowableValues = { "name", "code",
-                "created_date", "modified_date", "is_active", "product_type", "variant_count" })
+                "created_date", "updated_at", "is_active", "product_type", "variant_count" })
         private String field = "name";
 
         /**

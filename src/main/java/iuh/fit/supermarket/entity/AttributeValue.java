@@ -51,8 +51,8 @@ public class AttributeValue {
      * Thời gian cập nhật
      */
     @UpdateTimestamp
-    @Column(name = "modified_date")
-    private LocalDateTime modifiedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     /**
      * Thuộc tính mà giá trị này thuộc về

@@ -178,7 +178,7 @@ public class AttributeValueServiceImpl implements AttributeValueService {
         dto.setValue(attributeValue.getValue());
         dto.setDescription(attributeValue.getDescription());
         dto.setCreatedDate(attributeValue.getCreatedDate());
-        dto.setModifiedDate(attributeValue.getModifiedDate());
+        dto.setUpdatedAt(attributeValue.getUpdatedAt());
 
         // Map thông tin thuộc tính
         if (attributeValue.getAttribute() != null) {
@@ -186,7 +186,7 @@ public class AttributeValueServiceImpl implements AttributeValueService {
             attributeDto.setId(attributeValue.getAttribute().getId());
             attributeDto.setName(attributeValue.getAttribute().getName());
             attributeDto.setCreatedDate(attributeValue.getAttribute().getCreatedDate());
-            attributeDto.setModifiedDate(attributeValue.getAttribute().getModifiedDate());
+            attributeDto.setUpdatedAt(attributeValue.getAttribute().getUpdatedAt());
             dto.setAttribute(attributeDto);
         }
 

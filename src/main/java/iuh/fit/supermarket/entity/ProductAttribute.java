@@ -37,8 +37,8 @@ public class ProductAttribute {
      * Thời gian cập nhật
      */
     @UpdateTimestamp
-    @Column(name = "modified_date")
-    private LocalDateTime modifiedDate;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     /**
      * Sản phẩm có thuộc tính này
