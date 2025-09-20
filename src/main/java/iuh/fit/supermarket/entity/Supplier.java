@@ -28,17 +28,14 @@ public class Supplier {
     @Column(name = "supplier_id")
     private Integer supplierId;
 
+    @Column(name = "code_supplier", length = 50, unique = true)
+    private String code;
+
     /**
      * Tên nhà cung cấp
      */
     @Column(name = "name", nullable = false)
     private String name;
-
-    /**
-     * Thông tin liên hệ
-     */
-    @Column(name = "contact")
-    private String contact;
 
     /**
      * Địa chỉ nhà cung cấp
@@ -49,13 +46,13 @@ public class Supplier {
     /**
      * Email nhà cung cấp
      */
-    @Column(name = "email")
+    @Column(name = "email", unique = true)
     private String email;
 
     /**
      * Số điện thoại
      */
-    @Column(name = "phone", length = 20)
+    @Column(name = "phone", length = 20, unique = true)
     private String phone;
 
     /**
@@ -63,6 +60,9 @@ public class Supplier {
      */
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
 
     /**
      * Thời gian tạo
@@ -83,4 +83,5 @@ public class Supplier {
      */
     @OneToMany(mappedBy = "supplier", fetch = FetchType.LAZY)
     private List<Import> imports;
+
 }

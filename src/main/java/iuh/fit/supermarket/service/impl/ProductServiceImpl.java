@@ -31,7 +31,6 @@ public class ProductServiceImpl implements ProductService {
     private final ProductUnitRepository productUnitRepository;
     private final AttributeRepository attributeRepository;
     private final AttributeValueRepository attributeValueRepository;
-    private final ProductAttributeRepository productAttributeRepository;
     private final ProductVariantRepository productVariantRepository;
     private final VariantAttributeRepository variantAttributeRepository;
     private final CategoryRepository categoryRepository;
@@ -75,14 +74,6 @@ public class ProductServiceImpl implements ProductService {
                 createProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue());
             }
         }
-
-        // Tạo thuộc tính sản phẩm
-        if (request.getAttributes() != null) {
-            for (ProductCreateRequest.ProductAttributeDto attrDto : request.getAttributes()) {
-                createProductAttribute(product, attrDto.getAttributeId(), attrDto.getValue());
-            }
-        }
-
         log.info("Tạo sản phẩm thành công với mã: {}");
         return mapToProductResponse(product);
     }
@@ -423,33 +414,6 @@ public class ProductServiceImpl implements ProductService {
         productUnit.setSortOrder(0);
 
         return productUnitRepository.save(productUnit);
-    }
-
-    /**
-     * Tạo thuộc tính sản phẩm với AttributeValue
-     */
-    private void createProductAttribute(Product product, Long attributeId, String value) {
-        // Tìm hoặc tạo AttributeValue
-        AttributeValue attributeValue = attributeValueRepository.findByValueAndAttributeId(value, attributeId)
-                .orElseGet(() -> {
-                    // Kiểm tra thuộc tính có tồn tại
-                    Attribute attribute = attributeRepository.findById(attributeId)
-                            .orElseThrow(
-                                    () -> new RuntimeException("Không tìm thấy thuộc tính với ID: " + attributeId));
-
-                    // Tạo AttributeValue mới
-                    AttributeValue newAttributeValue = new AttributeValue();
-                    newAttributeValue.setValue(value);
-                    newAttributeValue.setAttribute(attribute);
-                    return attributeValueRepository.save(newAttributeValue);
-                });
-
-        // Tạo ProductAttribute
-        ProductAttribute productAttribute = new ProductAttribute();
-        productAttribute.setProduct(product);
-        productAttribute.setAttributeValue(attributeValue);
-
-        productAttributeRepository.save(productAttribute);
     }
 
     /**
