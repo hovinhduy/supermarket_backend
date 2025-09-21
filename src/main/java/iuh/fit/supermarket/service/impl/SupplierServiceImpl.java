@@ -84,12 +84,32 @@ public class SupplierServiceImpl implements SupplierService {
     @Override
     @Transactional
     public SupplierResponse updateSupplier(Integer supplierId, SupplierUpdateRequest request) {
-        log.info("Cập nhật nhà cung cấp ID: {} với tên: {}", supplierId, request.getName());
+        log.info("Cập nhật nhà cung cấp ID: {} với tên: {}, mã code: {}", supplierId, request.getName(),
+                request.getCode());
 
         try {
             Supplier supplier = findSupplierEntityById(supplierId);
 
-            // Cập nhật thông tin
+            // Kiểm tra và cập nhật mã code nếu có thay đổi
+            if (StringUtils.hasText(request.getCode())) {
+                String newCode = request.getCode().trim();
+
+                // Kiểm tra mã code có thay đổi không
+                if (!newCode.equals(supplier.getCode())) {
+                    // Kiểm tra mã code đã tồn tại chưa (loại trừ nhà cung cấp hiện tại)
+                    if (supplierRepository.existsByCodeAndSupplierIdNot(newCode, supplierId)) {
+                        log.warn("Mã nhà cung cấp {} đã tồn tại khi cập nhật ID: {}", newCode, supplierId);
+                        throw new IllegalArgumentException(
+                                "Mã nhà cung cấp '" + newCode + "' đã tồn tại trong hệ thống");
+                    }
+
+                    log.info("Cập nhật mã code từ '{}' thành '{}' cho nhà cung cấp ID: {}",
+                            supplier.getCode(), newCode, supplierId);
+                    supplier.setCode(newCode);
+                }
+            }
+
+            // Cập nhật thông tin khác
             supplier.setName(request.getName());
             supplier.setAddress(request.getAddress());
             supplier.setEmail(request.getEmail());
@@ -101,7 +121,8 @@ public class SupplierServiceImpl implements SupplierService {
             // Lưu vào database
             Supplier updatedSupplier = supplierRepository.save(supplier);
 
-            log.info("Cập nhật nhà cung cấp thành công với ID: {}", updatedSupplier.getSupplierId());
+            log.info("Cập nhật nhà cung cấp thành công với ID: {}, mã code: {}",
+                    updatedSupplier.getSupplierId(), updatedSupplier.getCode());
             return convertToResponse(updatedSupplier);
 
         } catch (IllegalArgumentException e) {
@@ -110,6 +131,50 @@ public class SupplierServiceImpl implements SupplierService {
         } catch (Exception e) {
             log.error("Lỗi không mong muốn khi cập nhật nhà cung cấp: ", e);
             throw new RuntimeException("Không thể cập nhật nhà cung cấp: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Cập nhật trạng thái hoạt động của nhà cung cấp
+     */
+    @Override
+    @Transactional
+    public SupplierResponse updateSupplierStatus(Integer supplierId, Boolean isActive) {
+        log.info("Cập nhật trạng thái hoạt động nhà cung cấp ID: {} thành: {}", supplierId, isActive);
+
+        try {
+            // Validation input
+            if (isActive == null) {
+                throw new IllegalArgumentException("Trạng thái hoạt động không được để trống");
+            }
+
+            // Tìm nhà cung cấp
+            Supplier supplier = findSupplierEntityById(supplierId);
+
+            // Kiểm tra trạng thái hiện tại
+            Boolean currentStatus = supplier.getIsActive();
+            if (currentStatus.equals(isActive)) {
+                log.info("Trạng thái hoạt động của nhà cung cấp ID: {} đã là: {}, không cần cập nhật",
+                        supplierId, isActive);
+            } else {
+                log.info("Thay đổi trạng thái hoạt động nhà cung cấp ID: {} từ {} thành {}",
+                        supplierId, currentStatus, isActive);
+                supplier.setIsActive(isActive);
+            }
+
+            // Lưu vào database
+            Supplier updatedSupplier = supplierRepository.save(supplier);
+
+            log.info("Cập nhật trạng thái hoạt động nhà cung cấp thành công - ID: {}, trạng thái: {}",
+                    updatedSupplier.getSupplierId(), updatedSupplier.getIsActive());
+            return convertToResponse(updatedSupplier);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Lỗi validation khi cập nhật trạng thái nhà cung cấp: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi không mong muốn khi cập nhật trạng thái nhà cung cấp: ", e);
+            throw new RuntimeException("Không thể cập nhật trạng thái nhà cung cấp: " + e.getMessage(), e);
         }
     }
 
@@ -315,11 +380,11 @@ public class SupplierServiceImpl implements SupplierService {
      * Tạo mã nhà cung cấp tự động
      */
     private String generateSupplierCode() {
-        String prefix = "SUP";
-        int maxAttempts = 1000;
+        String prefix = "NCC";
+        int maxAttempts = 100000;
 
         for (int i = 1; i <= maxAttempts; i++) {
-            String code = String.format("%s%04d", prefix, i);
+            String code = String.format("%s%06d", prefix, i);
             if (!supplierRepository.existsByCode(code)) {
                 return code;
             }

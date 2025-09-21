@@ -84,18 +84,20 @@ public class SupplierController {
          * API cập nhật thông tin nhà cung cấp
          */
         @PutMapping("/{id}")
-        @Operation(summary = "Cập nhật thông tin nhà cung cấp", description = "Cập nhật thông tin của một nhà cung cấp đã tồn tại")
+        @Operation(summary = "Cập nhật thông tin nhà cung cấp", description = "Cập nhật thông tin của một nhà cung cấp đã tồn tại, bao gồm cả mã code")
         @ApiResponses(value = {
                         @ApiResponse(responseCode = "200", description = "Cập nhật nhà cung cấp thành công"),
                         @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
                         @ApiResponse(responseCode = "404", description = "Không tìm thấy nhà cung cấp"),
+                        @ApiResponse(responseCode = "409", description = "Mã nhà cung cấp đã tồn tại"),
                         @ApiResponse(responseCode = "500", description = "Lỗi hệ thống")
         })
         public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse>> updateSupplier(
                         @Parameter(description = "ID của nhà cung cấp", required = true) @PathVariable Integer id,
                         @Valid @RequestBody SupplierUpdateRequest request) {
 
-                log.info("API cập nhật nhà cung cấp ID: {} với tên: {}", id, request.getName());
+                log.info("API cập nhật nhà cung cấp ID: {} với tên: {}, mã code: {}", id, request.getName(),
+                                request.getCode());
 
                 try {
                         SupplierResponse supplierResponse = supplierService.updateSupplier(id, request);
@@ -111,13 +113,69 @@ public class SupplierController {
 
                         iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse> response = iuh.fit.supermarket.dto.common.ApiResponse
                                         .error(e.getMessage());
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+
+                        // Kiểm tra loại lỗi để trả về status code phù hợp
+                        if (e.getMessage().contains("không tìm thấy") || e.getMessage().contains("not found")) {
+                                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+                        } else if (e.getMessage().contains("đã tồn tại") || e.getMessage().contains("already exists")) {
+                                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+                        } else {
+                                return ResponseEntity.badRequest().body(response);
+                        }
 
                 } catch (Exception e) {
                         log.error("Lỗi không mong muốn khi cập nhật nhà cung cấp: ", e);
 
                         iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse> response = iuh.fit.supermarket.dto.common.ApiResponse
                                         .error("Có lỗi xảy ra khi cập nhật nhà cung cấp");
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+                }
+        }
+
+        /**
+         * API cập nhật trạng thái hoạt động của nhà cung cấp
+         */
+        @PatchMapping("/{id}/status")
+        @Operation(summary = "Cập nhật trạng thái hoạt động nhà cung cấp", description = "Cập nhật chỉ trạng thái hoạt động (isActive) của nhà cung cấp")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Cập nhật trạng thái thành công"),
+                        @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+                        @ApiResponse(responseCode = "404", description = "Không tìm thấy nhà cung cấp"),
+                        @ApiResponse(responseCode = "500", description = "Lỗi hệ thống")
+        })
+        public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse>> updateSupplierStatus(
+                        @Parameter(description = "ID của nhà cung cấp", required = true) @PathVariable Integer id,
+                        @Valid @RequestBody iuh.fit.supermarket.dto.supplier.SupplierStatusUpdateRequest request) {
+
+                log.info("API cập nhật trạng thái hoạt động nhà cung cấp ID: {} thành: {}", id, request.getIsActive());
+
+                try {
+                        SupplierResponse supplierResponse = supplierService.updateSupplierStatus(id,
+                                        request.getIsActive());
+
+                        iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse> response = iuh.fit.supermarket.dto.common.ApiResponse
+                                        .success("Cập nhật trạng thái nhà cung cấp thành công", supplierResponse);
+
+                        return ResponseEntity.ok(response);
+
+                } catch (IllegalArgumentException e) {
+                        log.error("Lỗi validation khi cập nhật trạng thái nhà cung cấp: {}", e.getMessage());
+
+                        iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse> response = iuh.fit.supermarket.dto.common.ApiResponse
+                                        .error(e.getMessage());
+
+                        // Kiểm tra loại lỗi để trả về status code phù hợp
+                        if (e.getMessage().contains("không tìm thấy") || e.getMessage().contains("not found")) {
+                                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+                        } else {
+                                return ResponseEntity.badRequest().body(response);
+                        }
+
+                } catch (Exception e) {
+                        log.error("Lỗi không mong muốn khi cập nhật trạng thái nhà cung cấp: ", e);
+
+                        iuh.fit.supermarket.dto.common.ApiResponse<SupplierResponse> response = iuh.fit.supermarket.dto.common.ApiResponse
+                                        .error("Có lỗi xảy ra khi cập nhật trạng thái nhà cung cấp");
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
                 }
         }

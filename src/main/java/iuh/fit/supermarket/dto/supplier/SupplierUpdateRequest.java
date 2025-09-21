@@ -18,6 +18,13 @@ import lombok.NoArgsConstructor;
 public class SupplierUpdateRequest {
 
     /**
+     * Mã nhà cung cấp
+     */
+    @Size(max = 50, message = "Mã nhà cung cấp không được vượt quá 50 ký tự")
+    @Schema(description = "Mã nhà cung cấp", example = "SUP0001")
+    private String code;
+
+    /**
      * Tên nhà cung cấp
      */
     @NotBlank(message = "Tên nhà cung cấp không được để trống")

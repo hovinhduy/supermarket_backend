@@ -106,6 +106,15 @@ public interface SupplierService {
     Supplier findSupplierEntityById(Integer supplierId);
 
     /**
+     * Cập nhật trạng thái hoạt động của nhà cung cấp
+     *
+     * @param supplierId ID nhà cung cấp cần cập nhật
+     * @param isActive   trạng thái hoạt động mới
+     * @return SupplierResponse thông tin nhà cung cấp đã cập nhật
+     */
+    SupplierResponse updateSupplierStatus(Integer supplierId, Boolean isActive);
+
+    /**
      * Xóa nhiều nhà cung cấp cùng lúc (soft delete)
      *
      * @param request danh sách ID nhà cung cấp cần xóa
