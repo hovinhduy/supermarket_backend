@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 
 /**
  * Entity đại diện cho kho hàng và tồn kho sản phẩm trong hệ thống
- * CHỈ LƯU TỒN KHO CHO BIẾN THỂ CÓ ĐỚN VỊ CƠ BẢN (isBaseUnit = true)
  * Số lượng của các biến thể khác được tính toán dựa trên conversionValue
  * Hệ thống chỉ có 1 kho duy nhất
  */

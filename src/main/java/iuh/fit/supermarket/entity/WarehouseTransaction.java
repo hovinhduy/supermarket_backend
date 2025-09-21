@@ -31,6 +31,13 @@ public class WarehouseTransaction {
     private Long transactionId;
 
     /**
+     * Số lượng tồn kho trước khi thực hiện giao dịch
+     * Giúp audit và trace lại lịch sử thay đổi tồn kho
+     */
+    @Column(name = "before_quantity", nullable = false)
+    private Integer beforeQuantity;
+
+    /**
      * Số lượng thay đổi
      * Số dương cho nhập hàng/trả hàng, số âm cho bán hàng/xuất hủy
      */
@@ -39,6 +46,7 @@ public class WarehouseTransaction {
 
     /**
      * Số lượng tồn kho sau khi thực hiện giao dịch
+     * Công thức: newQuantity = beforeQuantity + quantityChange
      */
     @Column(name = "new_quantity", nullable = false)
     private Integer newQuantity;
@@ -83,8 +91,6 @@ public class WarehouseTransaction {
         STOCK_IN, // Nhập hàng
         SALE, // Bán hàng
         RETURN, // Trả hàng
-        ADJUSTMENT, // Điều chỉnh
-        TRANSFER_OUT, // Chuyển kho (xuất)
-        TRANSFER_IN // Chuyển kho (nhập)
+        ADJUSTMENT, // Kiểm khê
     }
 }

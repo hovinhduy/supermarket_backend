@@ -35,18 +35,6 @@ public class ImportDetail {
     private Integer quantity;
 
     /**
-     * Giá nhập trên một đơn vị
-     */
-    @Column(name = "cost_per_unit", precision = 10, scale = 2, nullable = false)
-    private BigDecimal costPerUnit;
-
-    /**
-     * Ngày hết hạn
-     */
-    @Column(name = "expiry_date")
-    private LocalDate expiryDate;
-
-    /**
      * Thời gian tạo
      */
     @CreationTimestamp
@@ -67,12 +55,4 @@ public class ImportDetail {
     @JoinColumn(name = "variant_id", nullable = false)
     private ProductVariant variant;
 
-    /**
-     * Tính tổng giá trị nhập cho dòng này
-     * 
-     * @return tổng giá trị (số lượng * giá đơn vị)
-     */
-    public BigDecimal getTotalValue() {
-        return costPerUnit.multiply(BigDecimal.valueOf(quantity));
-    }
 }

@@ -29,16 +29,16 @@ public class Import {
     private Integer importId;
 
     /**
+     * Mã phiếu nhập (duy nhất)
+     */
+    @Column(name = "import_code", length = 50, nullable = false, unique = true)
+    private String importCode;
+
+    /**
      * Ngày nhập hàng
      */
     @Column(name = "import_date")
     private LocalDateTime importDate = LocalDateTime.now();
-
-    /**
-     * Tổng chi phí nhập hàng
-     */
-    @Column(name = "total_cost", precision = 12, scale = 2)
-    private BigDecimal totalCost;
 
     /**
      * Ghi chú
