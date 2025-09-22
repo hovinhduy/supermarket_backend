@@ -31,6 +31,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Stocktake Management", description = "API quản lý kiểm kê kho")
+@SecurityRequirement(name = "Bearer Authentication")
 public class StocktakeController {
 
     private final StocktakeService stocktakeService;

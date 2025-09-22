@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.product.AttributeCreateRequest;
@@ -25,6 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Attribute Management", description = "APIs cho quản lý thuộc tính sản phẩm")
+@SecurityRequirement(name = "Bearer Authentication")
 public class AttributeController {
 
     private final AttributeService attributeService;

@@ -36,7 +36,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Import Management", description = "APIs quản lý phiếu nhập hàng")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = "Bearer Authentication")
 public class ImportController {
 
     private final ImportService importService;

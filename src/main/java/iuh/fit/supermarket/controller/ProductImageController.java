@@ -2,6 +2,7 @@ package iuh.fit.supermarket.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.product.ProductImageDto;
@@ -26,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Product Image Management", description = "APIs cho quản lý hình ảnh sản phẩm")
+@SecurityRequirement(name = "Bearer Authentication")
 public class ProductImageController {
 
         private final ProductImageService productImageService;

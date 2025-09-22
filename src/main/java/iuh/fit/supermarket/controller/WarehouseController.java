@@ -31,6 +31,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Warehouse Management", description = "APIs quản lý tồn kho và giao dịch kho")
+@SecurityRequirement(name = "Bearer Authentication")
 public class WarehouseController {
 
     private final WarehouseService warehouseService;
