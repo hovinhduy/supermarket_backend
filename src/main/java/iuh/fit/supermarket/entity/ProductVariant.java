@@ -121,12 +121,6 @@ public class ProductVariant {
     private List<Warehouse> warehouses;
 
     /**
-     * Lịch sử xuất nhập kho
-     */
-    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<StockMovement> stockMovements;
-
-    /**
      * Chi tiết nhập hàng
      */
     @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)

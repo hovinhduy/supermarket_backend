@@ -108,6 +108,44 @@ public class GlobalExceptionHandler {
         }
 
         /**
+         * Xử lý DuplicateStocktakeCodeException
+         */
+        @ExceptionHandler(DuplicateStocktakeCodeException.class)
+        public ResponseEntity<ApiResponse<Map<String, Object>>> handleDuplicateStocktakeCodeException(
+                        DuplicateStocktakeCodeException ex) {
+
+                log.warn("Duplicate stocktake code: {}", ex.getMessage());
+
+                Map<String, Object> details = new HashMap<>();
+                details.put("stocktakeCode", ex.getStocktakeCode());
+
+                ApiResponse<Map<String, Object>> response = ApiResponse.error(ex.getMessage(), details);
+                return ResponseEntity.badRequest().body(response);
+        }
+
+        /**
+         * Xử lý StocktakeException
+         */
+        @ExceptionHandler(StocktakeException.class)
+        public ResponseEntity<ApiResponse<Object>> handleStocktakeException(StocktakeException ex) {
+                log.error("Stocktake error: {}", ex.getMessage(), ex);
+
+                ApiResponse<Object> response = ApiResponse.error(ex.getMessage());
+                return ResponseEntity.badRequest().body(response);
+        }
+
+        /**
+         * Xử lý StocktakeNotFoundException
+         */
+        @ExceptionHandler(StocktakeNotFoundException.class)
+        public ResponseEntity<ApiResponse<Object>> handleStocktakeNotFoundException(StocktakeNotFoundException ex) {
+                log.warn("Stocktake not found: {}", ex.getMessage());
+
+                ApiResponse<Object> response = ApiResponse.error(ex.getMessage());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        /**
          * Xử lý validation errors
          */
         @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -9,42 +9,35 @@ public enum StocktakeStatus {
      * Kiểm kê đang chờ thực hiện
      */
     PENDING("Pending"),
-    
-    /**
-     * Kiểm kê đang thực hiện
-     */
-    IN_PROGRESS("In_Progress"),
-    
+
     /**
      * Kiểm kê đã hoàn thành
      */
-    COMPLETED("Completed"),
-    
-    /**
-     * Kiểm kê đã được xác nhận cuối cùng
-     */
-    FINALIZED("Finalized");
-    
+    COMPLETED("Completed");
+
     private final String value;
-    
+
     /**
      * Constructor cho StocktakeStatus
+     * 
      * @param value giá trị string tương ứng trong database
      */
     StocktakeStatus(String value) {
         this.value = value;
     }
-    
+
     /**
      * Lấy giá trị string của enum
+     * 
      * @return giá trị string
      */
     public String getValue() {
         return value;
     }
-    
+
     /**
      * Chuyển đổi từ string sang enum
+     * 
      * @param value giá trị string
      * @return StocktakeStatus tương ứng
      */

@@ -46,6 +46,18 @@ public class StocktakeDetail {
     private Integer quantityDifference;
 
     /**
+     * Số lượng tăng
+     */
+    @Column(name = "quantity_increase")
+    private Integer quantityIncrease;
+
+    /**
+     * Số lượng giảm
+     */
+    @Column(name = "quantity_decrease")
+    private Integer quantityDecrease;
+
+    /**
      * Ghi chú lý do chênh lệch
      */
     @Column(name = "reason", columnDefinition = "TEXT")

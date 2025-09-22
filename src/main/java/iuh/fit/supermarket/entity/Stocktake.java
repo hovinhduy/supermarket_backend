@@ -36,18 +36,6 @@ public class Stocktake {
     private String stocktakeCode;
 
     /**
-     * ID kho hàng
-     */
-    @Column(name = "warehouse_id", nullable = false)
-    private Integer warehouseId = 1;
-
-    /**
-     * Ngày bắt đầu kiểm kê
-     */
-    @Column(name = "stocktake_date", nullable = false)
-    private LocalDateTime stocktakeDate = LocalDateTime.now();
-
-    /**
      * Trạng thái kiểm kê
      */
     @Enumerated(EnumType.STRING)
