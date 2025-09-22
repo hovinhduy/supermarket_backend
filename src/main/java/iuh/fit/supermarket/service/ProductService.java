@@ -91,7 +91,6 @@ public interface ProductService {
      */
     ProductResponse createProductVariant(Long productId, ProductVariantCreateRequest request);
 
-
     /**
      * Tạo sản phẩm mới với nhiều biến thể cùng lúc
      * 
@@ -99,8 +98,6 @@ public interface ProductService {
      * @return thông tin sản phẩm đã tạo
      */
     ProductResponse createProductWithVariants(ProductCreateWithVariantsRequest request);
-
-
 
     /**
      * Cập nhật thông tin biến thể sản phẩm
@@ -136,8 +133,17 @@ public interface ProductService {
 
     /**
      * Xóa một biến thể (soft delete)
-     * 
+     *
      * @param variantId ID biến thể cần xóa
      */
     void deleteProductVariant(Long variantId);
+
+    /**
+     * Tìm kiếm biến thể sản phẩm theo từ khóa
+     * Từ khóa có thể là mã biến thể hoặc tên biến thể
+     *
+     * @param keyword từ khóa tìm kiếm (mã biến thể hoặc tên biến thể)
+     * @return danh sách biến thể tìm được
+     */
+    List<ProductVariantDto> searchProductVariants(String keyword);
 }

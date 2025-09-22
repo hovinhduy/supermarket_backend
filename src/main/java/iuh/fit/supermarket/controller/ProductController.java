@@ -414,4 +414,37 @@ public class ProductController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+
+    /**
+     * Tìm kiếm biến thể sản phẩm theo từ khóa
+     */
+    @GetMapping("/variants/search")
+    @Operation(summary = "Tìm kiếm biến thể sản phẩm", description = "Tìm kiếm biến thể sản phẩm theo từ khóa. Từ khóa có thể là mã biến thể hoặc tên biến thể.")
+    public ResponseEntity<ApiResponse<List<ProductVariantDto>>> searchProductVariants(
+            @RequestParam String keyword) {
+
+        log.info("API tìm kiếm biến thể với từ khóa: {}", keyword);
+
+        try {
+            // Gọi service để tìm kiếm
+            List<ProductVariantDto> variants = productService.searchProductVariants(keyword);
+
+            // Tạo response message
+            String message = variants.isEmpty() ? "Không tìm thấy biến thể nào"
+                    : String.format("Tìm thấy %d biến thể", variants.size());
+
+            ApiResponse<List<ProductVariantDto>> response = ApiResponse.success(message, variants);
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.warn("Validation error khi tìm kiếm biến thể: {}", e.getMessage());
+            ApiResponse<List<ProductVariantDto>> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi tìm kiếm biến thể sản phẩm", e);
+            ApiResponse<List<ProductVariantDto>> response = ApiResponse.error("Lỗi hệ thống");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

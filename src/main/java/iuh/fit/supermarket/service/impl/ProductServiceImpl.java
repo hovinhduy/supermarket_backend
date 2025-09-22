@@ -1074,4 +1074,46 @@ public class ProductServiceImpl implements ProductService {
         }
     }
 
+    /**
+     * Tìm kiếm biến thể sản phẩm theo từ khóa
+     * Từ khóa có thể là mã biến thể hoặc tên biến thể
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductVariantDto> searchProductVariants(String keyword) {
+        log.info("Tìm kiếm biến thể với từ khóa: {}", keyword);
+
+        // Validation: từ khóa không được rỗng
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Từ khóa tìm kiếm không được rỗng");
+        }
+
+        String trimmedKeyword = keyword.trim();
+        List<ProductVariant> variants = new ArrayList<>();
+
+        // 1. Tìm kiếm chính xác theo mã biến thể trước
+        Optional<ProductVariant> variantByCode = productVariantRepository.findByVariantCode(trimmedKeyword);
+        if (variantByCode.isPresent() && !variantByCode.get().getIsDeleted()) {
+            variants.add(variantByCode.get());
+        }
+
+        // 2. Tìm kiếm theo từ khóa trong tên và mã biến thể (LIKE search)
+        Page<ProductVariant> variantsByKeyword = productVariantRepository.findByKeyword(
+                trimmedKeyword,
+                PageRequest.of(0, 100) // Giới hạn 100 kết quả
+        );
+
+        // Thêm các kết quả mới không trùng lặp
+        List<ProductVariant> keywordMatches = variantsByKeyword.getContent().stream()
+                .filter(variant -> !variants.contains(variant)) // Tránh trùng lặp với kết quả tìm theo code
+                .collect(Collectors.toList());
+
+        variants.addAll(keywordMatches);
+
+        // Convert sang DTO và trả về
+        return variants.stream()
+                .map(this::mapToProductVariantDto)
+                .collect(Collectors.toList());
+    }
+
 }
