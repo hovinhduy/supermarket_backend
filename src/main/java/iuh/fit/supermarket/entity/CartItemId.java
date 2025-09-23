@@ -14,14 +14,14 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CartItemId implements Serializable {
-    
+
     /**
      * ID giỏ hàng
      */
     private Integer cart;
-    
+
     /**
      * ID biến thể sản phẩm
      */
-    private Integer variant;
+    private Long variant;
 }

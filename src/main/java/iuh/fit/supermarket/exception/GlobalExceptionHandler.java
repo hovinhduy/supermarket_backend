@@ -39,6 +39,71 @@ public class GlobalExceptionHandler {
         }
 
         /**
+         * Xử lý ngoại lệ chung liên quan đến bảng giá
+         */
+        @ExceptionHandler(PriceException.class)
+        public ResponseEntity<ApiResponse<String>> handlePriceException(
+                        PriceException ex) {
+
+                log.warn("Price exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ validation bảng giá
+         */
+        @ExceptionHandler(PriceValidationException.class)
+        public ResponseEntity<ApiResponse<String>> handlePriceValidationException(
+                        PriceValidationException ex) {
+
+                log.warn("Price validation exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ trùng mã bảng giá
+         */
+        @ExceptionHandler(DuplicatePriceCodeException.class)
+        public ResponseEntity<ApiResponse<String>> handleDuplicatePriceCodeException(
+                        DuplicatePriceCodeException ex) {
+
+                log.warn("Duplicate price code exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ không tìm thấy bảng giá
+         */
+        @ExceptionHandler(PriceNotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handlePriceNotFoundException(
+                        PriceNotFoundException ex) {
+
+                log.warn("Price not found exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ xung đột business logic bảng giá
+         */
+        @ExceptionHandler(PriceConflictException.class)
+        public ResponseEntity<ApiResponse<String>> handlePriceConflictException(
+                        PriceConflictException ex) {
+
+                log.warn("Price conflict exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
          * Xử lý ImportException
          */
         @ExceptionHandler(ImportException.class)

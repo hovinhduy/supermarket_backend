@@ -83,13 +83,6 @@ public class Employee {
     private List<Order> orders;
 
     /**
-     * Danh sách lịch sử giá được tạo bởi nhân viên này
-     */
-    @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
-    @JsonIgnore
-    private List<PriceHistory> priceHistories;
-
-    /**
      * Danh sách phiếu nhập được tạo bởi nhân viên này
      */
     @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
@@ -123,4 +116,18 @@ public class Employee {
     @OneToMany(mappedBy = "completedBy", fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Stocktake> completedStocktakes;
+
+    /**
+     * Danh sách bảng giá được tạo bởi nhân viên này
+     */
+    @OneToMany(mappedBy = "createdBy", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Price> createdPrices;
+
+    /**
+     * Danh sách bảng giá được cập nhật bởi nhân viên này
+     */
+    @OneToMany(mappedBy = "updatedBy", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Price> updatedPrices;
 }

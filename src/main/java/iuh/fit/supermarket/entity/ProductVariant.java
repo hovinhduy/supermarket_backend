@@ -109,12 +109,6 @@ public class ProductVariant {
     private List<ProductImage> images;
 
     /**
-     * Lịch sử giá của biến thể
-     */
-    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<PriceHistory> priceHistories;
-
-    /**
      * Thông tin tồn kho
      */
     @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -137,4 +131,10 @@ public class ProductVariant {
      */
     @OneToMany(mappedBy = "variant", fetch = FetchType.LAZY)
     private List<OrderDetail> orderDetails;
+
+    /**
+     * Danh sách giá chi tiết cho biến thể này
+     */
+    @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<PriceDetail> priceDetails;
 }

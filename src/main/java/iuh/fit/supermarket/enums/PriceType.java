@@ -6,45 +6,47 @@ package iuh.fit.supermarket.enums;
  */
 public enum PriceType {
     /**
-     * Giá thường
+     * Đang áp dụng
      */
-    REGULAR("Regular"),
-    
+    CURRENT("current"),
+
     /**
-     * Giá khuyến mãi
+     * Tạm dừng áp dụng
      */
-    PROMOTION("Promotion"),
-    
+    PAUSED("paused"),
+
     /**
-     * Giá thanh lý
+     * Chưa áp dụng
      */
-    CLEARANCE("Clearance"),
-    
+    UPCOMING("upcoming"),
     /**
-     * Giá đặc biệt
+     * Đã hết hiệu lực
      */
-    SPECIAL("Special");
-    
+    EXPIRED("expired");
+
     private final String value;
-    
+
     /**
      * Constructor cho PriceType
+     * 
      * @param value giá trị string tương ứng trong database
      */
     PriceType(String value) {
         this.value = value;
     }
-    
+
     /**
      * Lấy giá trị string của enum
+     * 
      * @return giá trị string
      */
     public String getValue() {
         return value;
     }
-    
+
     /**
      * Chuyển đổi từ string sang enum
+     * 
      * @param value giá trị string
      * @return PriceType tương ứng
      */

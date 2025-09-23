@@ -14,14 +14,14 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BannerVariantId implements Serializable {
-    
+
     /**
      * ID banner
      */
     private Integer banner;
-    
+
     /**
      * ID biến thể sản phẩm
      */
-    private Integer variant;
+    private Long variant;
 }

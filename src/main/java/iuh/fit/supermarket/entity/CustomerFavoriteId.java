@@ -14,14 +14,14 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CustomerFavoriteId implements Serializable {
-    
+
     /**
      * ID khách hàng
      */
     private Integer customer;
-    
+
     /**
      * ID biến thể sản phẩm
      */
-    private Integer variant;
+    private Long variant;
 }
