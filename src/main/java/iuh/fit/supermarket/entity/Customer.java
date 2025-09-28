@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.CustomerType;
+import iuh.fit.supermarket.enums.Gender;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,6 +9,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -38,20 +40,39 @@ public class Customer {
     /**
      * Email khách hàng (duy nhất)
      */
-    @Column(name = "email", nullable = false, unique = true)
+    @Column(name = "email", nullable = false)
     private String email;
 
     /**
-     * Số điện thoại khách hàng
+     * Số điện thoại khách hàng(duy nhất)
      */
-    @Column(name = "phone", length = 20)
+    @Column(name = "phone", length = 20, unique = true, nullable = false)
     private String phone;
 
     /**
      * Mật khẩu đã được hash
      */
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
+
+    /**
+     * giới tính
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender")
+    private Gender gender;
+
+    /**
+     * Địa chỉ khách hàng
+     */
+    @Column(name = "address")
+    private String address;
+
+    /**
+     * Ngày sinh khách hàng
+     */
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
 
     /**
      * Loại khách hàng (Regular/VIP)
@@ -81,12 +102,6 @@ public class Customer {
     private LocalDateTime updatedAt;
 
     /**
-     * Danh sách địa chỉ của khách hàng
-     */
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<CustomerAddress> addresses;
-
-    /**
      * Danh sách đơn hàng của khách hàng
      */
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -98,11 +113,12 @@ public class Customer {
     @OneToOne(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private ShoppingCart shoppingCart;
 
-    /**
-     * Danh sách sản phẩm yêu thích
-     */
-    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<CustomerFavorite> favorites;
+    // /**
+    // * Danh sách sản phẩm yêu thích
+    // */
+    // @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch =
+    // FetchType.LAZY)
+    // private List<CustomerFavorite> favorites;
 
     /**
      * Danh sách điểm tích lũy

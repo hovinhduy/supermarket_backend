@@ -49,7 +49,8 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
      * Tìm bảng giá cần chuyển từ UPCOMING sang CURRENT
      */
     @Query("SELECT p FROM Price p WHERE p.status = :status AND p.startDate <= :currentTime")
-    List<Price> findPricesToActivate(@Param("status") PriceType status, @Param("currentTime") LocalDateTime currentTime);
+    List<Price> findPricesToActivate(@Param("status") PriceType status,
+            @Param("currentTime") LocalDateTime currentTime);
 
     /**
      * Tìm bảng giá cần chuyển từ CURRENT sang EXPIRED
@@ -61,17 +62,17 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
      * Tìm kiếm bảng giá với điều kiện phức tạp
      */
     @Query("SELECT p FROM Price p WHERE " +
-           "(:searchTerm IS NULL OR " +
-           " LOWER(p.priceName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-           " LOWER(p.priceCode) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
-           "(:status IS NULL OR p.status = :status) AND " +
-           "(:startDateFrom IS NULL OR p.startDate >= :startDateFrom) AND " +
-           "(:startDateTo IS NULL OR p.startDate <= :startDateTo) AND " +
-           "(:endDateFrom IS NULL OR p.endDate >= :endDateFrom) AND " +
-           "(:endDateTo IS NULL OR p.endDate <= :endDateTo) AND " +
-           "(:createdBy IS NULL OR p.createdBy.employeeId = :createdBy) AND " +
-           "(:createdFrom IS NULL OR p.createdAt >= :createdFrom) AND " +
-           "(:createdTo IS NULL OR p.createdAt <= :createdTo)")
+            "(:searchTerm IS NULL OR " +
+            " LOWER(p.priceName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            " LOWER(p.priceCode) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) AND " +
+            "(:status IS NULL OR p.status = :status) AND " +
+            "(:startDateFrom IS NULL OR p.startDate >= :startDateFrom) AND " +
+            "(:startDateTo IS NULL OR p.startDate <= :startDateTo) AND " +
+            "(:endDateFrom IS NULL OR p.endDate >= :endDateFrom) AND " +
+            "(:endDateTo IS NULL OR p.endDate <= :endDateTo) AND " +
+            "(:createdBy IS NULL OR p.createdBy.employeeId = :createdBy) AND " +
+            "(:createdFrom IS NULL OR p.createdAt >= :createdFrom) AND " +
+            "(:createdTo IS NULL OR p.createdAt <= :createdTo)")
     Page<Price> findPricesAdvanced(
             @Param("searchTerm") String searchTerm,
             @Param("status") PriceType status,
@@ -92,19 +93,20 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
     int updateStatusByIds(@Param("priceIds") List<Long> priceIds, @Param("status") PriceType status);
 
     /**
-     * Tìm bảng giá CURRENT có chứa biến thể sản phẩm cụ thể
+     * Tìm bảng giá CURRENT có chứa đơn vị sản phẩm cụ thể
      */
-    @Query("SELECT p FROM Price p JOIN p.priceDetails pd WHERE p.status = :status AND pd.variant.variantId = :variantId")
-    List<Price> findCurrentPricesByVariantId(@Param("status") PriceType status, @Param("variantId") Long variantId);
+    @Query("SELECT p FROM Price p JOIN p.priceDetails pd WHERE p.status = :status AND pd.productUnit.id = :productUnitId")
+    List<Price> findCurrentPricesByProductUnitId(@Param("status") PriceType status,
+            @Param("productUnitId") Long productUnitId);
 
     /**
-     * Kiểm tra biến thể sản phẩm có tồn tại trong bảng giá CURRENT khác không
+     * Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
      */
     @Query("SELECT COUNT(p) > 0 FROM Price p JOIN p.priceDetails pd WHERE " +
-           "p.status = :status AND pd.variant.variantId = :variantId AND p.priceId != :excludePriceId")
-    boolean existsVariantInOtherCurrentPrice(@Param("status") PriceType status, 
-                                           @Param("variantId") Long variantId, 
-                                           @Param("excludePriceId") Long excludePriceId);
+            "p.status = :status AND pd.productUnit.id = :productUnitId AND p.priceId != :excludePriceId")
+    boolean existsProductUnitInOtherCurrentPrice(@Param("status") PriceType status,
+            @Param("productUnitId") Long productUnitId,
+            @Param("excludePriceId") Long excludePriceId);
 
     /**
      * Đếm số lượng bảng giá theo trạng thái

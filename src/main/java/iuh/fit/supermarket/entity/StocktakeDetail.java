@@ -78,11 +78,11 @@ public class StocktakeDetail {
     private Stocktake stocktake;
 
     /**
-     * Biến thể sản phẩm được kiểm kê
+     * Đơn vị sản phẩm được kiểm kê
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id", nullable = false)
+    private ProductUnit productUnit;
 
     /**
      * Tính toán chênh lệch tự động

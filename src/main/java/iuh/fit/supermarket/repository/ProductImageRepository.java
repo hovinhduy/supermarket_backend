@@ -19,34 +19,24 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
 
     /**
      * Tìm tất cả hình ảnh của một sản phẩm, sắp xếp theo thứ tự
-     * 
+     *
      * @param productId ID của sản phẩm
      * @return danh sách hình ảnh của sản phẩm
      */
-    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
-    List<ProductImage> findByProductIdOrderBySortOrder(@Param("productId") Long productId);
-
-    /**
-     * Tìm tất cả hình ảnh của một biến thể sản phẩm
-     * 
-     * @param variantId ID của biến thể sản phẩm
-     * @return danh sách hình ảnh của biến thể
-     */
-    @Query("SELECT pi FROM ProductImage pi WHERE pi.variant.variantId = :variantId ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
-    List<ProductImage> findByVariantIdOrderBySortOrder(@Param("variantId") Long variantId);
+    List<ProductImage> findByProduct_IdOrderBySortOrderAscCreatedAtAsc(Long productId);
 
     /**
      * Tìm hình ảnh chính của sản phẩm (sortOrder = 0 hoặc thấp nhất)
-     * 
+     *
      * @param productId ID của sản phẩm
      * @return hình ảnh chính của sản phẩm
      */
-    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId AND pi.variant IS NULL ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
     Optional<ProductImage> findMainImageByProductId(@Param("productId") Long productId);
 
     /**
      * Tìm hình ảnh theo URL
-     * 
+     *
      * @param imageUrl URL của hình ảnh
      * @return hình ảnh tương ứng
      */
@@ -54,7 +44,7 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
 
     /**
      * Đếm số lượng hình ảnh của một sản phẩm
-     * 
+     *
      * @param productId ID của sản phẩm
      * @return số lượng hình ảnh
      */
@@ -62,17 +52,8 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
     long countByProductId(@Param("productId") Long productId);
 
     /**
-     * Đếm số lượng hình ảnh của một biến thể
-     * 
-     * @param variantId ID của biến thể
-     * @return số lượng hình ảnh
-     */
-    @Query("SELECT COUNT(pi) FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    long countByVariantId(@Param("variantId") Long variantId);
-
-    /**
      * Xóa tất cả hình ảnh của một sản phẩm
-     * 
+     *
      * @param productId ID của sản phẩm
      */
     @Modifying
@@ -81,27 +62,17 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
     void deleteByProductId(@Param("productId") Long productId);
 
     /**
-     * Xóa tất cả hình ảnh của một biến thể
-     * 
-     * @param variantId ID của biến thể
-     */
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    void deleteByVariantId(@Param("variantId") Long variantId);
-
-    /**
-     * Tìm hình ảnh chung của sản phẩm (không thuộc về biến thể nào)
-     * 
+     * Tìm hình ảnh chung của sản phẩm
+     *
      * @param productId ID của sản phẩm
      * @return danh sách hình ảnh chung của sản phẩm
      */
-    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId AND pi.variant IS NULL ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
+    @Query("SELECT pi FROM ProductImage pi WHERE pi.product.id = :productId ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
     List<ProductImage> findGeneralImagesByProductId(@Param("productId") Long productId);
 
     /**
      * Tìm thứ tự sắp xếp lớn nhất cho sản phẩm
-     * 
+     *
      * @param productId ID của sản phẩm
      * @return thứ tự sắp xếp lớn nhất
      */
@@ -109,11 +80,35 @@ public interface ProductImageRepository extends JpaRepository<ProductImage, Inte
     Integer findMaxSortOrderByProductId(@Param("productId") Long productId);
 
     /**
-     * Tìm thứ tự sắp xếp lớn nhất cho biến thể
-     * 
-     * @param variantId ID của biến thể
-     * @return thứ tự sắp xếp lớn nhất
+     * Tìm tất cả hình ảnh của sản phẩm mà chưa được chọn bởi ProductUnit cụ thể
+     *
+     * @param productId ID của sản phẩm
+     * @param productUnitId ID của ProductUnit
+     * @return danh sách hình ảnh chưa được chọn
      */
-    @Query("SELECT COALESCE(MAX(pi.sortOrder), 0) FROM ProductImage pi WHERE pi.variant.variantId = :variantId")
-    Integer findMaxSortOrderByVariantId(@Param("variantId") Long variantId);
+    @Query("SELECT pi FROM ProductImage pi " +
+           "WHERE pi.product.id = :productId " +
+           "AND pi.imageId NOT IN (" +
+           "    SELECT pui.productImage.imageId FROM ProductUnitImage pui " +
+           "    WHERE pui.productUnit.id = :productUnitId AND pui.isActive = true" +
+           ") " +
+           "ORDER BY pi.sortOrder ASC, pi.createdAt ASC")
+    List<ProductImage> findAvailableImagesForProductUnit(@Param("productId") Long productId,
+                                                        @Param("productUnitId") Long productUnitId);
+
+    /**
+     * Tìm tất cả hình ảnh của sản phẩm đã được chọn bởi ProductUnit cụ thể
+     *
+     * @param productId ID của sản phẩm
+     * @param productUnitId ID của ProductUnit
+     * @return danh sách hình ảnh đã được chọn
+     */
+    @Query("SELECT pi FROM ProductImage pi " +
+           "JOIN ProductUnitImage pui ON pi.imageId = pui.productImage.imageId " +
+           "WHERE pi.product.id = :productId " +
+           "AND pui.productUnit.id = :productUnitId " +
+           "AND pui.isActive = true " +
+           "ORDER BY pui.displayOrder ASC, pi.sortOrder ASC")
+    List<ProductImage> findSelectedImagesForProductUnit(@Param("productId") Long productId,
+                                                       @Param("productUnitId") Long productUnitId);
 }

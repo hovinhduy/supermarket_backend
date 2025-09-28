@@ -10,11 +10,11 @@ import java.time.LocalDateTime;
 
 /**
  * Entity đại diện cho kho hàng và tồn kho sản phẩm trong hệ thống
- * Số lượng của các biến thể khác được tính toán dựa trên conversionValue
+ * Số lượng của các đơn vị khác được tính toán dựa trên conversionValue
  * Hệ thống chỉ có 1 kho duy nhất
  */
 @Entity
-@Table(name = "warehouses", uniqueConstraints = @UniqueConstraint(columnNames = { "variant_id" }))
+@Table(name = "warehouses", uniqueConstraints = @UniqueConstraint(columnNames = { "product_unit_id" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -42,9 +42,9 @@ public class Warehouse {
     private LocalDateTime updatedAt;
 
     /**
-     * Biến thể sản phẩm
+     * Đơn vị sản phẩm
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id", nullable = false)
+    private ProductUnit productUnit;
 }

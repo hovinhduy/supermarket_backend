@@ -49,10 +49,10 @@ public class CartItem {
     private ShoppingCart cart;
     
     /**
-     * Biến thể sản phẩm
+     * Đơn vị sản phẩm
      */
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id")
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id")
+    private ProductUnit productUnit;
 }

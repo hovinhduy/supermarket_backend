@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * DTO cho response upload hình ảnh sản phẩm
+ * DTO cho phản hồi upload hình ảnh sản phẩm
  */
 @Data
 @NoArgsConstructor
@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 public class ProductImageUploadResponse {
 
     /**
-     * ID của hình ảnh vừa được tạo
+     * ID của hình ảnh đã upload
      */
     private Integer imageId;
 
@@ -28,7 +28,7 @@ public class ProductImageUploadResponse {
     private String message;
 
     /**
-     * Thứ tự sắp xếp được gán
+     * Thứ tự sắp xếp
      */
     private Integer sortOrder;
 
@@ -43,13 +43,21 @@ public class ProductImageUploadResponse {
     private String contentType;
 
     /**
-     * Constructor cho trường hợp thành công
+     * Trạng thái upload
      */
-    public ProductImageUploadResponse(Integer imageId, String imageUrl, String message, Integer sortOrder) {
+    private boolean success = true;
+
+    /**
+     * Constructor for successful upload
+     */
+    public ProductImageUploadResponse(Integer imageId, String imageUrl, String message,
+            Integer sortOrder, Long fileSize, String contentType) {
         this.imageId = imageId;
         this.imageUrl = imageUrl;
         this.message = message;
         this.sortOrder = sortOrder;
+        this.fileSize = fileSize;
+        this.contentType = contentType;
+        this.success = true;
     }
 }
-

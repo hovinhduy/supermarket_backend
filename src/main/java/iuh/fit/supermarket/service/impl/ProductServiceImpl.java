@@ -1,21 +1,31 @@
 package iuh.fit.supermarket.service.impl;
 
 import iuh.fit.supermarket.dto.product.*;
-import iuh.fit.supermarket.entity.*;
-import iuh.fit.supermarket.repository.*;
+import iuh.fit.supermarket.dto.unit.UnitDto;
+import iuh.fit.supermarket.entity.Brand;
+import iuh.fit.supermarket.entity.Category;
+import iuh.fit.supermarket.entity.Product;
+import iuh.fit.supermarket.entity.ProductUnit;
+import iuh.fit.supermarket.entity.Unit;
+import iuh.fit.supermarket.exception.DuplicateProductException;
+import iuh.fit.supermarket.exception.ProductException;
+import iuh.fit.supermarket.exception.ProductNotFoundException;
+import iuh.fit.supermarket.repository.BrandRepository;
+import iuh.fit.supermarket.repository.CategoryRepository;
+import iuh.fit.supermarket.repository.ProductRepository;
+import iuh.fit.supermarket.repository.ProductUnitRepository;
+import iuh.fit.supermarket.repository.UnitRepository;
 import iuh.fit.supermarket.service.ProductService;
-import iuh.fit.supermarket.service.VariantAttributeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -28,14 +38,10 @@ import java.util.stream.Collectors;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
-    private final ProductUnitRepository productUnitRepository;
-    private final AttributeRepository attributeRepository;
-    private final AttributeValueRepository attributeValueRepository;
-    private final ProductVariantRepository productVariantRepository;
-    private final VariantAttributeRepository variantAttributeRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
-    private final VariantAttributeService variantAttributeService;
+    private final UnitRepository unitRepository;
+    private final ProductUnitRepository productUnitRepository;
 
     /**
      * Tạo sản phẩm mới
@@ -44,37 +50,58 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse createProduct(ProductCreateRequest request) {
         log.info("Bắt đầu tạo sản phẩm mới: {}", request.getName());
 
-        // Tạo entity Product (chỉ thông tin chung)
+        // Kiểm tra trùng lặp tên sản phẩm
+        if (existsByName(request.getName())) {
+            throw DuplicateProductException.forProductName(request.getName());
+        }
+
+        // Validation danh sách units
+        validateUnits(request.getUnits());
+
+        // Kiểm tra dữ liệu đầu vào
+        if (request.getCategoryId() == null) {
+            throw new ProductException("ID danh mục không được để trống");
+        }
+
+        // Kiểm tra danh mục tồn tại và hoạt động
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ProductException(
+                        "Không tìm thấy danh mục với ID: " + request.getCategoryId()));
+
+        if (!category.getIsActive()) {
+            throw new ProductException("Danh mục đã bị vô hiệu hóa");
+        }
+
+        // Kiểm tra thương hiệu nếu có cung cấp
+        Brand brand = null;
+        if (request.getBrandId() != null) {
+            brand = brandRepository.findById(request.getBrandId())
+                    .orElseThrow(() -> new ProductException(
+                            "Không tìm thấy thương hiệu với ID: " + request.getBrandId()));
+
+            if (!brand.getIsActive()) {
+                throw new ProductException("Thương hiệu đã bị vô hiệu hóa");
+            }
+        }
+
+        // Tạo entity Product
         Product product = new Product();
         product.setName(request.getName());
         product.setDescription(request.getDescription());
-        product.setIsActive(true);
+        product.setCategory(category);
+        product.setBrand(brand); // Có thể null nếu không cung cấp brandId
+        product.setIsRewardPoint(request.getIsRewardPoint() != null ? request.getIsRewardPoint() : false);
+        product.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
         product.setIsDeleted(false);
-        product.setVariantCount(1); // Mặc định có 1 variant cơ bản
 
         // Lưu sản phẩm
         product = productRepository.save(product);
-        log.info("Đã lưu sản phẩm với ID: {}", product.getId());
+        log.info("Đã tạo sản phẩm với ID: {}", product.getId());
 
-        // Kiểm tra baseUnit bắt buộc
-        if (request.getBaseUnit() == null || request.getBaseUnit().getUnit() == null
-                || request.getBaseUnit().getUnit().trim().isEmpty()) {
-            throw new RuntimeException("Đơn vị cơ bản (baseUnit) là bắt buộc khi tạo sản phẩm");
-        }
+        // Tạo các đơn vị cho sản phẩm
+        createProductUnits(product, request.getUnits());
+        log.info("Đã tạo {} đơn vị cho sản phẩm ID: {}", request.getUnits().size(), product.getId());
 
-        // Tạo đơn vị cơ bản và variant mặc định
-        ProductUnit baseUnit = createProductUnit(product, request.getBaseUnit().getUnit(), 1, true);
-
-        // Tạo variant cơ bản với đơn vị này
-        createDefaultProductVariant(product, baseUnit, request.getBaseUnit(), request.getAllowsSale());
-
-        // Tạo các đơn vị bổ sung
-        if (request.getAdditionalUnits() != null) {
-            for (ProductCreateRequest.AdditionalUnitDto unitDto : request.getAdditionalUnits()) {
-                createProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue());
-            }
-        }
-        log.info("Tạo sản phẩm thành công với mã: {}");
         return mapToProductResponse(product);
     }
 
@@ -84,10 +111,14 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public ProductResponse getProductById(Long id) {
-        log.info("Lấy thông tin sản phẩm ID: {}", id);
+        log.debug("Lấy thông tin sản phẩm với ID: {}", id);
 
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+                .orElseThrow(() -> new ProductNotFoundException(id));
+
+        if (product.getIsDeleted()) {
+            throw new ProductNotFoundException(id);
+        }
 
         return mapToProductResponse(product);
     }
@@ -97,23 +128,64 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public ProductResponse updateProduct(Long id, ProductUpdateRequest request) {
-        log.info("Cập nhật sản phẩm ID: {}", id);
+        log.info("Bắt đầu cập nhật sản phẩm với ID: {}", id);
 
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+                .orElseThrow(() -> new ProductNotFoundException(id));
 
-        // Cập nhật thông tin cơ bản (chỉ thông tin chung)
-        if (request.getName() != null)
-            product.setName(request.getName());
-        if (request.getDescription() != null)
-            product.setDescription(request.getDescription());
-        if (request.getCategoryId() != null) {
+        if (product.getIsDeleted()) {
+            throw new ProductNotFoundException(id);
         }
-        if (request.getIsActive() != null)
-            product.setIsActive(request.getIsActive());
 
+        // Kiểm tra trùng lặp tên sản phẩm (nếu có thay đổi tên)
+        if (request.getName() != null && !request.getName().equals(product.getName())) {
+            if (existsByNameAndIdNot(request.getName(), id)) {
+                throw DuplicateProductException.forProductName(request.getName());
+            }
+            product.setName(request.getName());
+        }
+
+        // Cập nhật mô tả
+        if (request.getDescription() != null) {
+            product.setDescription(request.getDescription());
+        }
+
+        // Cập nhật danh mục
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ProductException(
+                            "Không tìm thấy danh mục với ID: " + request.getCategoryId()));
+
+            if (!category.getIsActive()) {
+                throw new ProductException("Danh mục đã bị vô hiệu hóa");
+            }
+            product.setCategory(category);
+        }
+
+        // Cập nhật thương hiệu (nếu có)
+        if (request.getBrandId() != null) {
+            Brand brand = brandRepository.findById(request.getBrandId())
+                    .orElseThrow(() -> new ProductException(
+                            "Không tìm thấy thương hiệu với ID: " + request.getBrandId()));
+
+            if (!brand.getIsActive()) {
+                throw new ProductException("Thương hiệu đã bị vô hiệu hóa");
+            }
+            product.setBrand(brand);
+        }
+
+        // Cập nhật các trường khác
+        if (request.getIsRewardPoint() != null) {
+            product.setIsRewardPoint(request.getIsRewardPoint());
+        }
+
+        if (request.getIsActive() != null) {
+            product.setIsActive(request.getIsActive());
+        }
+
+        // Lưu thay đổi
         product = productRepository.save(product);
-        log.info("Cập nhật sản phẩm thành công");
+        log.info("Đã cập nhật sản phẩm với ID: {}", product.getId());
 
         return mapToProductResponse(product);
     }
@@ -123,129 +195,106 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     public void deleteProduct(Long id) {
-        log.info("Xóa sản phẩm ID: {}", id);
+        log.info("Bắt đầu xóa sản phẩm với ID: {}", id);
 
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + id));
+                .orElseThrow(() -> new ProductNotFoundException(id));
 
-        // Xóa mềm sản phẩm
+        if (product.getIsDeleted()) {
+            throw new ProductNotFoundException(id);
+        }
+
+        // Thực hiện soft delete cho sản phẩm
         product.setIsDeleted(true);
         product.setIsActive(false);
         productRepository.save(product);
 
-        // Xóa mềm tất cả các biến thể của sản phẩm
-        softDeleteProductVariants(id);
+        // Soft delete tất cả đơn vị sản phẩm liên quan
+        List<ProductUnit> productUnits = productUnitRepository.findByProductId(id);
+        for (ProductUnit productUnit : productUnits) {
+            productUnit.setIsDeleted(true);
+            productUnit.setIsActive(false);
+        }
+        productUnitRepository.saveAll(productUnits);
 
-        log.info("Xóa sản phẩm và các biến thể thành công");
+        log.info("Đã xóa sản phẩm và {} đơn vị sản phẩm với ID: {}", productUnits.size(), id);
     }
 
     /**
-     * Xóa nhiều sản phẩm cùng lúc (soft delete)
+     * Xóa nhiều sản phẩm (soft delete)
      */
     @Override
-    public void deleteProducts(List<Long> ids) {
-        log.info("Xóa nhiều sản phẩm với {} ID: {}", ids.size(), ids);
+    public void deleteMultipleProducts(List<Long> ids) {
+        log.info("Bắt đầu xóa {} sản phẩm", ids.size());
 
         if (ids == null || ids.isEmpty()) {
-            throw new RuntimeException("Danh sách ID sản phẩm không được rỗng");
+            throw new ProductException("Danh sách ID sản phẩm không được rỗng");
         }
 
-        // Tìm tất cả sản phẩm theo danh sách ID
         List<Product> products = productRepository.findAllById(ids);
 
-        // Kiểm tra xem có sản phẩm nào không tồn tại
         if (products.size() != ids.size()) {
-            List<Long> foundIds = products.stream().map(Product::getId).collect(Collectors.toList());
-            List<Long> notFoundIds = ids.stream().filter(id -> !foundIds.contains(id)).collect(Collectors.toList());
-            throw new RuntimeException("Không tìm thấy sản phẩm với ID: " + notFoundIds);
+            throw new ProductException("Một số sản phẩm không tồn tại hoặc đã bị xóa");
         }
 
-        // Cập nhật trạng thái xóa cho tất cả sản phẩm
+        // Thực hiện soft delete cho tất cả sản phẩm và đơn vị sản phẩm liên quan
+        int totalProductUnits = 0;
         for (Product product : products) {
-            product.setIsDeleted(true);
-            product.setIsActive(false);
-        }
+            if (!product.getIsDeleted()) {
+                product.setIsDeleted(true);
+                product.setIsActive(false);
 
-        // Lưu tất cả sản phẩm đã cập nhật
-        productRepository.saveAll(products);
-
-        // Xóa mềm tất cả các biến thể của từng sản phẩm
-        for (Product product : products) {
-            softDeleteProductVariants(product.getId());
-        }
-
-        log.info("Xóa {} sản phẩm và các biến thể thành công", products.size());
-    }
-
-    /**
-     * Xóa mềm tất cả các biến thể của một sản phẩm
-     */
-    private void softDeleteProductVariants(Long productId) {
-        log.info("Xóa mềm các biến thể của sản phẩm ID: {}", productId);
-
-        // Tìm tất cả biến thể của sản phẩm (bao gồm cả đã xóa)
-        List<ProductVariant> variants = productVariantRepository.findAllByProductId(productId);
-
-        if (variants != null && !variants.isEmpty()) {
-            // Cập nhật trạng thái xóa mềm cho tất cả biến thể
-            for (ProductVariant variant : variants) {
-                variant.setIsDeleted(true);
-                variant.setIsActive(false);
-                variant.setAllowsSale(false); // Không cho phép bán nữa
+                // Soft delete tất cả đơn vị sản phẩm liên quan
+                List<ProductUnit> productUnits = productUnitRepository.findByProductId(product.getId());
+                for (ProductUnit productUnit : productUnits) {
+                    productUnit.setIsDeleted(true);
+                    productUnit.setIsActive(false);
+                }
+                productUnitRepository.saveAll(productUnits);
+                totalProductUnits += productUnits.size();
             }
-
-            // Lưu tất cả biến thể đã cập nhật
-            productVariantRepository.saveAll(variants);
-
-            log.info("Đã xóa mềm {} biến thể của sản phẩm ID: {}", variants.size(), productId);
-        } else {
-            log.info("Không tìm thấy biến thể nào cho sản phẩm ID: {}", productId);
         }
+
+        productRepository.saveAll(products);
+        log.info("Đã xóa {} sản phẩm và {} đơn vị sản phẩm", products.size(), totalProductUnits);
     }
 
     /**
-     * Lấy danh sách sản phẩm với phân trang
+     * Lấy danh sách sản phẩm với phân trang và tìm kiếm/lọc
      */
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getProducts(Pageable pageable) {
-        log.info("Lấy danh sách sản phẩm với phân trang");
+    public ProductListResponse getProducts(String searchTerm,
+            Integer categoryId,
+            Integer brandId,
+            Boolean isActive,
+            Boolean isRewardPoint,
+            Pageable pageable) {
+        log.debug(
+                "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}",
+                searchTerm, categoryId, brandId, isActive, isRewardPoint);
 
-        Page<Product> products = productRepository.findAll(pageable);
-        return products.map(this::mapToProductResponse);
+        // Tạm thời sử dụng method đơn giản, sau này có thể mở rộng với Specification
+        Page<Product> productPage;
+
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            productPage = productRepository.findProductsAdvanced(searchTerm.trim(), isActive, pageable);
+        } else {
+            productPage = productRepository.findProductsAdvanced("", isActive, pageable);
+        }
+
+        return mapToProductListResponse(productPage);
     }
 
     /**
-     * Lấy danh sách sản phẩm với filtering, searching và sorting nâng cao
+     * Lấy tất cả sản phẩm đang hoạt động
      */
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> getProductsAdvanced(ProductPageableRequest request) {
-        log.info("Lấy danh sách sản phẩm nâng cao: page={}, limit={}, search={}, isActive={}",
-                request.getPage(), request.getLimit(), request.getSearchTerm(), request.getIsActive());
+    public List<ProductResponse> getAllActiveProducts() {
+        log.debug("Lấy tất cả sản phẩm đang hoạt động");
 
-        // Tạo Pageable object từ request
-        Pageable pageable = createPageableFromRequest(request);
-
-        // Gọi repository để lấy dữ liệu
-        Page<Product> products = productRepository.findProductsAdvanced(
-                request.getSearchTerm(),
-                request.getActiveValue(),
-                pageable);
-
-        // Map sang ProductResponse
-        return products.map(this::mapToProductResponse);
-    }
-
-    /**
-     * Tìm kiếm sản phẩm theo từ khóa
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductResponse> searchProducts(String keyword) {
-        log.info("Tìm kiếm sản phẩm với từ khóa: {}", keyword);
-
-        List<Product> products = productRepository.findByNameContaining(keyword);
+        List<Product> products = productRepository.findByIsActiveAndIsDeleted(true, false);
         return products.stream()
                 .map(this::mapToProductResponse)
                 .collect(Collectors.toList());
@@ -256,864 +305,680 @@ public class ProductServiceImpl implements ProductService {
      */
     @Override
     @Transactional(readOnly = true)
-    public List<ProductResponse> getProductsByCategory(Long categoryId) {
-        log.info("Lấy sản phẩm theo danh mục ID: {}", categoryId);
+    public ProductListResponse getProductsByCategory(Integer categoryId, Pageable pageable) {
+        log.debug("Lấy danh sách sản phẩm theo danh mục ID: {}", categoryId);
 
-        List<Product> products = productRepository.findByCategoryIdAndIsDeleted(
-                categoryId, false);
-        return products.stream()
-                .map(this::mapToProductResponse)
-                .collect(Collectors.toList());
+        // Kiểm tra danh mục tồn tại
+        if (!categoryRepository.existsById(categoryId)) {
+            throw new ProductException("Không tìm thấy danh mục với ID: " + categoryId);
+        }
+
+        List<Product> products = productRepository.findByCategoryIdAndIsDeleted(categoryId.longValue(), false);
+
+        // Tạm thời convert thành Page manually, sau này có thể cải thiện
+        return createProductListResponse(products, pageable);
     }
 
     /**
-     * Tạo biến thể sản phẩm
+     * Lấy danh sách sản phẩm theo thương hiệu
      */
     @Override
-    public ProductResponse createProductVariant(Long productId, ProductVariantCreateRequest request) {
-        log.info("Tạo biến thể cho sản phẩm ID: {}", productId);
+    @Transactional(readOnly = true)
+    public ProductListResponse getProductsByBrand(Integer brandId, Pageable pageable) {
+        log.debug("Lấy danh sách sản phẩm theo thương hiệu ID: {}", brandId);
 
-        // Kiểm tra sản phẩm tồn tại
-        productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm gốc với ID: " + productId));
-
-        // TODO: Cần thay đổi logic tạo biến thể theo mô hình mới
-        // Không tạo Product mới, mà tạo ProductVariant
-        throw new RuntimeException("Chức năng tạo biến thể đang được cập nhật theo mô hình mới");
-    }
-
-    /**
-     * Tạo mã variant tự động cho sản phẩm đơn giản (theo product)
-     */
-    private String generateVariantCode(String productCode) {
-        log.info("Tạo mã variant tự động cho sản phẩm: {}", productCode);
-
-        // Với sản phẩm đơn giản, mã variant = mã sản phẩm + "-01"
-        String baseVariantCode = productCode + "-01";
-
-        // Kiểm tra xem mã đã tồn tại chưa
-        int counter = 1;
-        String variantCode = baseVariantCode;
-        while (productVariantRepository.existsByVariantCode(variantCode)) {
-            counter++;
-            variantCode = productCode + String.format("-%02d", counter);
+        // Kiểm tra thương hiệu tồn tại
+        if (!brandRepository.existsById(brandId)) {
+            throw new ProductException("Không tìm thấy thương hiệu với ID: " + brandId);
         }
 
-        return variantCode;
+        // Tạm thời sử dụng phương pháp đơn giản
+        List<Product> allProducts = productRepository.findByIsActiveAndIsDeleted(true, false);
+        List<Product> brandProducts = allProducts.stream()
+                .filter(product -> product.getBrand().getBrandId().equals(brandId))
+                .collect(Collectors.toList());
+
+        return createProductListResponse(brandProducts, pageable);
     }
 
     /**
-     * Tạo mã variant tự động toàn cục (SP000001, SP000002...)
+     * Tìm kiếm sản phẩm theo tên
      */
-    private String generateGlobalVariantCode() {
-        log.info("Tạo mã variant tự động toàn cục");
+    @Override
+    @Transactional(readOnly = true)
+    public ProductListResponse searchProducts(String keyword, Pageable pageable) {
+        log.debug("Tìm kiếm sản phẩm với từ khóa: {}", keyword);
 
-        List<String> maxCodes = productVariantRepository.findMaxVariantCode();
-
-        if (maxCodes.isEmpty()) {
-            return "SP000001";
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new ProductException("Từ khóa tìm kiếm không được rỗng");
         }
 
-        String maxCode = maxCodes.get(0);
-        try {
-            // Chỉ lấy số từ mã SP000001 (bỏ qua SP)
-            int number = Integer.parseInt(maxCode.substring(2)) + 1;
-            return String.format("SP%06d", number);
-        } catch (Exception e) {
-            log.warn("Lỗi khi parse mã variant: {}", maxCode);
-            return "SP000001";
-        }
+        List<Product> products = productRepository.findByNameContaining(keyword.trim());
+        return createProductListResponse(products, pageable);
     }
 
     /**
-     * Tạo hoặc sử dụng mã variant từ request
-     * Nếu variantCode từ request không null và không trống, kiểm tra tính duy nhất
-     * và sử dụng
-     * Nếu variantCode trùng lặp, báo lỗi
-     * Nếu không có variantCode, tự động tạo mã variant mới
+     * Kiểm tra sản phẩm có tồn tại không
      */
-    private String generateOrUseVariantCode(String requestedVariantCode) {
-        // Nếu có variantCode từ request và không trống
-        if (requestedVariantCode != null && !requestedVariantCode.trim().isEmpty()) {
-            String trimmedCode = requestedVariantCode.trim();
-
-            // Kiểm tra mã variant đã tồn tại chưa
-            if (productVariantRepository.existsByVariantCode(trimmedCode)) {
-                log.error("Mã variant {} đã tồn tại trong hệ thống", trimmedCode);
-                throw new RuntimeException(
-                        "Mã variant '" + trimmedCode + "' đã tồn tại trong hệ thống. Vui lòng sử dụng mã khác.");
-            }
-
-            log.info("Sử dụng mã variant từ request: {}", trimmedCode);
-            return trimmedCode;
-        }
-
-        // Nếu không có variantCode từ request, tạo tự động
-        log.info("Không có mã variant từ request, tạo mã tự động");
-        return generateGlobalVariantCode();
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsById(Long id) {
+        return productRepository.existsById(id);
     }
 
     /**
-     * Tạo variant mặc định cho sản phẩm đơn giản
+     * Kiểm tra tên sản phẩm có bị trùng không
      */
-    private void createDefaultProductVariant(Product product, ProductUnit unit,
-            ProductCreateRequest.BaseUnitDto baseUnitDto,
-            Boolean allowsSale) {
-        log.info("Tạo variant mặc định cho sản phẩm: {}", product.getId());
-
-        ProductVariant variant = new ProductVariant();
-
-        // Tạo variant code: sử dụng từ request nếu có, nếu không thì tự động tạo
-        String variantCode = generateOrUseVariantCode(baseUnitDto.getVariantCode());
-        variant.setVariantCode(variantCode);
-
-        // Tạo tên variant: Tên sản phẩm + Đơn vị
-        String variantName = product.getName() + " - " + unit.getUnit();
-        variant.setVariantName(variantName);
-
-        // Thiết lập thông tin cơ bản
-        variant.setProduct(product);
-        variant.setUnit(unit);
-
-        // Thiết lập barcode nếu có
-        if (baseUnitDto.getBarcode() != null && !baseUnitDto.getBarcode().trim().isEmpty()) {
-            variant.setBarcode(baseUnitDto.getBarcode());
-        }
-
-        // Thiết lập trạng thái cho phép bán từ request hoặc mặc định
-        if (allowsSale != null) {
-            variant.setAllowsSale(allowsSale);
-        } else {
-            variant.setAllowsSale(true);
-        }
-        variant.setIsActive(true);
-        variant.setIsDeleted(false);
-
-        // Lưu variant
-        productVariantRepository.save(variant);
-        log.info("Đã tạo variant mặc định với mã: {} (chỉ thông tin cơ bản)", variantCode);
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByName(String name) {
+        return productRepository.findByNameContaining(name).stream()
+                .anyMatch(product -> product.getName().equalsIgnoreCase(name) && !product.getIsDeleted());
     }
 
     /**
-     * Tạo đơn vị sản phẩm (không chứa giá)
+     * Kiểm tra tên sản phẩm có bị trùng không (loại trừ ID hiện tại)
      */
-    private ProductUnit createProductUnit(Product product, String unit, Integer conversionValue) {
-        return createProductUnit(product, unit, conversionValue, false);
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByNameAndIdNot(String name, Long excludeId) {
+        return productRepository.findByNameContaining(name).stream()
+                .anyMatch(product -> product.getName().equalsIgnoreCase(name)
+                        && !product.getId().equals(excludeId)
+                        && !product.getIsDeleted());
     }
 
     /**
-     * Tạo đơn vị sản phẩm với khả năng đánh dấu là đơn vị cơ bản
-     */
-    private ProductUnit createProductUnit(Product product, String unit, Integer conversionValue, Boolean isBaseUnit) {
-        ProductUnit productUnit = new ProductUnit();
-        productUnit.setProduct(product);
-        productUnit.setUnit(unit);
-        productUnit.setConversionValue(conversionValue);
-        productUnit.setIsBaseUnit(isBaseUnit != null ? isBaseUnit : false);
-        productUnit.setIsActive(true);
-        productUnit.setSortOrder(0);
-
-        return productUnitRepository.save(productUnit);
-    }
-
-    /**
-     * Map Product entity thành ProductResponse DTO
+     * Chuyển đổi Product entity sang ProductResponse DTO
      */
     private ProductResponse mapToProductResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
         response.setName(product.getName());
         response.setDescription(product.getDescription());
-        response.setVariantCount(product.getVariantCount());
         response.setIsActive(product.getIsActive());
-        response.setCreatedDate(product.getCreatedDate());
+        response.setIsDeleted(product.getIsDeleted());
+        response.setIsRewardPoint(product.getIsRewardPoint());
+        response.setCreatedDate(product.getCreatedAt());
         response.setUpdatedAt(product.getUpdatedAt());
 
-        // Map category nếu có
-        if (product.getCategory() != null) {
-            ProductResponse.CategoryDto categoryDto = new ProductResponse.CategoryDto();
-            categoryDto.setId(product.getCategory().getCategoryId().longValue());
-            categoryDto.setName(product.getCategory().getName());
-            response.setCategory(categoryDto);
-        }
-
-        // Map brand nếu có
+        // Map thông tin thương hiệu
         if (product.getBrand() != null) {
-            ProductResponse.BrandDto brandDto = new ProductResponse.BrandDto();
-            // Brand entity dùng Integer ID tương tự Category
-            brandDto.setId(product.getBrand().getBrandId().longValue());
-            brandDto.setName(product.getBrand().getName());
-            response.setBrand(brandDto);
+            ProductResponse.BrandInfo brandInfo = new ProductResponse.BrandInfo();
+            brandInfo.setBrandId(product.getBrand().getBrandId());
+            brandInfo.setName(product.getBrand().getName());
+            brandInfo.setBrandCode(product.getBrand().getBrandCode());
+            brandInfo.setLogoUrl(product.getBrand().getLogoUrl());
+            response.setBrand(brandInfo);
         }
 
-        // Map variants (biến thể sản phẩm)
-        List<ProductVariant> variants = productVariantRepository.findByProductId(product.getId());
-        if (variants != null && !variants.isEmpty()) {
-            List<ProductVariantDto> variantDtos = variants.stream()
-                    .map(this::mapToProductVariantDto)
-                    .collect(Collectors.toList());
-            response.setVariants(variantDtos);
+        // Map thông tin danh mục
+        if (product.getCategory() != null) {
+            ProductResponse.CategoryInfo categoryInfo = new ProductResponse.CategoryInfo();
+            categoryInfo.setCategoryId(product.getCategory().getCategoryId());
+            categoryInfo.setName(product.getCategory().getName());
+            categoryInfo.setDescription(product.getCategory().getDescription());
+            response.setCategory(categoryInfo);
         }
+
+        // Set count thông tin
+        response.setUnitCount(product.getProductUnits() != null ? product.getProductUnits().size() : 0);
+        response.setImageCount(product.getImages() != null ? product.getImages().size() : 0);
+
+        // Map thông tin các đơn vị sản phẩm
+        List<ProductUnit> productUnits = productUnitRepository.findByProductId(product.getId());
+        List<ProductResponse.ProductUnitInfo> productUnitInfos = productUnits.stream()
+                .filter(pu -> !pu.getIsDeleted()) // Chỉ lấy các unit chưa bị xóa
+                .map(this::mapToProductUnitInfo)
+                .collect(Collectors.toList());
+        response.setProductUnits(productUnitInfos);
 
         return response;
     }
 
     /**
-     * Tạo sản phẩm mới với nhiều biến thể cùng lúc
+     * Chuyển đổi Page<Product> sang ProductListResponse
      */
-    @Override
-    public ProductResponse createProductWithVariants(ProductCreateWithVariantsRequest request) {
-        log.info("Bắt đầu tạo sản phẩm với nhiều biến thể: {}", request.getName());
+    private ProductListResponse mapToProductListResponse(Page<Product> productPage) {
+        List<ProductListResponse.ProductSummary> productSummaries = productPage.getContent().stream()
+                .map(this::mapToProductSummary)
+                .collect(Collectors.toList());
 
-        // Validation dữ liệu đầu vào
-        validateProductCreateWithVariantsRequest(request);
+        ProductListResponse.PageInfo pageInfo = new ProductListResponse.PageInfo();
+        pageInfo.setCurrentPage(productPage.getNumber());
+        pageInfo.setPageSize(productPage.getSize());
+        pageInfo.setTotalElements(productPage.getTotalElements());
+        pageInfo.setTotalPages(productPage.getTotalPages());
+        pageInfo.setIsFirst(productPage.isFirst());
+        pageInfo.setIsLast(productPage.isLast());
+        pageInfo.setHasPrevious(productPage.hasPrevious());
+        pageInfo.setHasNext(productPage.hasNext());
 
-        // Kiểm tra sự tồn tại của category và brand
-        Category category = validateAndGetCategory(request.getCategoryId());
-
-        // Brand không bắt buộc, chỉ kiểm tra tồn tại nếu có truyền brandId
-        Brand brand = null;
-        if (request.getBrandId() != null) {
-            brand = validateAndGetBrand(request.getBrandId());
-        }
-
-        // Tạo entity Product
-        Product product = new Product();
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
-        product.setCategory(category);
-        product.setBrand(brand);
-        product.setIsActive(true);
-        product.setIsDeleted(false);
-        product.setVariantCount(request.getVariants().size());
-
-        // Lưu sản phẩm
-        product = productRepository.save(product);
-        log.info("Đã lưu sản phẩm với ID: {}", product.getId());
-
-        // Tạo các biến thể
-        int totalVariants = 0;
-        for (ProductCreateWithVariantsRequest.VariantDto variantDto : request.getVariants()) {
-            createProductVariantFromDto(product, variantDto, request.getAllowsSale());
-            // Mỗi variantDto có thể tạo nhiều ProductVariant (một cho mỗi unit)
-            totalVariants += variantDto.getUnits() != null ? variantDto.getUnits().size() : 0;
-        }
-
-        log.info("Tạo sản phẩm với {} biến thể (từ {} SKUs) thành công với mã: {} (chỉ thông tin cơ bản)",
-                totalVariants, request.getVariants().size());
-        return mapToProductResponse(product);
+        return new ProductListResponse(productSummaries, pageInfo);
     }
 
     /**
-     * Tạo biến thể sản phẩm từ DTO - tạo một ProductVariant cho mỗi đơn vị
+     * Chuyển đổi List<Product> sang ProductListResponse (tạm thời)
      */
-    private void createProductVariantFromDto(Product product,
-            ProductCreateWithVariantsRequest.VariantDto variantDto,
-            Boolean allowsSale) {
+    private ProductListResponse createProductListResponse(List<Product> products, Pageable pageable) {
+        List<ProductListResponse.ProductSummary> productSummaries = products.stream()
+                .map(this::mapToProductSummary)
+                .collect(Collectors.toList());
 
-        if (variantDto.getUnits() == null || variantDto.getUnits().isEmpty()) {
-            throw new RuntimeException("Biến thể phải có ít nhất một đơn vị");
+        // Tạo PageInfo giả lập
+        ProductListResponse.PageInfo pageInfo = new ProductListResponse.PageInfo();
+        pageInfo.setCurrentPage(0);
+        pageInfo.setPageSize(products.size());
+        pageInfo.setTotalElements((long) products.size());
+        pageInfo.setTotalPages(1);
+        pageInfo.setIsFirst(true);
+        pageInfo.setIsLast(true);
+        pageInfo.setHasPrevious(false);
+        pageInfo.setHasNext(false);
+
+        return new ProductListResponse(productSummaries, pageInfo);
+    }
+
+    /**
+     * Chuyển đổi Product entity sang ProductSummary DTO
+     */
+    private ProductListResponse.ProductSummary mapToProductSummary(Product product) {
+        ProductListResponse.ProductSummary summary = new ProductListResponse.ProductSummary();
+        summary.setId(product.getId());
+        summary.setName(product.getName());
+        summary.setDescription(product.getDescription());
+        summary.setIsActive(product.getIsActive());
+        summary.setIsRewardPoint(product.getIsRewardPoint());
+        summary.setCreatedDate(product.getCreatedAt());
+        summary.setUpdatedAt(product.getUpdatedAt());
+
+        // Set tên thương hiệu và danh mục
+        summary.setBrandName(product.getBrand() != null ? product.getBrand().getName() : null);
+        summary.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
+
+        // Load và map thông tin units
+        List<ProductUnit> productUnits = productUnitRepository.findActiveByProductId(product.getId());
+        List<ProductListResponse.ProductUnitSummary> unitSummaries = productUnits.stream()
+                .map(this::mapToProductUnitSummary)
+                .collect(Collectors.toList());
+
+        summary.setUnits(unitSummaries);
+        summary.setUnitCount(unitSummaries.size());
+        summary.setImageCount(product.getImages() != null ? product.getImages().size() : 0);
+        summary.setMainImageUrl(null); // Tạm thời null, sau này có thể query thật
+
+        return summary;
+    }
+
+    /**
+     * Kiểm tra sản phẩm có đơn vị cơ bản không
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasBaseUnit(Long productId) {
+        return productUnitRepository.hasBaseUnit(productId);
+    }
+
+    /**
+     * Validation danh sách units
+     */
+    private void validateUnits(List<ProductUnitRequest> units) {
+        if (units == null || units.isEmpty()) {
+            throw new ProductException("Danh sách đơn vị sản phẩm không được để trống");
         }
 
-        // Tạo một ProductVariant cho mỗi đơn vị
-        for (int i = 0; i < variantDto.getUnits().size(); i++) {
-            ProductCreateWithVariantsRequest.VariantUnitDto unitDto = variantDto.getUnits().get(i);
+        // Kiểm tra phải có ít nhất 1 đơn vị cơ bản
+        long baseUnitCount = units.stream()
+                .filter(ProductUnitRequest::isBaseUnit)
+                .count();
 
-            // Kiểm tra xem đã có base unit cho loại đơn vị này chưa
-            Optional<ProductUnit> existingBaseUnit = productUnitRepository
-                    .findByProductIdAndUnitAndIsBaseUnit(product.getId(), unitDto.getUnit(), true);
+        if (baseUnitCount == 0) {
+            throw new ProductException("Phải có ít nhất 1 đơn vị cơ bản (isBaseUnit = true)");
+        }
 
-            // Ưu tiên cờ isBaseUnit từ request; nếu null thì chỉ gán base unit cho đơn vị
-            // đầu tiên nếu chưa tồn tại base unit nào cho sản phẩm
-            Boolean isBaseUnit;
-            if (unitDto.getIsBaseUnit() != null) {
-                isBaseUnit = unitDto.getIsBaseUnit();
-            } else {
-                // Nếu không chỉ định, chỉ gán base unit cho đơn vị đầu tiên của variant đầu
-                // tiên
-                boolean anyBaseUnitExists = productUnitRepository.findByProductIdAndIsBaseUnit(product.getId(), true)
-                        .isPresent();
-                isBaseUnit = !anyBaseUnitExists && i == 0;
-            }
+        if (baseUnitCount > 1) {
+            throw new ProductException("Chỉ được có 1 đơn vị cơ bản");
+        }
 
-            // Nếu đã có base unit cho loại đơn vị này, sử dụng lại
-            if (existingBaseUnit.isPresent() && Boolean.TRUE.equals(isBaseUnit)) {
-                log.info("Sử dụng lại base unit đã tồn tại: {} cho sản phẩm: {}",
-                        unitDto.getUnit());
-                // Không cần tạo mới, sẽ sử dụng lại trong findOrCreateProductUnit
-            }
+        // Kiểm tra không có unitName trùng lặp
+        long uniqueUnitNames = units.stream()
+                .map(ProductUnitRequest::unitName)
+                .map(String::toLowerCase)
+                .distinct()
+                .count();
 
-            // Tìm hoặc tạo ProductUnit cho đơn vị này
-            ProductUnit productUnit = findOrCreateProductUnit(product, unitDto.getUnit(), unitDto.getConversionValue(),
-                    isBaseUnit);
+        if (uniqueUnitNames != units.size()) {
+            throw new ProductException("Không được có đơn vị tính trùng lặp");
+        }
 
-            // Tạo variant code: sử dụng từ request nếu có, nếu không thì tự động tạo
-            String variantCode = generateOrUseVariantCode(unitDto.getVariantCode());
-
-            // Tạo ProductVariant
-            ProductVariant productVariant = new ProductVariant();
-            productVariant.setProduct(product);
-            productVariant.setVariantCode(variantCode);
-            productVariant.setVariantName(generateVariantNameWithUnit(product, variantDto, unitDto.getUnit()));
-            productVariant.setUnit(productUnit);
-            productVariant.setBarcode(unitDto.getBarcode());
-            productVariant.setIsActive(true);
-            productVariant.setIsDeleted(false);
-            productVariant.setAllowsSale(allowsSale != null ? allowsSale : true);
-
-            // Lưu ProductVariant
-            productVariant = productVariantRepository.save(productVariant);
-            log.info("Đã tạo ProductVariant với code: {} cho đơn vị: {} (chỉ thông tin cơ bản)", variantCode,
-                    unitDto.getUnit());
-
-            // Tạo thuộc tính cho tất cả các biến thể (vì mỗi unit là 1 variant riêng)
-            if (variantDto.getAttributes() != null && !variantDto.getAttributes().isEmpty()) {
-                for (ProductCreateWithVariantsRequest.VariantAttributeDto attrDto : variantDto.getAttributes()) {
-                    createVariantAttribute(productVariant, attrDto.getAttributeId(), attrDto.getValue());
+        // Kiểm tra code không trùng lặp nếu có
+        for (ProductUnitRequest unitRequest : units) {
+            if (unitRequest.code() != null && !unitRequest.code().trim().isEmpty()) {
+                if (productUnitRepository.existsByCode(unitRequest.code().trim())) {
+                    throw new ProductException(
+                            "Mã đơn vị sản phẩm '" + unitRequest.code() + "' đã tồn tại trong hệ thống");
                 }
             }
         }
+
+        // Kiểm tra barcode không trùng lặp nếu có
+        for (ProductUnitRequest unitRequest : units) {
+            if (unitRequest.barcode() != null && !unitRequest.barcode().trim().isEmpty()) {
+                if (productUnitRepository.existsByBarcode(unitRequest.barcode().trim())) {
+                    throw new ProductException("Mã vạch '" + unitRequest.barcode() + "' đã tồn tại trong hệ thống");
+                }
+            }
+        }
+
+        // Kiểm tra không có code trùng lặp trong cùng request
+        Set<String> codesInRequest = units.stream()
+                .map(ProductUnitRequest::code)
+                .filter(code -> code != null && !code.trim().isEmpty())
+                .collect(Collectors.toSet());
+
+        if (codesInRequest.size() != units.stream()
+                .map(ProductUnitRequest::code)
+                .filter(code -> code != null && !code.trim().isEmpty())
+                .count()) {
+            throw new ProductException("Không được có mã đơn vị sản phẩm trùng lặp trong cùng yêu cầu");
+        }
     }
 
     /**
-     * Tìm hoặc tạo ProductUnit
+     * Tạo các đơn vị cho sản phẩm
      */
-    private ProductUnit findOrCreateProductUnit(Product product, String unitName, Integer conversionValue) {
-        return findOrCreateProductUnit(product, unitName, conversionValue, false);
+    private void createProductUnits(Product product, List<ProductUnitRequest> unitRequests) {
+        for (ProductUnitRequest unitRequest : unitRequests) {
+            // Tìm hoặc tạo Unit theo tên
+            Unit unit = findOrCreateUnit(unitRequest.unitName());
+
+            ProductUnit productUnit = new ProductUnit();
+            productUnit.setProduct(product);
+            productUnit.setUnit(unit);
+
+            // Sử dụng code tùy chỉnh nếu có, ngược lại tự động tạo
+            String finalCode;
+            if (unitRequest.code() != null && !unitRequest.code().trim().isEmpty()) {
+                finalCode = unitRequest.code().trim();
+                log.debug("Sử dụng mã tùy chỉnh: {} cho sản phẩm ID: {}", finalCode, product.getId());
+            } else {
+                finalCode = generateProductUnitCode(product.getId(), unit.getId());
+                log.debug("Tự động tạo mã: {} cho sản phẩm ID: {}", finalCode, product.getId());
+            }
+            productUnit.setCode(finalCode);
+
+            productUnit.setConversionValue(unitRequest.conversionValue());
+            productUnit.setIsBaseUnit(unitRequest.isBaseUnit());
+            productUnit.setBarcode(unitRequest.barcode());
+            productUnit.setIsActive(true);
+            productUnit.setIsDeleted(false);
+
+            productUnitRepository.save(productUnit);
+            log.debug("Đã tạo đơn vị sản phẩm với mã: {} cho sản phẩm ID: {}",
+                    productUnit.getCode(), product.getId());
+        }
     }
 
     /**
-     * Tìm hoặc tạo ProductUnit với khả năng đánh dấu là đơn vị cơ bản
+     * Tạo mã đơn vị sản phẩm duy nhất
      */
-    private ProductUnit findOrCreateProductUnit(Product product, String unitName, Integer conversionValue,
-            Boolean isBaseUnit) {
-        // Kiểm tra xem ProductUnit đã tồn tại chưa
-        Optional<ProductUnit> existingUnit = productUnitRepository.findByProductIdAndUnit(product.getId(), unitName);
+    private String generateProductUnitCode(Long productId, Long unitId) {
+        // Format: PU{productId}U{unitId}T{timestamp}
+        long timestamp = System.currentTimeMillis() % 100000; // Lấy 5 chữ số cuối
+        String code = String.format("PU%dU%dT%d", productId, unitId, timestamp);
+
+        // Kiểm tra trùng lặp và tạo lại nếu cần
+        int attempts = 0;
+        while (productUnitRepository.existsByCode(code) && attempts < 10) {
+            timestamp = System.currentTimeMillis() % 100000;
+            code = String.format("PU%dU%dT%d", productId, unitId, timestamp);
+            attempts++;
+        }
+
+        if (attempts >= 10) {
+            throw new ProductException("Không thể tạo mã đơn vị sản phẩm duy nhất sau 10 lần thử");
+        }
+
+        return code;
+    }
+
+    /**
+     * Chuyển đổi ProductUnit entity sang ProductUnitInfo DTO
+     */
+    private ProductResponse.ProductUnitInfo mapToProductUnitInfo(ProductUnit productUnit) {
+        ProductResponse.ProductUnitInfo info = new ProductResponse.ProductUnitInfo();
+        info.setId(productUnit.getId());
+        info.setCode(productUnit.getCode());
+        info.setBarcode(productUnit.getBarcode());
+        info.setConversionValue(productUnit.getConversionValue());
+        info.setIsBaseUnit(productUnit.getIsBaseUnit());
+        info.setIsActive(productUnit.getIsActive());
+
+        // Set tên đơn vị tính
+        if (productUnit.getUnit() != null) {
+            info.setUnitName(productUnit.getUnit().getName());
+        }
+
+        return info;
+    }
+
+    /**
+     * Tìm hoặc tạo Unit theo tên
+     */
+    private Unit findOrCreateUnit(String unitName) {
+        // Tìm Unit theo tên (case-insensitive)
+        Optional<Unit> existingUnit = unitRepository.findByNameIgnoreCase(unitName.trim());
 
         if (existingUnit.isPresent()) {
-            log.info("ProductUnit đã tồn tại: {} cho sản phẩm: {}", unitName, product.getId());
-            return existingUnit.get();
-        }
-
-        // Tạo ProductUnit mới nếu chưa tồn tại
-        ProductUnit productUnit = new ProductUnit();
-        productUnit.setProduct(product);
-        productUnit.setUnit(unitName);
-        productUnit.setConversionValue(conversionValue != null ? conversionValue : 1);
-        productUnit.setIsBaseUnit(isBaseUnit != null ? isBaseUnit : false);
-        productUnit.setIsActive(true);
-
-        // Tạo code cho unit
-        productUnit.setCode(product.getId() + "-" + unitName);
-
-        ProductUnit savedUnit = productUnitRepository.save(productUnit);
-        log.info("Đã tạo ProductUnit mới: {} cho sản phẩm: {} (isBaseUnit: {})",
-                unitName, product.getId(), isBaseUnit);
-
-        return savedUnit;
-    }
-
-    /**
-     * Tạo tên biến thể từ thuộc tính
-     */
-    private String generateVariantName(Product product, ProductCreateWithVariantsRequest.VariantDto variantDto) {
-        StringBuilder nameBuilder = new StringBuilder(product.getName());
-
-        if (variantDto.getAttributes() != null && !variantDto.getAttributes().isEmpty()) {
-            for (ProductCreateWithVariantsRequest.VariantAttributeDto attr : variantDto.getAttributes()) {
-                nameBuilder.append(" - ").append(attr.getValue());
+            Unit unit = existingUnit.get();
+            // Kiểm tra Unit có hoạt động không
+            if (!unit.getIsActive() || unit.getIsDeleted()) {
+                throw new ProductException("Đơn vị tính '" + unitName + "' đã bị vô hiệu hóa hoặc xóa");
             }
-        }
+            log.debug("Sử dụng đơn vị tính có sẵn: {}", unitName);
+            return unit;
+        } else {
+            // Tạo Unit mới
+            Unit newUnit = new Unit();
+            newUnit.setName(unitName.trim());
+            newUnit.setIsActive(true);
+            newUnit.setIsDeleted(false);
 
-        return nameBuilder.toString();
-    }
-
-    /**
-     * Tạo tên biến thể từ thuộc tính có kèm đơn vị
-     */
-    private String generateVariantNameWithUnit(Product product, ProductCreateWithVariantsRequest.VariantDto variantDto,
-            String unitName) {
-        StringBuilder nameBuilder = new StringBuilder(product.getName());
-
-        if (variantDto.getAttributes() != null && !variantDto.getAttributes().isEmpty()) {
-            for (ProductCreateWithVariantsRequest.VariantAttributeDto attr : variantDto.getAttributes()) {
-                nameBuilder.append(" - ").append(attr.getValue());
-            }
-        }
-
-        // Thêm đơn vị vào cuối tên
-        nameBuilder.append(" - ").append(unitName);
-
-        return nameBuilder.toString();
-    }
-
-    /**
-     * Tạo thuộc tính cho biến thể
-     */
-    private void createVariantAttribute(ProductVariant productVariant, Long attributeId, String value) {
-        try {
-            // Tìm hoặc tạo AttributeValue
-            AttributeValue attributeValue = attributeValueRepository
-                    .findByValueAndAttributeId(value, attributeId)
-                    .orElseGet(() -> {
-                        // Tạo AttributeValue mới
-                        Attribute attribute = attributeRepository.findById(attributeId)
-                                .orElseThrow(
-                                        () -> new RuntimeException("Không tìm thấy thuộc tính với ID: " + attributeId));
-
-                        AttributeValue newValue = new AttributeValue();
-                        newValue.setAttribute(attribute);
-                        newValue.setValue(value);
-                        return attributeValueRepository.save(newValue);
-                    });
-
-            // Kiểm tra xem liên kết đã tồn tại chưa
-            if (!variantAttributeRepository.existsByVariantIdAndAttributeValueId(
-                    productVariant.getVariantId(), attributeValue.getId())) {
-
-                // Tạo liên kết VariantAttribute
-                VariantAttribute variantAttribute = new VariantAttribute();
-                variantAttribute.setVariant(productVariant);
-                variantAttribute.setAttributeValue(attributeValue);
-
-                variantAttributeRepository.save(variantAttribute);
-
-                log.info("Đã tạo thuộc tính {} = {} cho variant: {}",
-                        attributeValue.getAttribute().getName(), value, productVariant.getVariantCode());
-            } else {
-                log.info("Thuộc tính {} = {} đã tồn tại cho variant: {}",
-                        attributeValue.getAttribute().getName(), value, productVariant.getVariantCode());
-            }
-
-        } catch (Exception e) {
-            log.error("Lỗi khi tạo thuộc tính cho variant: ", e);
-            throw new RuntimeException("Lỗi khi tạo thuộc tính: " + e.getMessage());
+            Unit savedUnit = unitRepository.save(newUnit);
+            log.info("Đã tạo đơn vị tính mới: {} với ID: {}", unitName, savedUnit.getId());
+            return savedUnit;
         }
     }
 
-    /**
-     * Validation dữ liệu đầu vào cho createProductWithVariants
-     */
-    private void validateProductCreateWithVariantsRequest(ProductCreateWithVariantsRequest request) {
-        // Kiểm tra tên sản phẩm bắt buộc
-        if (request.getName() == null || request.getName().trim().isEmpty()) {
-            throw new RuntimeException("Tên sản phẩm là bắt buộc");
-        }
-
-        // Kiểm tra categoryId bắt buộc
-        if (request.getCategoryId() == null) {
-            throw new RuntimeException("ID danh mục sản phẩm (categoryId) là bắt buộc");
-        }
-
-        // Brand không bắt buộc, sẽ kiểm tra tồn tại trong logic chính nếu có truyền
-
-        // Kiểm tra danh sách variants
-        if (request.getVariants() == null || request.getVariants().isEmpty()) {
-            throw new RuntimeException("Cần ít nhất một biến thể để tạo sản phẩm");
-        }
-
-        // Kiểm tra trùng lặp attributeId trong mỗi variant
-        validateVariantAttributes(request.getVariants());
-    }
+    // ==================== QUẢN LÝ ĐƠN VỊ SẢN PHẨM ====================
 
     /**
-     * Kiểm tra trùng lặp attributeId trong danh sách thuộc tính của mỗi variant
-     */
-    private void validateVariantAttributes(List<ProductCreateWithVariantsRequest.VariantDto> variants) {
-        for (int variantIndex = 0; variantIndex < variants.size(); variantIndex++) {
-            ProductCreateWithVariantsRequest.VariantDto variant = variants.get(variantIndex);
-
-            // Bỏ qua nếu variant không có attributes
-            if (variant.getAttributes() == null || variant.getAttributes().isEmpty()) {
-                continue;
-            }
-
-            // Kiểm tra giới hạn tối đa 3 thuộc tính
-            if (variant.getAttributes().size() > 3) {
-                throw new RuntimeException(String.format(
-                        "Variant thứ %d có %d thuộc tính, vượt quá giới hạn tối đa 3 thuộc tính cho mỗi variant",
-                        variantIndex + 1, variant.getAttributes().size()));
-            }
-
-            // Sử dụng Set để theo dõi các attributeId đã xuất hiện
-            Set<Long> seenAttributeIds = new HashSet<>();
-
-            for (int attrIndex = 0; attrIndex < variant.getAttributes().size(); attrIndex++) {
-                ProductCreateWithVariantsRequest.VariantAttributeDto attribute = variant.getAttributes().get(attrIndex);
-
-                // Kiểm tra attributeId không được null
-                if (attribute.getAttributeId() == null) {
-                    throw new RuntimeException(String.format(
-                            "AttributeId không được để trống tại variant thứ %d, thuộc tính thứ %d",
-                            variantIndex + 1, attrIndex + 1));
-                }
-
-                // Kiểm tra trùng lặp attributeId
-                if (seenAttributeIds.contains(attribute.getAttributeId())) {
-                    throw new RuntimeException(String.format(
-                            "Phát hiện trùng lặp attributeId %d trong variant thứ %d. Mỗi thuộc tính chỉ được xuất hiện một lần trong cùng một variant",
-                            attribute.getAttributeId(), variantIndex + 1));
-                }
-
-                seenAttributeIds.add(attribute.getAttributeId());
-            }
-        }
-    }
-
-    /**
-     * Kiểm tra và lấy thông tin Category
-     */
-    private Category validateAndGetCategory(Long categoryId) {
-        // Chuyển đổi Long sang Integer vì Category entity sử dụng Integer
-        Integer categoryIdInt = Math.toIntExact(categoryId);
-
-        Category category = categoryRepository.findById(categoryIdInt)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục sản phẩm với ID: " + categoryId));
-
-        // Kiểm tra category có đang hoạt động không
-        if (!category.getIsActive()) {
-            throw new RuntimeException("Danh mục sản phẩm với ID: " + categoryId + " đang không hoạt động");
-        }
-
-        log.info("Đã xác thực danh mục: {} (ID: {})", category.getName(), categoryId);
-        return category;
-    }
-
-    /**
-     * Kiểm tra và lấy thông tin Brand
-     */
-    private Brand validateAndGetBrand(Long brandId) {
-        // Chuyển đổi Long sang Integer vì Brand entity sử dụng Integer
-        Integer brandIdInt = Math.toIntExact(brandId);
-
-        Brand brand = brandRepository.findById(brandIdInt)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy thương hiệu sản phẩm với ID: " + brandId));
-
-        // Kiểm tra brand có đang hoạt động không
-        if (!brand.getIsActive()) {
-            throw new RuntimeException("Thương hiệu sản phẩm với ID: " + brandId + " đang không hoạt động");
-        }
-
-        log.info("Đã xác thực thương hiệu: {} (ID: {})", brand.getName(), brandId);
-        return brand;
-    }
-
-    /**
-     * Map ProductVariant entity thành ProductVariantDto
-     */
-    private ProductVariantDto mapToProductVariantDto(ProductVariant variant) {
-        ProductVariantDto dto = new ProductVariantDto();
-
-        dto.setVariantId(variant.getVariantId());
-        dto.setVariantName(variant.getVariantName());
-        dto.setVariantCode(variant.getVariantCode());
-        dto.setBarcode(variant.getBarcode());
-        dto.setAllowsSale(variant.getAllowsSale());
-        dto.setIsActive(variant.getIsActive());
-
-        dto.setCreatedAt(variant.getCreatedAt());
-        dto.setUpdatedAt(variant.getUpdatedAt());
-
-        // Map unit information
-        if (variant.getUnit() != null) {
-            ProductVariantDto.ProductUnitDto unitDto = new ProductVariantDto.ProductUnitDto();
-            unitDto.setId(variant.getUnit().getId());
-            unitDto.setCode(variant.getUnit().getCode());
-            unitDto.setUnit(variant.getUnit().getUnit());
-            unitDto.setConversionValue(variant.getUnit().getConversionValue());
-            unitDto.setIsBaseUnit(variant.getUnit().getIsBaseUnit());
-            dto.setUnit(unitDto);
-        }
-
-        // Map variant attributes
-        List<VariantAttribute> variantAttributes = variantAttributeRepository.findByVariantId(variant.getVariantId());
-        if (variantAttributes != null && !variantAttributes.isEmpty()) {
-            List<VariantAttributeDto> attributeDtos = variantAttributes.stream()
-                    .map(this::mapToVariantAttributeDto)
-                    .collect(Collectors.toList());
-            dto.setAttributes(attributeDtos);
-        }
-
-        // Map images (nếu cần)
-        // TODO: Implement image mapping if needed
-
-        return dto;
-    }
-
-    /**
-     * Cập nhật thông tin biến thể sản phẩm
+     * Thêm đơn vị mới vào sản phẩm
      */
     @Override
-    public ProductVariantDto updateProductVariant(Long variantId, ProductVariantUpdateRequest request) {
-        log.info("Cập nhật biến thể sản phẩm ID: {}", variantId);
-
-        // Kiểm tra biến thể tồn tại
-        ProductVariant variant = productVariantRepository.findById(variantId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
-
-        // Cập nhật thông tin cơ bản
-        if (request.getVariantName() != null) {
-            variant.setVariantName(request.getVariantName());
-        }
-
-        if (request.getBarcode() != null) {
-            // Kiểm tra barcode đã tồn tại chưa (ngoại trừ biến thể hiện tại)
-            Optional<ProductVariant> existingVariant = productVariantRepository.findByBarcode(request.getBarcode());
-            if (existingVariant.isPresent() && !existingVariant.get().getVariantId().equals(variantId)) {
-                throw new RuntimeException("Mã vạch đã tồn tại: " + request.getBarcode());
-            }
-            variant.setBarcode(request.getBarcode());
-        }
-
-        // Cập nhật số lượng tồn kho thông qua WarehouseService
-        // Không cập nhật trực tiếp trong ProductVariant nữa
-        // TODO: Implement warehouse update logic through WarehouseService if needed
-
-        if (request.getAllowsSale() != null) {
-            variant.setAllowsSale(request.getAllowsSale());
-        }
-
-        if (request.getIsActive() != null) {
-            variant.setIsActive(request.getIsActive());
-        }
-
-        // Cập nhật đơn vị nếu có
-        if (request.getUnitId() != null) {
-            ProductUnit unit = productUnitRepository.findById(request.getUnitId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn vị với ID: " + request.getUnitId()));
-
-            // Kiểm tra đơn vị có thuộc về cùng sản phẩm không
-            if (!unit.getProduct().getId().equals(variant.getProduct().getId())) {
-                throw new RuntimeException("Đơn vị không thuộc về sản phẩm này");
-            }
-
-            variant.setUnit(unit);
-        }
-
-        // Lưu biến thể đã cập nhật
-        variant = productVariantRepository.save(variant);
-        log.info("Đã cập nhật biến thể với ID: {}", variantId);
-
-        // Cập nhật thuộc tính biến thể nếu có
-        if (request.getAttributeValueIds() != null && !request.getAttributeValueIds().isEmpty()) {
-            variantAttributeService.updateVariantAttributes(variantId, request.getAttributeValueIds());
-            log.info("Đã cập nhật {} thuộc tính cho biến thể", request.getAttributeValueIds().size());
-        }
-
-        return mapToProductVariantDto(variant);
-    }
-
-    /**
-     * Lấy thông tin biến thể theo ID
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public ProductVariantDto getProductVariantById(Long variantId) {
-        log.info("Lấy thông tin biến thể ID: {}", variantId);
-
-        ProductVariant variant = productVariantRepository.findById(variantId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
-
-        return mapToProductVariantDto(variant);
-    }
-
-    /**
-     * Lấy danh sách biến thể theo ID sản phẩm
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductVariantDto> getProductVariantsByProductId(Long productId) {
-        log.info("Lấy danh sách biến thể cho sản phẩm ID: {}", productId);
+    @Transactional
+    public ProductUnitResponse addProductUnit(Long productId, ProductUnitRequest request) {
+        log.info("Bắt đầu thêm đơn vị mới cho sản phẩm ID: {}, unit: {}", productId, request.unitName());
 
         // Kiểm tra sản phẩm tồn tại
-        productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + productId));
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException("Không tìm thấy sản phẩm với ID: " + productId));
 
-        // Lấy danh sách biến thể
-        List<ProductVariant> variants = productVariantRepository.findByProductId(productId);
+        // Tìm hoặc tạo Unit theo tên
+        Unit unit = findOrCreateUnit(request.unitName());
 
-        return variants.stream()
-                .map(this::mapToProductVariantDto)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Xóa nhiều biến thể cùng lúc (soft delete)
-     */
-    @Override
-    public void deleteProductVariants(List<Long> variantIds) {
-        log.info("Xóa {} biến thể với IDs: {}", variantIds != null ? variantIds.size() : 0, variantIds);
-
-        if (variantIds == null || variantIds.isEmpty()) {
-            throw new RuntimeException("Danh sách ID biến thể không được rỗng");
+        // Kiểm tra đã tồn tại ProductUnit với cùng product và unit chưa
+        Optional<ProductUnit> existingProductUnit = productUnitRepository.findByProductIdAndUnitId(productId,
+                unit.getId());
+        if (existingProductUnit.isPresent() && !existingProductUnit.get().getIsDeleted()) {
+            throw new ProductException("Đơn vị tính '" + request.unitName() + "' đã tồn tại cho sản phẩm này");
         }
 
-        // Lấy tất cả biến thể cần xóa
-        List<ProductVariant> variants = productVariantRepository.findAllById(variantIds);
-
-        if (variants.isEmpty()) {
-            throw new RuntimeException("Không tìm thấy biến thể nào với các ID đã cho");
-        }
-
-        // Kiểm tra nếu có ID không tồn tại
-        List<Long> foundIds = variants.stream()
-                .map(ProductVariant::getVariantId)
-                .collect(Collectors.toList());
-
-        List<Long> notFoundIds = variantIds.stream()
-                .filter(id -> !foundIds.contains(id))
-                .collect(Collectors.toList());
-
-        if (!notFoundIds.isEmpty()) {
-            log.warn("Một số ID biến thể không tồn tại: {}", notFoundIds);
-        }
-
-        // Xóa mềm các biến thể
-        variants.forEach(variant -> {
-            variant.setIsDeleted(true);
-            variant.setIsActive(false);
-        });
-
-        productVariantRepository.saveAll(variants);
-
-        log.info("Đã xóa {} biến thể thành công", variants.size());
-    }
-
-    /**
-     * Xóa một biến thể (soft delete)
-     */
-    @Override
-    public void deleteProductVariant(Long variantId) {
-        log.info("Xóa biến thể ID: {}", variantId);
-
-        ProductVariant variant = productVariantRepository.findById(variantId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " + variantId));
-
-        // Xóa mềm biến thể
-        variant.setIsDeleted(true);
-        variant.setIsActive(false);
-        productVariantRepository.save(variant);
-
-        log.info("Đã xóa biến thể thành công");
-    }
-
-    /**
-     * Map VariantAttribute entity thành VariantAttributeDto
-     */
-    private VariantAttributeDto mapToVariantAttributeDto(VariantAttribute variantAttribute) {
-        VariantAttributeDto dto = new VariantAttributeDto();
-
-        dto.setId(variantAttribute.getId());
-        dto.setVariantId(variantAttribute.getVariant().getVariantId());
-
-        if (variantAttribute.getAttributeValue() != null) {
-            dto.setAttributeValueId(variantAttribute.getAttributeValue().getId());
-            dto.setAttributeValue(variantAttribute.getAttributeValue().getValue());
-            dto.setAttributeValueDescription(variantAttribute.getAttributeValue().getDescription());
-
-            if (variantAttribute.getAttributeValue().getAttribute() != null) {
-                dto.setAttributeName(variantAttribute.getAttributeValue().getAttribute().getName());
+        // Kiểm tra nếu là đơn vị cơ bản thì không được có đơn vị cơ bản khác
+        if (request.isBaseUnit()) {
+            boolean hasBaseUnit = productUnitRepository.hasBaseUnit(productId);
+            if (hasBaseUnit) {
+                throw new ProductException("Sản phẩm đã có đơn vị cơ bản. Chỉ được phép có một đơn vị cơ bản duy nhất");
             }
         }
 
-        return dto;
-    }
-
-    /**
-     * Tạo Pageable object từ ProductPageableRequest
-     */
-    private Pageable createPageableFromRequest(ProductPageableRequest request) {
-        // Tạo Sort object từ sorts trong request
-        Sort sort = Sort.unsorted();
-
-        if (request.getSorts() != null && !request.getSorts().isEmpty()) {
-            List<Sort.Order> orders = request.getSorts().stream()
-                    .map(sortCriteria -> {
-                        Sort.Direction direction = "DESC".equalsIgnoreCase(sortCriteria.getOrder())
-                                ? Sort.Direction.DESC
-                                : Sort.Direction.ASC;
-                        return new Sort.Order(direction, mapSortField(sortCriteria.getField()));
-                    })
-                    .collect(Collectors.toList());
-            sort = Sort.by(orders);
+        // Kiểm tra mã code nếu có
+        if (request.code() != null && !request.code().trim().isEmpty()) {
+            if (productUnitRepository.existsByCode(request.code().trim())) {
+                throw new ProductException("Mã đơn vị sản phẩm '" + request.code() + "' đã tồn tại");
+            }
         }
 
-        // Tạo PageRequest với page index, size và sort
-        return PageRequest.of(
-                request.getPageIndex(),
-                request.getValidLimit(),
-                sort);
-    }
-
-    /**
-     * Map tên field từ frontend sang tên field entity
-     */
-    private String mapSortField(String field) {
-        // Map các tên field phổ biến
-        switch (field.toLowerCase()) {
-            case "name":
-                return "name";
-            case "code":
-                return "code";
-            case "createdate":
-            case "created_date":
-                return "createdDate";
-            case "updatedAt":
-            case "updated_at":
-                return "updatedAt";
-            case "isactive":
-            case "is_active":
-                return "isActive";
-            case "variantcount":
-            case "variant_count":
-                return "variantCount";
-            default:
-                // Nếu không match, trả về field gốc (có thể gây lỗi nếu field không tồn tại)
-                log.warn("Không nhận dạng được sort field: {}, sử dụng 'name' làm mặc định", field);
-                return "name";
+        // Kiểm tra barcode nếu có
+        if (request.barcode() != null && !request.barcode().trim().isEmpty()) {
+            if (productUnitRepository.existsByBarcode(request.barcode().trim())) {
+                throw new ProductException("Mã vạch '" + request.barcode() + "' đã tồn tại");
+            }
         }
+
+        // Tạo ProductUnit mới
+        ProductUnit productUnit = new ProductUnit();
+        productUnit.setProduct(product);
+        productUnit.setUnit(unit);
+
+        // Sử dụng code tùy chỉnh nếu có, ngược lại tự động tạo
+        String finalCode;
+        if (request.code() != null && !request.code().trim().isEmpty()) {
+            finalCode = request.code().trim();
+        } else {
+            finalCode = generateProductUnitCode(product.getId(), unit.getId());
+        }
+        productUnit.setCode(finalCode);
+
+        productUnit.setConversionValue(request.conversionValue());
+        productUnit.setIsBaseUnit(request.isBaseUnit());
+        productUnit.setBarcode(request.barcode());
+        productUnit.setIsActive(true);
+        productUnit.setIsDeleted(false);
+
+        ProductUnit savedProductUnit = productUnitRepository.save(productUnit);
+        log.info("Đã thêm đơn vị sản phẩm với mã: {} cho sản phẩm ID: {}", savedProductUnit.getCode(), productId);
+
+        return mapToProductUnitResponse(savedProductUnit);
     }
 
     /**
-     * Tìm kiếm biến thể sản phẩm theo từ khóa
-     * Từ khóa có thể là mã biến thể hoặc tên biến thể
+     * Cập nhật thông tin đơn vị sản phẩm
+     */
+    @Override
+    @Transactional
+    public ProductUnitResponse updateProductUnit(Long productId, Long unitId, ProductUnitUpdateRequest request) {
+        log.info("Bắt đầu cập nhật đơn vị sản phẩm ID: {} của sản phẩm ID: {}", unitId, productId);
+
+        // Kiểm tra có dữ liệu cập nhật không
+        if (!request.hasUpdates()) {
+            throw new ProductException("Không có dữ liệu để cập nhật");
+        }
+
+        // Tìm ProductUnit
+        ProductUnit productUnit = productUnitRepository.findByIdAndProductId(unitId, productId)
+                .orElseThrow(() -> new ProductNotFoundException(
+                        "Không tìm thấy đơn vị sản phẩm với ID: " + unitId + " thuộc sản phẩm ID: " + productId));
+
+        // Cập nhật tên đơn vị tính nếu có
+        if (request.unitName() != null) {
+            Unit newUnit = findOrCreateUnit(request.unitName());
+
+            // Kiểm tra không trùng với đơn vị khác của cùng sản phẩm
+            Optional<ProductUnit> existingProductUnit = productUnitRepository.findByProductIdAndUnitId(productId,
+                    newUnit.getId());
+            if (existingProductUnit.isPresent() && !existingProductUnit.get().getId().equals(unitId)
+                    && !existingProductUnit.get().getIsDeleted()) {
+                throw new ProductException("Đơn vị tính '" + request.unitName() + "' đã tồn tại cho sản phẩm này");
+            }
+
+            productUnit.setUnit(newUnit);
+        }
+
+        // Cập nhật tỷ lệ quy đổi
+        if (request.conversionValue() != null) {
+            productUnit.setConversionValue(request.conversionValue());
+        }
+
+        // Cập nhật đơn vị cơ bản
+        if (request.isBaseUnit() != null) {
+            if (request.isBaseUnit()) {
+                // Kiểm tra không có đơn vị cơ bản khác
+                boolean hasOtherBaseUnit = productUnitRepository.findByProductIdAndIsBaseUnit(productId, true)
+                        .filter(pu -> !pu.getId().equals(unitId))
+                        .isPresent();
+                if (hasOtherBaseUnit) {
+                    throw new ProductException(
+                            "Sản phẩm đã có đơn vị cơ bản khác. Chỉ được phép có một đơn vị cơ bản duy nhất");
+                }
+
+                // Tự động điều chỉnh conversionValue = 1 cho đơn vị cơ bản
+                if (request.conversionValue() != null && request.conversionValue() != 1) {
+                    log.info("Tự động điều chỉnh conversionValue từ {} thành 1 cho đơn vị cơ bản",
+                            request.conversionValue());
+                }
+                if (productUnit.getConversionValue() != 1) {
+                    productUnit.setConversionValue(1);
+                }
+            }
+            productUnit.setIsBaseUnit(request.isBaseUnit());
+        }
+
+        // Cập nhật mã code
+        if (request.code() != null) {
+            if (productUnitRepository.existsByCodeAndIdNot(request.code(), unitId)) {
+                throw new ProductException("Mã đơn vị sản phẩm '" + request.code() + "' đã tồn tại");
+            }
+            productUnit.setCode(request.code());
+        }
+
+        // Cập nhật barcode
+        if (request.barcode() != null) {
+            if (productUnitRepository.existsByBarcodeAndIdNot(request.barcode(), unitId)) {
+                throw new ProductException("Mã vạch '" + request.barcode() + "' đã tồn tại");
+            }
+            productUnit.setBarcode(request.barcode());
+        }
+
+        // Cập nhật trạng thái hoạt động
+        if (request.isActive() != null) {
+            productUnit.setIsActive(request.isActive());
+        }
+
+        ProductUnit updatedProductUnit = productUnitRepository.save(productUnit);
+        log.info("Đã cập nhật đơn vị sản phẩm ID: {} của sản phẩm ID: {}", unitId, productId);
+
+        return mapToProductUnitResponse(updatedProductUnit);
+    }
+
+    /**
+     * Xóa đơn vị khỏi sản phẩm (soft delete)
+     */
+    @Override
+    @Transactional
+    public void deleteProductUnit(Long productId, Long unitId) {
+        log.info("Bắt đầu xóa đơn vị sản phẩm ID: {} khỏi sản phẩm ID: {}", unitId, productId);
+
+        // Tìm ProductUnit
+        ProductUnit productUnit = productUnitRepository.findByIdAndProductId(unitId, productId)
+                .orElseThrow(() -> new ProductNotFoundException(
+                        "Không tìm thấy đơn vị sản phẩm với ID: " + unitId + " thuộc sản phẩm ID: " + productId));
+
+        // Không cho phép xóa đơn vị cơ bản nếu là đơn vị duy nhất
+        if (productUnit.getIsBaseUnit()) {
+            long totalUnits = productUnitRepository.countByProductId(productId);
+            if (totalUnits <= 1) {
+                throw new ProductException("Không thể xóa đơn vị cơ bản duy nhất của sản phẩm");
+            }
+        }
+
+        // Soft delete
+        productUnit.setIsDeleted(true);
+        productUnit.setIsActive(false);
+        productUnitRepository.save(productUnit);
+
+        log.info("Đã xóa đơn vị sản phẩm ID: {} khỏi sản phẩm ID: {}", unitId, productId);
+    }
+
+    /**
+     * Lấy danh sách đơn vị của sản phẩm
      */
     @Override
     @Transactional(readOnly = true)
-    public List<ProductVariantDto> searchProductVariants(String keyword) {
-        log.info("Tìm kiếm biến thể với từ khóa: {}", keyword);
+    public List<ProductUnitResponse> getProductUnits(Long productId) {
+        log.info("Lấy danh sách đơn vị của sản phẩm ID: {}", productId);
 
-        // Validation: từ khóa không được rỗng
-        if (keyword == null || keyword.trim().isEmpty()) {
-            throw new IllegalArgumentException("Từ khóa tìm kiếm không được rỗng");
+        // Kiểm tra sản phẩm tồn tại
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException("Không tìm thấy sản phẩm với ID: " + productId);
         }
 
-        String trimmedKeyword = keyword.trim();
-        List<ProductVariant> variants = new ArrayList<>();
+        List<ProductUnit> productUnits = productUnitRepository.findActiveByProductId(productId);
 
-        // 1. Tìm kiếm chính xác theo mã biến thể trước
-        Optional<ProductVariant> variantByCode = productVariantRepository.findByVariantCode(trimmedKeyword);
-        if (variantByCode.isPresent() && !variantByCode.get().getIsDeleted()) {
-            variants.add(variantByCode.get());
-        }
-
-        // 2. Tìm kiếm theo từ khóa trong tên và mã biến thể (LIKE search)
-        Page<ProductVariant> variantsByKeyword = productVariantRepository.findByKeyword(
-                trimmedKeyword,
-                PageRequest.of(0, 100) // Giới hạn 100 kết quả
-        );
-
-        // Thêm các kết quả mới không trùng lặp
-        List<ProductVariant> keywordMatches = variantsByKeyword.getContent().stream()
-                .filter(variant -> !variants.contains(variant)) // Tránh trùng lặp với kết quả tìm theo code
-                .collect(Collectors.toList());
-
-        variants.addAll(keywordMatches);
-
-        // Convert sang DTO và trả về
-        return variants.stream()
-                .map(this::mapToProductVariantDto)
+        return productUnits.stream()
+                .map(this::mapToProductUnitResponse)
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lấy thông tin đơn vị sản phẩm theo ID
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductUnitResponse getProductUnit(Long productId, Long unitId) {
+        log.info("Lấy thông tin đơn vị sản phẩm ID: {} của sản phẩm ID: {}", unitId, productId);
+
+        ProductUnit productUnit = productUnitRepository.findByIdAndProductId(unitId, productId)
+                .orElseThrow(() -> new ProductNotFoundException(
+                        "Không tìm thấy đơn vị sản phẩm với ID: " + unitId + " thuộc sản phẩm ID: " + productId));
+
+        return mapToProductUnitResponse(productUnit);
+    }
+
+    /**
+     * Lấy đơn vị cơ bản của sản phẩm
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductUnitResponse getBaseProductUnit(Long productId) {
+        log.info("Lấy đơn vị cơ bản của sản phẩm ID: {}", productId);
+
+        // Kiểm tra sản phẩm tồn tại
+        if (!productRepository.existsById(productId)) {
+            throw new ProductNotFoundException("Không tìm thấy sản phẩm với ID: " + productId);
+        }
+
+        ProductUnit baseUnit = productUnitRepository.findByProductIdAndIsBaseUnit(productId, true)
+                .orElseThrow(() -> new ProductNotFoundException(
+                        "Không tìm thấy đơn vị cơ bản cho sản phẩm ID: " + productId));
+
+        return mapToProductUnitResponse(baseUnit);
+    }
+
+    /**
+     * Chuyển đổi ProductUnit entity sang ProductUnitResponse DTO
+     */
+    private ProductUnitResponse mapToProductUnitResponse(ProductUnit productUnit) {
+        // Tạo UnitDto từ Unit entity
+        UnitDto unitDto = new UnitDto();
+        unitDto.setId(productUnit.getUnit().getId());
+        unitDto.setName(productUnit.getUnit().getName());
+        unitDto.setIsActive(productUnit.getUnit().getIsActive());
+        unitDto.setIsDeleted(productUnit.getUnit().getIsDeleted());
+        unitDto.setCreatedAt(productUnit.getUnit().getCreatedAt());
+        unitDto.setUpdatedAt(productUnit.getUnit().getUpdatedAt());
+
+        return new ProductUnitResponse(
+                productUnit.getId(),
+                productUnit.getCode(),
+                productUnit.getBarcode(),
+                productUnit.getConversionValue(),
+                productUnit.getIsBaseUnit(),
+                productUnit.getIsActive(),
+                unitDto,
+                productUnit.getProduct().getId(),
+                productUnit.getCreatedAt(),
+                productUnit.getUpdatedAt());
+    }
+
+    /**
+     * Chuyển đổi ProductUnit entity sang ProductUnitSummary DTO
+     */
+    private ProductListResponse.ProductUnitSummary mapToProductUnitSummary(ProductUnit productUnit) {
+        ProductListResponse.ProductUnitSummary summary = new ProductListResponse.ProductUnitSummary();
+        summary.setId(productUnit.getId());
+        summary.setCode(productUnit.getCode());
+        summary.setBarcode(productUnit.getBarcode());
+        summary.setConversionValue(productUnit.getConversionValue());
+        summary.setIsBaseUnit(productUnit.getIsBaseUnit());
+        summary.setIsActive(productUnit.getIsActive());
+
+        // Set thông tin đơn vị tính
+        if (productUnit.getUnit() != null) {
+            summary.setUnitName(productUnit.getUnit().getName());
+            summary.setUnitId(productUnit.getUnit().getId());
+        }
+
+        return summary;
+    }
 }

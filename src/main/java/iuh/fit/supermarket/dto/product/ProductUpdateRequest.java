@@ -1,92 +1,57 @@
 package iuh.fit.supermarket.dto.product;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.util.List;
+import lombok.NoArgsConstructor;
 
 /**
  * DTO cho yêu cầu cập nhật sản phẩm
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Schema(description = "Yêu cầu cập nhật sản phẩm")
 public class ProductUpdateRequest {
 
     /**
      * Tên sản phẩm
      */
+    @Size(max = 255, message = "Tên sản phẩm không được vượt quá 255 ký tự")
+    @Schema(description = "Tên sản phẩm", example = "Smartphone Samsung Galaxy S24 Plus")
     private String name;
-
-    /**
-     * Tên đầy đủ của sản phẩm
-     */
-    private String fullName;
 
     /**
      * Mô tả sản phẩm
      */
+    @Schema(description = "Mô tả sản phẩm", example = "Điện thoại thông minh cao cấp với camera chất lượng cao và màn hình lớn")
     private String description;
 
     /**
-     * ID danh mục sản phẩm
+     * ID thương hiệu
      */
-    private Long categoryId;
+    @Positive(message = "ID thương hiệu phải là số dương")
+    @Schema(description = "ID thương hiệu", example = "1")
+    private Integer brandId;
 
     /**
-     * Giá gốc
+     * ID danh mục
      */
-    private BigDecimal basePrice;
+    @Positive(message = "ID danh mục phải là số dương")
+    @Schema(description = "ID danh mục", example = "1")
+    private Integer categoryId;
 
     /**
-     * Giá vốn
+     * Có tích điểm thưởng không
      */
-    private BigDecimal cost;
-
-    /**
-     * Đơn vị cơ bản
-     */
-    private String unit;
-
-    /**
-     * Mã vạch
-     */
-    private String barcode;
-
-    /**
-     * Tên thương hiệu
-     */
-    private String tradeMarkName;
-
-    /**
-     * Cho phép bán hay không
-     */
-    private Boolean allowsSale;
+    @Schema(description = "Có tích điểm thưởng không", example = "true")
+    private Boolean isRewardPoint;
 
     /**
      * Trạng thái hoạt động
      */
+    @Schema(description = "Trạng thái hoạt động", example = "true")
     private Boolean isActive;
-
-    /**
-     * Số lượng tối thiểu
-     */
-    private BigDecimal minQuantity;
-
-    /**
-     * Số lượng tối đa
-     */
-    private BigDecimal maxQuantity;
-
-    /**
-     * Danh sách thuộc tính cập nhật
-     */
-    private List<ProductAttributeUpdateDto> attributes;
-
-    /**
-     * DTO cho cập nhật thuộc tính sản phẩm
-     */
-    @Data
-    public static class ProductAttributeUpdateDto {
-        private Long attributeId;
-        private String value;
-    }
 }

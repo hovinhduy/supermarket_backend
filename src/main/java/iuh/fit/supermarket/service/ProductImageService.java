@@ -14,7 +14,7 @@ public interface ProductImageService {
 
     /**
      * Upload hình ảnh cho sản phẩm
-     * 
+     *
      * @param request thông tin upload ảnh
      * @return thông tin ảnh đã upload
      */
@@ -22,7 +22,7 @@ public interface ProductImageService {
 
     /**
      * Upload nhiều hình ảnh cho sản phẩm
-     * 
+     *
      * @param productId ID sản phẩm
      * @param variantId ID biến thể (tùy chọn)
      * @param files     danh sách file ảnh
@@ -32,7 +32,7 @@ public interface ProductImageService {
 
     /**
      * Lấy tất cả hình ảnh của sản phẩm
-     * 
+     *
      * @param productId ID sản phẩm
      * @return danh sách hình ảnh
      */
@@ -40,7 +40,7 @@ public interface ProductImageService {
 
     /**
      * Lấy hình ảnh của biến thể cụ thể
-     * 
+     *
      * @param variantId ID biến thể
      * @return danh sách hình ảnh của biến thể
      */
@@ -48,15 +48,23 @@ public interface ProductImageService {
 
     /**
      * Lấy hình ảnh chính của sản phẩm
-     * 
+     *
      * @param productId ID sản phẩm
      * @return hình ảnh chính
      */
     ProductImageDto getMainProductImage(Long productId);
 
     /**
+     * Lấy thông tin hình ảnh theo ID
+     *
+     * @param imageId ID hình ảnh
+     * @return thông tin hình ảnh
+     */
+    ProductImageDto getImageById(Integer imageId);
+
+    /**
      * Xóa hình ảnh theo ID
-     * 
+     *
      * @param imageId ID hình ảnh
      * @return true nếu xóa thành công
      */
@@ -64,7 +72,7 @@ public interface ProductImageService {
 
     /**
      * Xóa tất cả hình ảnh của sản phẩm
-     * 
+     *
      * @param productId ID sản phẩm
      * @return số lượng ảnh đã xóa
      */
@@ -72,7 +80,7 @@ public interface ProductImageService {
 
     /**
      * Xóa tất cả hình ảnh của biến thể
-     * 
+     *
      * @param variantId ID biến thể
      * @return số lượng ảnh đã xóa
      */
@@ -80,7 +88,7 @@ public interface ProductImageService {
 
     /**
      * Cập nhật thứ tự sắp xếp hình ảnh
-     * 
+     *
      * @param imageId      ID hình ảnh
      * @param newSortOrder thứ tự mới
      * @return hình ảnh đã cập nhật
@@ -89,7 +97,7 @@ public interface ProductImageService {
 
     /**
      * Cập nhật văn bản thay thế cho hình ảnh
-     * 
+     *
      * @param imageId  ID hình ảnh
      * @param imageAlt văn bản thay thế mới
      * @return hình ảnh đã cập nhật
@@ -98,7 +106,7 @@ public interface ProductImageService {
 
     /**
      * Kiểm tra số lượng hình ảnh của sản phẩm
-     * 
+     *
      * @param productId ID sản phẩm
      * @return số lượng hình ảnh
      */
@@ -106,7 +114,7 @@ public interface ProductImageService {
 
     /**
      * Kiểm tra số lượng hình ảnh của biến thể
-     * 
+     *
      * @param variantId ID biến thể
      * @return số lượng hình ảnh
      */

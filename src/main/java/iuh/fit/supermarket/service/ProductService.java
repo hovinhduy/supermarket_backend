@@ -1,7 +1,12 @@
 package iuh.fit.supermarket.service;
 
-import iuh.fit.supermarket.dto.product.*;
-import org.springframework.data.domain.Page;
+import iuh.fit.supermarket.dto.product.ProductCreateRequest;
+import iuh.fit.supermarket.dto.product.ProductListResponse;
+import iuh.fit.supermarket.dto.product.ProductResponse;
+import iuh.fit.supermarket.dto.product.ProductUpdateRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitUpdateRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitResponse;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -13,7 +18,7 @@ public interface ProductService {
 
     /**
      * Tạo sản phẩm mới
-     *
+     * 
      * @param request thông tin sản phẩm cần tạo
      * @return thông tin sản phẩm đã tạo
      */
@@ -44,106 +49,148 @@ public interface ProductService {
     void deleteProduct(Long id);
 
     /**
-     * Xóa nhiều sản phẩm cùng lúc (soft delete)
+     * Xóa nhiều sản phẩm (soft delete)
      * 
-     * @param ids Danh sách ID sản phẩm cần xóa
+     * @param ids danh sách ID sản phẩm cần xóa
      */
-    void deleteProducts(List<Long> ids);
+    void deleteMultipleProducts(List<Long> ids);
 
     /**
-     * Lấy danh sách sản phẩm với phân trang
+     * Lấy danh sách sản phẩm với phân trang và tìm kiếm/lọc
      * 
-     * @param pageable thông tin phân trang
-     * @return danh sách sản phẩm
+     * @param searchTerm    từ khóa tìm kiếm (tìm theo tên sản phẩm)
+     * @param categoryId    ID danh mục để lọc (tùy chọn)
+     * @param brandId       ID thương hiệu để lọc (tùy chọn)
+     * @param isActive      trạng thái hoạt động để lọc (tùy chọn)
+     * @param isRewardPoint có tích điểm thưởng để lọc (tùy chọn)
+     * @param pageable      thông tin phân trang
+     * @return danh sách sản phẩm với phân trang
      */
-    Page<ProductResponse> getProducts(Pageable pageable);
+    ProductListResponse getProducts(String searchTerm,
+            Integer categoryId,
+            Integer brandId,
+            Boolean isActive,
+            Boolean isRewardPoint,
+            Pageable pageable);
 
     /**
-     * Lấy danh sách sản phẩm với filtering, searching và sorting nâng cao
+     * Lấy tất cả sản phẩm đang hoạt động (không phân trang)
      * 
-     * @param request thông tin phân trang, filtering và sorting
-     * @return danh sách sản phẩm
+     * @return danh sách sản phẩm đang hoạt động
      */
-    Page<ProductResponse> getProductsAdvanced(ProductPageableRequest request);
-
-    /**
-     * Tìm kiếm sản phẩm theo từ khóa
-     * 
-     * @param keyword từ khóa tìm kiếm
-     * @return danh sách sản phẩm tìm được
-     */
-    List<ProductResponse> searchProducts(String keyword);
+    List<ProductResponse> getAllActiveProducts();
 
     /**
      * Lấy danh sách sản phẩm theo danh mục
      * 
      * @param categoryId ID danh mục
+     * @param pageable   thông tin phân trang
      * @return danh sách sản phẩm
      */
-    List<ProductResponse> getProductsByCategory(Long categoryId);
+    ProductListResponse getProductsByCategory(Integer categoryId, Pageable pageable);
 
     /**
-     * Tạo biến thể sản phẩm
+     * Lấy danh sách sản phẩm theo thương hiệu
      * 
-     * @param productId ID sản phẩm gốc
-     * @param request   thông tin biến thể
-     * @return thông tin biến thể đã tạo
+     * @param brandId  ID thương hiệu
+     * @param pageable thông tin phân trang
+     * @return danh sách sản phẩm
      */
-    ProductResponse createProductVariant(Long productId, ProductVariantCreateRequest request);
+    ProductListResponse getProductsByBrand(Integer brandId, Pageable pageable);
 
     /**
-     * Tạo sản phẩm mới với nhiều biến thể cùng lúc
+     * Tìm kiếm sản phẩm theo tên
      * 
-     * @param request thông tin sản phẩm và các biến thể
-     * @return thông tin sản phẩm đã tạo
+     * @param keyword  từ khóa tìm kiếm
+     * @param pageable thông tin phân trang
+     * @return danh sách sản phẩm tìm được
      */
-    ProductResponse createProductWithVariants(ProductCreateWithVariantsRequest request);
+    ProductListResponse searchProducts(String keyword, Pageable pageable);
 
     /**
-     * Cập nhật thông tin biến thể sản phẩm
+     * Kiểm tra sản phẩm có tồn tại không
      * 
-     * @param variantId ID biến thể
-     * @param request   thông tin cập nhật biến thế
-     * @return thông tin biến thể đã cập nhật
+     * @param id ID sản phẩm
+     * @return true nếu tồn tại, false nếu không
      */
-    ProductVariantDto updateProductVariant(Long variantId, ProductVariantUpdateRequest request);
+    boolean existsById(Long id);
 
     /**
-     * Lấy thông tin biến thể theo ID
-     *
-     * @param variantId ID biến thể
-     * @return thông tin biến thể
+     * Kiểm tra tên sản phẩm có bị trùng không
+     * 
+     * @param name tên sản phẩm
+     * @return true nếu trùng, false nếu không
      */
-    ProductVariantDto getProductVariantById(Long variantId);
+    boolean existsByName(String name);
 
     /**
-     * Lấy danh sách biến thể theo ID sản phẩm
-     *
+     * Kiểm tra tên sản phẩm có bị trùng không (loại trừ ID hiện tại)
+     * 
+     * @param name      tên sản phẩm
+     * @param excludeId ID sản phẩm được loại trừ
+     * @return true nếu trùng, false nếu không
+     */
+    boolean existsByNameAndIdNot(String name, Long excludeId);
+
+    /**
+     * Kiểm tra sản phẩm có đơn vị cơ bản không
+     * 
      * @param productId ID sản phẩm
-     * @return danh sách biến thể của sản phẩm
+     * @return true nếu có đơn vị cơ bản, false nếu không
      */
-    List<ProductVariantDto> getProductVariantsByProductId(Long productId);
+    boolean hasBaseUnit(Long productId);
+
+    // ==================== QUẢN LÝ ĐƠN VỊ SẢN PHẨM ====================
 
     /**
-     * Xóa nhiều biến thể cùng lúc (soft delete)
+     * Thêm đơn vị mới vào sản phẩm
      * 
-     * @param variantIds Danh sách ID biến thể cần xóa
+     * @param productId ID sản phẩm
+     * @param request   thông tin đơn vị cần thêm
+     * @return thông tin đơn vị sản phẩm đã tạo
      */
-    void deleteProductVariants(List<Long> variantIds);
+    ProductUnitResponse addProductUnit(Long productId, ProductUnitRequest request);
 
     /**
-     * Xóa một biến thể (soft delete)
-     *
-     * @param variantId ID biến thể cần xóa
+     * Cập nhật thông tin đơn vị sản phẩm
+     * 
+     * @param productId ID sản phẩm
+     * @param unitId    ID đơn vị sản phẩm
+     * @param request   thông tin cập nhật
+     * @return thông tin đơn vị sản phẩm đã cập nhật
      */
-    void deleteProductVariant(Long variantId);
+    ProductUnitResponse updateProductUnit(Long productId, Long unitId, ProductUnitUpdateRequest request);
 
     /**
-     * Tìm kiếm biến thể sản phẩm theo từ khóa
-     * Từ khóa có thể là mã biến thể hoặc tên biến thể
-     *
-     * @param keyword từ khóa tìm kiếm (mã biến thể hoặc tên biến thể)
-     * @return danh sách biến thể tìm được
+     * Xóa đơn vị khỏi sản phẩm (soft delete)
+     * 
+     * @param productId ID sản phẩm
+     * @param unitId    ID đơn vị sản phẩm
      */
-    List<ProductVariantDto> searchProductVariants(String keyword);
+    void deleteProductUnit(Long productId, Long unitId);
+
+    /**
+     * Lấy danh sách đơn vị của sản phẩm
+     * 
+     * @param productId ID sản phẩm
+     * @return danh sách đơn vị sản phẩm
+     */
+    List<ProductUnitResponse> getProductUnits(Long productId);
+
+    /**
+     * Lấy thông tin đơn vị sản phẩm theo ID
+     * 
+     * @param productId ID sản phẩm
+     * @param unitId    ID đơn vị sản phẩm
+     * @return thông tin đơn vị sản phẩm
+     */
+    ProductUnitResponse getProductUnit(Long productId, Long unitId);
+
+    /**
+     * Lấy đơn vị cơ bản của sản phẩm
+     * 
+     * @param productId ID sản phẩm
+     * @return thông tin đơn vị cơ bản
+     */
+    ProductUnitResponse getBaseProductUnit(Long productId);
 }

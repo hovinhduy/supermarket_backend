@@ -31,7 +31,7 @@ public interface PriceService {
     /**
      * Lấy thông tin bảng giá theo ID
      * 
-     * @param priceId ID bảng giá
+     * @param priceId        ID bảng giá
      * @param includeDetails có bao gồm chi tiết giá không
      * @return thông tin bảng giá
      */
@@ -40,7 +40,7 @@ public interface PriceService {
     /**
      * Lấy thông tin bảng giá theo mã
      * 
-     * @param priceCode mã bảng giá
+     * @param priceCode      mã bảng giá
      * @param includeDetails có bao gồm chi tiết giá không
      * @return thông tin bảng giá
      */
@@ -111,19 +111,11 @@ public interface PriceService {
     /**
      * Kiểm tra và validate business rules cho bảng giá
      * 
-     * @param request yêu cầu tạo/cập nhật bảng giá
-     * @param isUpdate có phải là cập nhật không
+     * @param request        yêu cầu tạo/cập nhật bảng giá
+     * @param isUpdate       có phải là cập nhật không
      * @param currentPriceId ID bảng giá hiện tại (nếu là cập nhật)
      */
     void validatePriceBusinessRules(PriceCreateRequest request, boolean isUpdate, Long currentPriceId);
-
-    /**
-     * Lấy giá hiện tại của biến thể sản phẩm
-     * 
-     * @param variantId ID biến thể sản phẩm
-     * @return chi tiết giá hiện tại
-     */
-    PriceDetailDto getCurrentPriceByVariantId(Long variantId);
 
     /**
      * Lấy danh sách chi tiết giá theo ID bảng giá
@@ -136,7 +128,7 @@ public interface PriceService {
     /**
      * Thêm chi tiết giá vào bảng giá
      * 
-     * @param priceId ID bảng giá
+     * @param priceId      ID bảng giá
      * @param priceDetails danh sách chi tiết giá cần thêm
      * @return thông tin bảng giá đã cập nhật
      */
@@ -144,10 +136,18 @@ public interface PriceService {
 
     /**
      * Xóa chi tiết giá khỏi bảng giá
-     * 
-     * @param priceId ID bảng giá
+     *
+     * @param priceId        ID bảng giá
      * @param priceDetailIds danh sách ID chi tiết giá cần xóa
      * @return thông tin bảng giá đã cập nhật
      */
     PriceResponse removePriceDetails(Long priceId, List<Long> priceDetailIds);
+
+    /**
+     * Lấy giá hiện tại của đơn vị sản phẩm
+     *
+     * @param productUnitId ID đơn vị sản phẩm
+     * @return chi tiết giá hiện tại
+     */
+    PriceDetailDto getCurrentPriceByVariantId(Long productUnitId);
 }

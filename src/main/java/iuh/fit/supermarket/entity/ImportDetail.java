@@ -49,10 +49,10 @@ public class ImportDetail {
     private Import importRecord;
 
     /**
-     * Biến thể sản phẩm được nhập
+     * Đơn vị sản phẩm được nhập
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id", nullable = false)
+    private ProductUnit productUnit;
 
 }

@@ -42,12 +42,6 @@ public class Product {
     private String description;
 
     /**
-     * Số lượng biến thể
-     */
-    @Column(name = "variant_count")
-    private Integer variantCount = 0;
-
-    /**
      * Trạng thái hoạt động
      */
     @Column(name = "is_active")
@@ -69,8 +63,8 @@ public class Product {
      * Thời gian tạo
      */
     @CreationTimestamp
-    @Column(name = "created_date")
-    private LocalDateTime createdDate;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     /**
      * Thời gian cập nhật
@@ -98,12 +92,6 @@ public class Product {
      */
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ProductUnit> productUnits;
-
-    /**
-     * Danh sách biến thể của sản phẩm
-     */
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ProductVariant> variants;
 
     /**
      * Danh sách hình ảnh của sản phẩm

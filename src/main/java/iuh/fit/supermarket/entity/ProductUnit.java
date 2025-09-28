@@ -12,17 +12,20 @@ import java.util.List;
 
 /**
  * Entity đại diện cho đơn vị đóng gói sản phẩm trong hệ thống
- * Chỉ định nghĩa đơn vị và tỷ lệ quy đổi, không chứa thông tin giá
+ * Định nghĩa mối quan hệ giữa sản phẩm và đơn vị tính, bao gồm tỷ lệ quy đổi và thông tin bổ sung
  */
 @Entity
-@Table(name = "product_units")
+@Table(name = "product_units", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_product_unit_code", columnNames = {"code"}),
+        @UniqueConstraint(name = "uk_product_unit_product_unit", columnNames = {"product_id", "unit_id"})
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductUnit {
 
     /**
-     * ID duy nhất của đơn vị
+     * ID duy nhất của đơn vị sản phẩm
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,39 +33,29 @@ public class ProductUnit {
     private Long id;
 
     /**
-     * Mã đơn vị (duy nhất)
+     * Mã đơn vị sản phẩm (duy nhất) - SKU cho đơn vị này
      */
     @Column(name = "code", length = 50, unique = true)
     private String code;
 
     /**
-     * Mã vạch của đơn vị
+     * Mã vạch của đơn vị sản phẩm
      */
     @Column(name = "barcode", length = 100)
     private String barcode;
 
     /**
-     * Tên đơn vị (ví dụ: "lon", "lốc", "thùng")
-     */
-    @Column(name = "unit", length = 50, nullable = false)
-    private String unit;
-
-    /**
      * Tỷ lệ quy đổi so với đơn vị cơ bản
-     * Ví dụ: lon=1, lốc=6, thùng=24
+     * Ví dụ: nếu đơn vị cơ bản là "cái" và đơn vị này là "thùng",
+     * conversionValue = 24 có nghĩa là 1 thùng = 24 cái
      */
     @Column(name = "conversion_value", nullable = false)
     private Integer conversionValue = 1;
 
-    /**
-     * Thứ tự sắp xếp hiển thị
-     */
-    @Column(name = "sort_order")
-    private Integer sortOrder = 0;
 
     /**
      * Đánh dấu đơn vị cơ bản của sản phẩm
-     * Chỉ có một đơn vị cơ bản cho mỗi sản phẩm
+     * Chỉ có một đơn vị cơ bản cho mỗi sản phẩm (conversionValue = 1)
      */
     @Column(name = "is_base_unit")
     private Boolean isBaseUnit = false;
@@ -74,11 +67,17 @@ public class ProductUnit {
     private Boolean isActive = true;
 
     /**
+     * Trạng thái xóa mềm
+     */
+    @Column(name = "is_deleted")
+    private Boolean isDeleted = false;
+
+    /**
      * Thời gian tạo
      */
     @CreationTimestamp
-    @Column(name = "created_date")
-    private LocalDateTime createdDate;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     /**
      * Thời gian cập nhật
@@ -95,8 +94,15 @@ public class ProductUnit {
     private Product product;
 
     /**
-     * Danh sách biến thể sử dụng đơn vị này
+     * Đơn vị tính được sử dụng
      */
-    @OneToMany(mappedBy = "unit", fetch = FetchType.LAZY)
-    private List<ProductVariant> variants;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id", nullable = false)
+    private Unit unit;
+
+    /**
+     * Danh sách mapping với các hình ảnh được chọn cho đơn vị này
+     */
+    @OneToMany(mappedBy = "productUnit", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ProductUnitImage> productUnitImages;
 }

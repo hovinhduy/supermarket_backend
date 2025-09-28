@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Entity đại diện cho hình ảnh sản phẩm trong hệ thống
@@ -59,9 +60,8 @@ public class ProductImage {
     private Product product;
 
     /**
-     * Biến thể cụ thể (NULL = ảnh chung cho sản phẩm)
+     * Danh sách mapping với các ProductUnit sử dụng hình ảnh này
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id")
-    private ProductVariant variant;
+    @OneToMany(mappedBy = "productImage", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<ProductUnitImage> productUnitImages;
 }

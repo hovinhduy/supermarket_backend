@@ -6,39 +6,41 @@ import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
 
 /**
- * DTO cho request upload hình ảnh sản phẩm
+ * DTO cho yêu cầu upload hình ảnh sản phẩm
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductImageUploadRequest {
-
+    
     /**
-     * ID sản phẩm (bắt buộc)
+     * ID của sản phẩm
      */
-    @NotNull(message = "ID sản phẩm không được để trống")
+    @NotNull(message = "Product ID không được để trống")
     private Long productId;
-
+    
     /**
-     * ID biến thể (tùy chọn - nếu có thì ảnh thuộc về biến thể cụ thể)
+     * ID của biến thể (tùy chọn)
      */
     private Long variantId;
-
+    
+    /**
+     * File hình ảnh
+     */
+    @NotNull(message = "File ảnh không được để trống")
+    private MultipartFile imageFile;
+    
     /**
      * Văn bản thay thế cho hình ảnh
      */
     private String imageAlt;
-
+    
     /**
-     * Thứ tự sắp xếp (tùy chọn - nếu không có sẽ tự động đặt)
+     * Thứ tự sắp xếp
      */
+    @Min(value = 0, message = "Sort order phải >= 0")
     private Integer sortOrder;
-
-    /**
-     * File ảnh cần upload
-     */
-    @NotNull(message = "File ảnh không được để trống")
-    private MultipartFile imageFile;
 }

@@ -7,45 +7,45 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * DTO đại diện cho thông tin hình ảnh sản phẩm
+ * DTO cho thông tin hình ảnh sản phẩm
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ProductImageDto {
-
+    
     /**
      * ID của hình ảnh
      */
     private Integer imageId;
-
+    
     /**
      * URL của hình ảnh
      */
     private String imageUrl;
-
+    
     /**
      * Văn bản thay thế cho hình ảnh
      */
     private String imageAlt;
-
+    
     /**
      * Thứ tự sắp xếp
      */
     private Integer sortOrder;
-
+    
     /**
      * Thời gian tạo
      */
     private LocalDateTime createdAt;
-
+    
     /**
-     * ID sản phẩm
+     * ID của sản phẩm
      */
     private Long productId;
-
+    
     /**
-     * ID biến thể (nếu có)
+     * ID của biến thể (nếu có)
      */
     private Long variantId;
 }

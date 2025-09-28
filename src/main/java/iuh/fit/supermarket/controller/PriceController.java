@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.price.*;
 import iuh.fit.supermarket.enums.PriceType;
+import iuh.fit.supermarket.exception.*;
 import iuh.fit.supermarket.service.PriceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,11 +51,18 @@ public class PriceController {
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
-        } catch (Exception e) {
-            log.error("Lỗi khi tạo bảng giá: ", e);
-
+        } catch (DuplicatePriceCodeException e) {
+            log.error("Mã bảng giá đã tồn tại: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        } catch (PriceValidationException e) {
+            log.error("Dữ liệu bảng giá không hợp lệ: ", e);
             ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error("Lỗi hệ thống khi tạo bảng giá");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -78,11 +86,21 @@ public class PriceController {
 
             return ResponseEntity.ok(response);
 
-        } catch (Exception e) {
-            log.error("Lỗi khi cập nhật bảng giá: ", e);
-
+        } catch (PriceNotFoundException e) {
+            log.error("Không tìm thấy bảng giá: ", e);
+            return ResponseEntity.notFound().build();
+        } catch (PriceConflictException e) {
+            log.error("Xung đột khi cập nhật bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        } catch (PriceValidationException e) {
+            log.error("Dữ liệu bảng giá không hợp lệ: ", e);
             ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("Lỗi khi cập nhật bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error("Lỗi hệ thống khi cập nhật bảng giá");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -330,18 +348,18 @@ public class PriceController {
     }
 
     /**
-     * Lấy giá hiện tại của biến thể sản phẩm
+     * Lấy giá hiện tại của đơn vị sản phẩm
      */
-    @GetMapping("/variant/{variantId}/current-price")
+    @GetMapping("/product-unit/{productUnitId}/current-price")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    @Operation(summary = "Lấy giá hiện tại của biến thể", description = "Lấy giá hiện tại đang áp dụng của biến thể sản phẩm")
+    @Operation(summary = "Lấy giá hiện tại của đơn vị sản phẩm", description = "Lấy giá hiện tại đang áp dụng của đơn vị sản phẩm")
     public ResponseEntity<ApiResponse<PriceDetailDto>> getCurrentPriceByVariantId(
-            @Parameter(description = "ID biến thể sản phẩm") @PathVariable Long variantId) {
+            @Parameter(description = "ID đơn vị sản phẩm") @PathVariable Long productUnitId) {
 
-        log.info("API lấy giá hiện tại của biến thể ID: {}", variantId);
+        log.info("API lấy giá hiện tại của đơn vị sản phẩm ID: {}", productUnitId);
 
         try {
-            PriceDetailDto priceDetail = priceService.getCurrentPriceByVariantId(variantId);
+            PriceDetailDto priceDetail = priceService.getCurrentPriceByVariantId(productUnitId);
 
             if (priceDetail != null) {
                 ApiResponse<PriceDetailDto> response = ApiResponse.success(
@@ -349,12 +367,12 @@ public class PriceController {
                 return ResponseEntity.ok(response);
             } else {
                 ApiResponse<PriceDetailDto> response = ApiResponse.success(
-                        "Không tìm thấy giá hiện tại cho biến thể này", null);
+                        "Không tìm thấy giá hiện tại cho đơn vị sản phẩm này", null);
                 return ResponseEntity.ok(response);
             }
 
         } catch (Exception e) {
-            log.error("Lỗi khi lấy giá hiện tại của biến thể: ", e);
+            log.error("Lỗi khi lấy giá hiện tại của đơn vị sản phẩm: ", e);
 
             ApiResponse<PriceDetailDto> response = ApiResponse.error(e.getMessage());
             return ResponseEntity.badRequest().body(response);

@@ -1,6 +1,6 @@
 package iuh.fit.supermarket.entity;
 
-import iuh.fit.supermarket.enums.PromotionDetailType;
+import iuh.fit.supermarket.enums.PromotionType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * Entity đại diện cho chi tiết quy tắc khuyến mãi trong hệ thống
+ * Entity đại diện định nghĩa chi tiết khuyến mãi trong hệ thống
  */
 @Entity
 @Table(name = "promotion_details")
@@ -24,14 +24,7 @@ public class PromotionDetail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "detail_id")
-    private Integer detailId;
-
-    /**
-     * Loại khuyến mãi
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "detail_type", nullable = false)
-    private PromotionDetailType detailType;
+    private Long detailId;
 
     /**
      * Giá trị khuyến mãi
@@ -64,18 +57,11 @@ public class PromotionDetail {
     private Integer giftQuantity;
 
     /**
-     * Chương trình khuyến mãi
+     * Đơn vị sản phẩm điều kiện
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "promotion_id", nullable = false)
-    private Promotion promotion;
-
-    /**
-     * Biến thể sản phẩm điều kiện
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "condition_variant_id")
-    private ProductVariant conditionVariant;
+    @JoinColumn(name = "condition_product_unit_id")
+    private ProductUnit conditionProductUnit;
 
     /**
      * Danh mục sản phẩm điều kiện
@@ -85,9 +71,17 @@ public class PromotionDetail {
     private Category conditionCategory;
 
     /**
-     * Biến thể sản phẩm tặng
+     * Đơn vị sản phẩm tặng
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "gift_variant_id")
-    private ProductVariant giftVariant;
+    @JoinColumn(name = "gift_product_unit_id")
+    private ProductUnit giftProductUnit;
+
+    /**
+     * Liên kết đến line
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "line_id", nullable = false)
+    private PromotionLine promotionLine;
+
 }

@@ -8,7 +8,7 @@ import java.io.Serializable;
 
 /**
  * Composite key cho entity CartItem
- * Sử dụng cho primary key phức hợp (cart_id, variant_id)
+ * Sử dụng cho primary key phức hợp (cart_id, product_unit_id)
  */
 @Data
 @NoArgsConstructor
@@ -21,7 +21,7 @@ public class CartItemId implements Serializable {
     private Integer cart;
 
     /**
-     * ID biến thể sản phẩm
+     * ID đơn vị sản phẩm
      */
-    private Long variant;
+    private Long productUnit;
 }

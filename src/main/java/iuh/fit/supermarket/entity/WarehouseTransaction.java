@@ -78,11 +78,11 @@ public class WarehouseTransaction {
     private LocalDateTime transactionDate;
 
     /**
-     * Biến thể sản phẩm
+     * Đơn vị sản phẩm
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id", nullable = false)
+    private ProductUnit productUnit;
 
     /**
      * Enum cho loại giao dịch

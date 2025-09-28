@@ -1,19 +1,39 @@
 package iuh.fit.supermarket.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
-import iuh.fit.supermarket.dto.product.*;
+import iuh.fit.supermarket.dto.product.ProductCreateRequest;
+import iuh.fit.supermarket.dto.product.ProductListResponse;
+import iuh.fit.supermarket.dto.product.ProductPageableRequest;
+import iuh.fit.supermarket.dto.product.ProductResponse;
+import iuh.fit.supermarket.dto.product.ProductUpdateRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitUpdateRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitResponse;
 import iuh.fit.supermarket.service.ProductService;
+import iuh.fit.supermarket.service.ProductExcelService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -21,432 +41,630 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/products")
-@RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Product Management", description = "APIs cho quản lý sản phẩm")
 @SecurityRequirement(name = "Bearer Authentication")
+@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductExcelService productExcelService;
 
     /**
-     * Lấy thông tin sản phẩm theo ID
+     * API tạo sản phẩm mới
+     */
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo một sản phẩm mới trong hệ thống")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Tạo sản phẩm thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Sản phẩm đã tồn tại"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
+            @Valid @RequestBody ProductCreateRequest request) {
+        log.info("API tạo sản phẩm mới: {}", request.getName());
+
+        try {
+            ProductResponse createdProduct = productService.createProduct(request);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(ApiResponse.success("Tạo sản phẩm thành công", createdProduct));
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * API lấy thông tin sản phẩm theo ID
      */
     @GetMapping("/{id}")
-    @Operation(summary = "Lấy thông tin sản phẩm", description = "Lấy thông tin chi tiết sản phẩm theo ID")
+    @Operation(summary = "Lấy thông tin sản phẩm theo ID", description = "Trả về thông tin chi tiết của sản phẩm theo ID")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
+    })
     public ResponseEntity<ApiResponse<ProductResponse>> getProductById(
-            @PathVariable Long id) {
-
-        log.info("API lấy thông tin sản phẩm ID: {}", id);
+            @Parameter(description = "ID của sản phẩm") @PathVariable Long id) {
+        log.info("API lấy thông tin sản phẩm với ID: {}", id);
 
         try {
             ProductResponse product = productService.getProductById(id);
-
-            ApiResponse<ProductResponse> response = ApiResponse.success(product);
-
-            return ResponseEntity.ok(response);
-
+            return ResponseEntity.ok(ApiResponse.success(product));
         } catch (Exception e) {
             log.error("Lỗi khi lấy thông tin sản phẩm: ", e);
-
-            ApiResponse<ProductResponse> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Cập nhật thông tin sản phẩm
+     * API cập nhật thông tin sản phẩm
      */
     @PutMapping("/{id}")
-    @Operation(summary = "Cập nhật sản phẩm", description = "Cập nhật thông tin sản phẩm")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Cập nhật thông tin sản phẩm", description = "Cập nhật thông tin sản phẩm theo ID")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @PathVariable Long id,
-            @RequestBody ProductUpdateRequest request) {
-
-        log.info("API cập nhật sản phẩm ID: {}", id);
+            @Parameter(description = "ID của sản phẩm") @PathVariable Long id,
+            @Valid @RequestBody ProductUpdateRequest request) {
+        log.info("API cập nhật sản phẩm với ID: {}", id);
 
         try {
-            ProductResponse product = productService.updateProduct(id, request);
-
-            ApiResponse<ProductResponse> response = ApiResponse.success("Cập nhật sản phẩm thành công", product);
-
-            return ResponseEntity.ok(response);
-
+            ProductResponse updatedProduct = productService.updateProduct(id, request);
+            return ResponseEntity.ok(ApiResponse.success("Cập nhật sản phẩm thành công", updatedProduct));
         } catch (Exception e) {
             log.error("Lỗi khi cập nhật sản phẩm: ", e);
-
-            ApiResponse<ProductResponse> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Xóa một sản phẩm
+     * API xóa sản phẩm
      */
     @DeleteMapping("/{id}")
-    @Operation(summary = "Xóa sản phẩm", description = "Xóa một sản phẩm (soft delete)")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Xóa sản phẩm", description = "Xóa sản phẩm khỏi hệ thống (soft delete)")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Xóa thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
     public ResponseEntity<ApiResponse<String>> deleteProduct(
-            @PathVariable Long id) {
-
-        log.info("API xóa sản phẩm ID: {}", id);
+            @Parameter(description = "ID của sản phẩm") @PathVariable Long id) {
+        log.info("API xóa sản phẩm với ID: {}", id);
 
         try {
             productService.deleteProduct(id);
-
-            ApiResponse<String> response = ApiResponse.success("Xóa sản phẩm và các biến thể thành công",
-                    (String) null);
-
-            return ResponseEntity.ok(response);
-
+            return ResponseEntity.ok(ApiResponse.success("Xóa sản phẩm thành công"));
         } catch (Exception e) {
             log.error("Lỗi khi xóa sản phẩm: ", e);
-
-            ApiResponse<String> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Xóa nhiều sản phẩm cùng lúc
+     * API xóa nhiều sản phẩm
      */
-    @DeleteMapping("/bulk")
-    @Operation(summary = "Xóa nhiều sản phẩm", description = "Xóa nhiều sản phẩm cùng lúc (soft delete). Nhận vào mảng các ID sản phẩm cần xóa.")
-    public ResponseEntity<ApiResponse<String>> deleteProducts(
-            @RequestBody List<Long> ids) {
-
-        log.info("API xóa nhiều sản phẩm với {} ID: {}", ids != null ? ids.size() : 0, ids);
+    @DeleteMapping("/batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Xóa nhiều sản phẩm", description = "Xóa nhiều sản phẩm khỏi hệ thống (soft delete)")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Xóa thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<String>> deleteMultipleProducts(
+            @Parameter(description = "Danh sách ID sản phẩm cần xóa") @RequestBody List<Long> ids) {
+        log.info("API xóa nhiều sản phẩm: {} sản phẩm", ids != null ? ids.size() : 0);
 
         try {
-            productService.deleteProducts(ids);
-
-            String message = String.format("Xóa %d sản phẩm và các biến thể thành công", ids != null ? ids.size() : 0);
-            ApiResponse<String> response = ApiResponse.success(message, (String) null);
-
-            return ResponseEntity.ok(response);
-
+            productService.deleteMultipleProducts(ids);
+            int deletedCount = (ids != null) ? ids.size() : 0;
+            return ResponseEntity.ok(ApiResponse.success("Xóa " + deletedCount + " sản phẩm thành công"));
         } catch (Exception e) {
             log.error("Lỗi khi xóa nhiều sản phẩm: ", e);
-
-            ApiResponse<String> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Lấy danh sách sản phẩm với phân trang (API cũ - deprecated)
+     * API lấy danh sách sản phẩm với phân trang và lọc
      */
-    @GetMapping
-    @Operation(summary = "Lấy danh sách sản phẩm (deprecated)", description = "API cũ - sử dụng POST /api/products/search")
-    @Deprecated
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProducts(
-            Pageable pageable) {
-
-        log.info("API lấy danh sách sản phẩm với phân trang (deprecated)");
+    @PostMapping("/search")
+    @Operation(summary = "Lấy danh sách sản phẩm", description = "Lấy danh sách sản phẩm với phân trang, tìm kiếm và lọc")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")
+    })
+    public ResponseEntity<ApiResponse<ProductListResponse>> getProducts(
+            @Valid @RequestBody ProductPageableRequest request) {
+        log.info(
+                "API lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, page={}, size={}",
+                request.getSearchTerm(), request.getCategoryId(), request.getBrandId(),
+                request.getIsActive(), request.getIsRewardPoint(), request.getPage(), request.getSize());
 
         try {
-            Page<ProductResponse> products = productService.getProducts(pageable);
+            // Tạo Pageable từ request
+            Pageable pageable = createPageableFromRequest(request);
 
-            ApiResponse<Page<ProductResponse>> response = ApiResponse.success(products);
-
-            return ResponseEntity.ok(response);
-
+            ProductListResponse products = productService.getProducts(
+                    request.getSearchTermTrimmed(),
+                    request.getCategoryId(),
+                    request.getBrandId(),
+                    request.getIsActive(),
+                    request.getIsRewardPoint(),
+                    pageable);
+            return ResponseEntity.ok(ApiResponse.success(products));
         } catch (Exception e) {
             log.error("Lỗi khi lấy danh sách sản phẩm: ", e);
-
-            ApiResponse<Page<ProductResponse>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Lấy danh sách sản phẩm với filtering, searching và sorting
+     * API lấy tất cả sản phẩm đang hoạt động
      */
-    @PostMapping("/list")
-    @Operation(summary = "Lấy danh sách sản phẩm nâng cao", description = "Lấy danh sách sản phẩm với filtering, searching và sorting")
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getProductsAdvanced(
-            @RequestBody ProductPageableRequest request) {
-
-        log.info("API lấy danh sách sản phẩm nâng cao: page={}, limit={}, search={}, isActive={}",
-                request.getPage(), request.getLimit(), request.getSearchTerm(), request.getIsActive());
+    @GetMapping("/active")
+    @Operation(summary = "Lấy tất cả sản phẩm đang hoạt động", description = "Lấy danh sách tất cả sản phẩm đang hoạt động (không phân trang)")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công")
+    })
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getAllActiveProducts() {
+        log.info("API lấy tất cả sản phẩm đang hoạt động");
 
         try {
-            Page<ProductResponse> products = productService.getProductsAdvanced(request);
-
-            ApiResponse<Page<ProductResponse>> response = ApiResponse.success(products);
-
-            return ResponseEntity.ok(response);
-
+            List<ProductResponse> products = productService.getAllActiveProducts();
+            return ResponseEntity.ok(ApiResponse.success(products));
         } catch (Exception e) {
-            log.error("Lỗi khi lấy danh sách sản phẩm nâng cao: ", e);
-
-            ApiResponse<Page<ProductResponse>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi lấy danh sách sản phẩm hoạt động: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Tìm kiếm sản phẩm
-     */
-    @GetMapping("/search")
-    @Operation(summary = "Tìm kiếm sản phẩm", description = "Tìm kiếm sản phẩm theo từ khóa")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> searchProducts(
-            @RequestParam String keyword) {
-
-        log.info("API tìm kiếm sản phẩm với từ khóa: {}", keyword);
-
-        try {
-            List<ProductResponse> products = productService.searchProducts(keyword);
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.success(products);
-
-            return ResponseEntity.ok(response);
-
-        } catch (Exception e) {
-            log.error("Lỗi khi tìm kiếm sản phẩm: ", e);
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
-        }
-    }
-
-    /**
-     * Lấy sản phẩm theo danh mục
+     * API lấy sản phẩm theo danh mục
      */
     @GetMapping("/category/{categoryId}")
-    @Operation(summary = "Lấy sản phẩm theo danh mục", description = "Lấy danh sách sản phẩm thuộc một danh mục")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getProductsByCategory(
-            @PathVariable Long categoryId) {
-
-        log.info("API lấy sản phẩm theo danh mục: {}", categoryId);
+    @Operation(summary = "Lấy sản phẩm theo danh mục", description = "Lấy danh sách sản phẩm theo danh mục với phân trang")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy danh mục")
+    })
+    public ResponseEntity<ApiResponse<ProductListResponse>> getProductsByCategory(
+            @Parameter(description = "ID danh mục") @PathVariable Integer categoryId,
+            @PageableDefault(size = 10) Pageable pageable) {
+        log.info("API lấy sản phẩm theo danh mục ID: {}", categoryId);
 
         try {
-            List<ProductResponse> products = productService.getProductsByCategory(categoryId);
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.success(products);
-
-            return ResponseEntity.ok(response);
-
+            ProductListResponse products = productService.getProductsByCategory(categoryId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(products));
         } catch (Exception e) {
             log.error("Lỗi khi lấy sản phẩm theo danh mục: ", e);
-
-            ApiResponse<List<ProductResponse>> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Tạo biến thể sản phẩm
+     * API lấy sản phẩm theo thương hiệu
      */
-    @PostMapping("/{id}/variants")
-    @Operation(summary = "Tạo biến thể sản phẩm", description = "Tạo biến thể cho sản phẩm")
-    public ResponseEntity<ApiResponse<ProductResponse>> createProductVariant(
-            @PathVariable Long id,
-            @RequestBody ProductVariantCreateRequest request) {
-
-        log.info("API tạo biến thể cho sản phẩm ID: {}", id);
+    @GetMapping("/brand/{brandId}")
+    @Operation(summary = "Lấy sản phẩm theo thương hiệu", description = "Lấy danh sách sản phẩm theo thương hiệu với phân trang")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy thương hiệu")
+    })
+    public ResponseEntity<ApiResponse<ProductListResponse>> getProductsByBrand(
+            @Parameter(description = "ID thương hiệu") @PathVariable Integer brandId,
+            @PageableDefault(size = 10) Pageable pageable) {
+        log.info("API lấy sản phẩm theo thương hiệu ID: {}", brandId);
 
         try {
-            ProductResponse variant = productService.createProductVariant(id, request);
-
-            ApiResponse<ProductResponse> response = ApiResponse.success("Tạo biến thể sản phẩm thành công", variant);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
+            ProductListResponse products = productService.getProductsByBrand(brandId, pageable);
+            return ResponseEntity.ok(ApiResponse.success(products));
         } catch (Exception e) {
-            log.error("Lỗi khi tạo biến thể sản phẩm: ", e);
-
-            ApiResponse<ProductResponse> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi lấy sản phẩm theo thương hiệu: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Tạo sản phẩm mới
+     * API tìm kiếm sản phẩm
      */
-    @PostMapping
-    @Operation(summary = "Tạo sản phẩm mới", description = "Tạo sản phẩm mới với thông tin cơ bản và biến thể (không bao gồm giá và tồn kho)")
-    public ResponseEntity<ApiResponse<ProductCreateResponse>> createProduct(
-            @RequestBody ProductCreateWithVariantsRequest request) {
+    // @GetMapping("/search")
+    // @Operation(summary = "Tìm kiếm sản phẩm", description = "Tìm kiếm sản phẩm
+    // theo từ khóa với phân trang")
+    // @ApiResponses(value = {
+    // @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+    // description = "Tìm kiếm thành công"),
+    // @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400",
+    // description = "Từ khóa không hợp lệ")
+    // })
+    // public ResponseEntity<ApiResponse<ProductListResponse>> searchProducts(
+    // @Parameter(description = "Từ khóa tìm kiếm") @RequestParam String keyword,
+    // @PageableDefault(size = 10) Pageable pageable) {
+    // log.info("API tìm kiếm sản phẩm với từ khóa: {}", keyword);
 
-        log.info("API tạo sản phẩm mới được gọi: {}", request.getName());
+    // try {
+    // ProductListResponse products = productService.searchProducts(keyword,
+    // pageable);
+    // return ResponseEntity.ok(ApiResponse.success(products));
+    // } catch (Exception e) {
+    // log.error("Lỗi khi tìm kiếm sản phẩm: ", e);
+    // return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+    // }
+    // }
+
+    /**
+     * Tạo Pageable từ ProductPageableRequest
+     */
+    private Pageable createPageableFromRequest(ProductPageableRequest request) {
+        // Xử lý sort
+        Sort sort = Sort.unsorted();
+        if (request.getSort() != null && !request.getSort().isEmpty()) {
+            Sort.Order[] orders = request.getSort().stream()
+                    .map(this::parseSortString)
+                    .toArray(Sort.Order[]::new);
+            sort = Sort.by(orders);
+        }
+
+        return PageRequest.of(request.getValidPage(), request.getValidSize(), sort);
+    }
+
+    /**
+     * Phân tích chuỗi sort thành Sort.Order
+     * Format: "fieldName" hoặc "fieldName,asc" hoặc "fieldName,desc"
+     */
+    private Sort.Order parseSortString(String sortStr) {
+        if (sortStr == null || sortStr.trim().isEmpty()) {
+            return Sort.Order.asc("createdAt"); // default sort
+        }
+
+        String[] parts = sortStr.split(",");
+        String property = parts[0].trim();
+
+        // Validate property name để tránh lỗi bảo mật
+        if (!isValidSortProperty(property)) {
+            property = "createdAt"; // fallback to safe default
+        }
+
+        Sort.Direction direction = Sort.Direction.ASC;
+        if (parts.length > 1) {
+            String directionStr = parts[1].trim().toLowerCase();
+            if ("desc".equals(directionStr)) {
+                direction = Sort.Direction.DESC;
+            }
+        }
+
+        return new Sort.Order(direction, property);
+    }
+
+    /**
+     * Kiểm tra tên trường sort có hợp lệ không
+     */
+    private boolean isValidSortProperty(String property) {
+        // Chỉ cho phép các trường an toàn
+        return property != null && ("id".equals(property) ||
+                "name".equals(property) ||
+                "productCode".equals(property) ||
+                "description".equals(property) ||
+                "isActive".equals(property) ||
+                "isRewardPoint".equals(property) ||
+                "createdAt".equals(property) ||
+                "updatedAt".equals(property));
+    }
+
+    // ==================== QUẢN LÝ ĐƠN VỊ SẢN PHẨM ====================
+
+    /**
+     * API thêm đơn vị mới vào sản phẩm
+     */
+    @PostMapping("/{productId}/units")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Thêm đơn vị mới vào sản phẩm", description = "Thêm một đơn vị tính mới cho sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "Thêm đơn vị thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Đơn vị đã tồn tại"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<ProductUnitResponse>> addProductUnit(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId,
+            @Valid @RequestBody ProductUnitRequest request) {
+        log.info("API thêm đơn vị mới cho sản phẩm ID: {}, unit: {}", productId, request.unitName());
 
         try {
-            ProductResponse product = productService.createProductWithVariants(request);
-
-            // Lấy danh sách biến thể đã tạo
-            List<ProductVariantDto> createdVariants = productService.getProductVariantsByProductId(product.getId());
-
-            // Tính tổng số variants thực tế
-            int totalVariants = createdVariants.size();
-
-            // Tạo response với danh sách biến thể đã tạo
-            ProductCreateResponse responseData = new ProductCreateResponse();
-            responseData.setId(product.getId());
-            responseData.setName(product.getName());
-            responseData.setSkuCount(request.getVariants().size());
-            responseData.setVariantCount(totalVariants);
-            responseData.setMessage("Tạo sản phẩm thành công với " + totalVariants + " biến thể (từ "
-                    + request.getVariants().size() + " SKUs) - chỉ thông tin cơ bản");
-            responseData.setVariants(createdVariants);
-
-            ApiResponse<ProductCreateResponse> response = ApiResponse.success("Thành công", responseData);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-
+            ProductUnitResponse productUnit = productService.addProductUnit(productId, request);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(ApiResponse.success("Thêm đơn vị sản phẩm thành công", productUnit));
         } catch (Exception e) {
-            log.error("Lỗi khi tạo sản phẩm: ", e);
-
-            ApiResponse<ProductCreateResponse> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi thêm đơn vị sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Lấy thông tin biến thể theo ID
+     * API cập nhật thông tin đơn vị sản phẩm
      */
-    @GetMapping("/variants/{variantId}")
-    @Operation(summary = "Lấy thông tin biến thể", description = "Lấy thông tin chi tiết biến thể theo ID")
-    public ResponseEntity<ApiResponse<ProductVariantDto>> getProductVariantById(
-            @PathVariable Long variantId) {
-
-        log.info("API lấy thông tin biến thể ID: {}", variantId);
+    @PutMapping("/{productId}/units/{unitId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Cập nhật thông tin đơn vị sản phẩm", description = "Cập nhật thông tin đơn vị tính của sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cập nhật thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc đơn vị"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<ProductUnitResponse>> updateProductUnit(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId,
+            @Parameter(description = "ID đơn vị sản phẩm") @PathVariable Long unitId,
+            @Valid @RequestBody ProductUnitUpdateRequest request) {
+        log.info("API cập nhật đơn vị sản phẩm ID: {} của sản phẩm ID: {}", unitId, productId);
 
         try {
-            ProductVariantDto variant = productService.getProductVariantById(variantId);
-
-            ApiResponse<ProductVariantDto> response = ApiResponse.success(variant);
-
-            return ResponseEntity.ok(response);
-
+            ProductUnitResponse productUnit = productService.updateProductUnit(productId, unitId, request);
+            return ResponseEntity.ok(ApiResponse.success("Cập nhật đơn vị sản phẩm thành công", productUnit));
         } catch (Exception e) {
-            log.error("Lỗi khi lấy thông tin biến thể: ", e);
-
-            ApiResponse<ProductVariantDto> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi cập nhật đơn vị sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Cập nhật thông tin biến thể
+     * API xóa đơn vị khỏi sản phẩm
      */
-    @PutMapping("/variants/{variantId}")
-    @Operation(summary = "Cập nhật biến thể", description = "Cập nhật thông tin biến thể sản phẩm")
-    public ResponseEntity<ApiResponse<ProductVariantDto>> updateProductVariant(
-            @PathVariable Long variantId,
-            @RequestBody ProductVariantUpdateRequest request) {
-
-        log.info("API cập nhật biến thể ID: {}", variantId);
+    @DeleteMapping("/{productId}/units/{unitId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Xóa đơn vị khỏi sản phẩm", description = "Xóa đơn vị tính khỏi sản phẩm (soft delete)")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Xóa thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc đơn vị"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Không thể xóa đơn vị cơ bản"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<String>> deleteProductUnit(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId,
+            @Parameter(description = "ID đơn vị sản phẩm") @PathVariable Long unitId) {
+        log.info("API xóa đơn vị sản phẩm ID: {} khỏi sản phẩm ID: {}", unitId, productId);
 
         try {
-            ProductVariantDto variant = productService.updateProductVariant(variantId, request);
-
-            ApiResponse<ProductVariantDto> response = ApiResponse.success("Cập nhật biến thể thành công", variant);
-
-            return ResponseEntity.ok(response);
-
+            productService.deleteProductUnit(productId, unitId);
+            return ResponseEntity.ok(ApiResponse.success("Xóa đơn vị sản phẩm thành công"));
         } catch (Exception e) {
-            log.error("Lỗi khi cập nhật biến thể: ", e);
-
-            ApiResponse<ProductVariantDto> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi xóa đơn vị sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Xóa một biến thể
+     * API lấy danh sách đơn vị của sản phẩm
      */
-    @DeleteMapping("/variants/{variantId}")
-    @Operation(summary = "Xóa biến thể", description = "Xóa một biến thể sản phẩm (soft delete)")
-    public ResponseEntity<ApiResponse<String>> deleteProductVariant(
-            @PathVariable Long variantId) {
-
-        log.info("API xóa biến thể ID: {}", variantId);
+    @GetMapping("/{productId}/units")
+    @Operation(summary = "Lấy danh sách đơn vị của sản phẩm", description = "Lấy tất cả đơn vị tính của sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm")
+    })
+    public ResponseEntity<ApiResponse<List<ProductUnitResponse>>> getProductUnits(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId) {
+        log.info("API lấy danh sách đơn vị của sản phẩm ID: {}", productId);
 
         try {
-            productService.deleteProductVariant(variantId);
-
-            ApiResponse<String> response = ApiResponse.success("Xóa biến thể thành công", (String) null);
-
-            return ResponseEntity.ok(response);
-
+            List<ProductUnitResponse> units = productService.getProductUnits(productId);
+            return ResponseEntity.ok(ApiResponse.success(units));
         } catch (Exception e) {
-            log.error("Lỗi khi xóa biến thể: ", e);
-
-            ApiResponse<String> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi lấy danh sách đơn vị sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Xóa nhiều biến thể cùng lúc
+     * API lấy thông tin đơn vị sản phẩm theo ID
      */
-    @DeleteMapping("/variants/bulk")
-    @Operation(summary = "Xóa nhiều biến thể", description = "Xóa nhiều biến thể sản phẩm cùng lúc (soft delete). Nhận vào mảng các ID biến thể cần xóa.")
-    public ResponseEntity<ApiResponse<String>> deleteProductVariants(
-            @RequestBody List<Long> variantIds) {
-
-        log.info("API xóa nhiều biến thể với {} ID: {}", variantIds != null ? variantIds.size() : 0, variantIds);
+    @GetMapping("/{productId}/units/{unitId}")
+    @Operation(summary = "Lấy thông tin đơn vị sản phẩm", description = "Lấy thông tin chi tiết của một đơn vị sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc đơn vị")
+    })
+    public ResponseEntity<ApiResponse<ProductUnitResponse>> getProductUnit(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId,
+            @Parameter(description = "ID đơn vị sản phẩm") @PathVariable Long unitId) {
+        log.info("API lấy thông tin đơn vị sản phẩm ID: {} của sản phẩm ID: {}", unitId, productId);
 
         try {
-            productService.deleteProductVariants(variantIds);
-
-            String message = String.format("Xóa %d biến thể thành công", variantIds != null ? variantIds.size() : 0);
-            ApiResponse<String> response = ApiResponse.success(message, (String) null);
-
-            return ResponseEntity.ok(response);
-
+            ProductUnitResponse unit = productService.getProductUnit(productId, unitId);
+            return ResponseEntity.ok(ApiResponse.success(unit));
         } catch (Exception e) {
-            log.error("Lỗi khi xóa nhiều biến thể: ", e);
-
-            ApiResponse<String> response = ApiResponse.error(e.getMessage());
-
-            return ResponseEntity.badRequest().body(response);
+            log.error("Lỗi khi lấy thông tin đơn vị sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
 
     /**
-     * Tìm kiếm biến thể sản phẩm theo từ khóa
+     * API lấy đơn vị cơ bản của sản phẩm
      */
-    @GetMapping("/variants/search")
-    @Operation(summary = "Tìm kiếm biến thể sản phẩm", description = "Tìm kiếm biến thể sản phẩm theo từ khóa. Từ khóa có thể là mã biến thể hoặc tên biến thể.")
-    public ResponseEntity<ApiResponse<List<ProductVariantDto>>> searchProductVariants(
-            @RequestParam String keyword) {
-
-        log.info("API tìm kiếm biến thể với từ khóa: {}", keyword);
+    @GetMapping("/{productId}/units/base")
+    @Operation(summary = "Lấy đơn vị cơ bản của sản phẩm", description = "Lấy thông tin đơn vị cơ bản (có conversionValue = 1) của sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm hoặc đơn vị cơ bản")
+    })
+    public ResponseEntity<ApiResponse<ProductUnitResponse>> getBaseProductUnit(
+            @Parameter(description = "ID sản phẩm") @PathVariable Long productId) {
+        log.info("API lấy đơn vị cơ bản của sản phẩm ID: {}", productId);
 
         try {
-            // Gọi service để tìm kiếm
-            List<ProductVariantDto> variants = productService.searchProductVariants(keyword);
-
-            // Tạo response message
-            String message = variants.isEmpty() ? "Không tìm thấy biến thể nào"
-                    : String.format("Tìm thấy %d biến thể", variants.size());
-
-            ApiResponse<List<ProductVariantDto>> response = ApiResponse.success(message, variants);
-            return ResponseEntity.ok(response);
-
-        } catch (IllegalArgumentException e) {
-            log.warn("Validation error khi tìm kiếm biến thể: {}", e.getMessage());
-            ApiResponse<List<ProductVariantDto>> response = ApiResponse.error(e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-
+            ProductUnitResponse baseUnit = productService.getBaseProductUnit(productId);
+            return ResponseEntity.ok(ApiResponse.success(baseUnit));
         } catch (Exception e) {
-            log.error("Lỗi khi tìm kiếm biến thể sản phẩm", e);
-            ApiResponse<List<ProductVariantDto>> response = ApiResponse.error("Lỗi hệ thống");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            log.error("Lỗi khi lấy đơn vị cơ bản của sản phẩm: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    // ==================== EXCEL IMPORT/EXPORT ====================
+
+    /**
+     * API export danh sách sản phẩm ra file Excel
+     */
+    @GetMapping("/export")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Export sản phẩm ra Excel", description = "Export danh sách sản phẩm ra file Excel")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Export thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi server"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<byte[]> exportProductsToExcel() {
+        log.info("API export danh sách sản phẩm ra Excel");
+
+        try {
+            // Lấy tất cả sản phẩm đang hoạt động
+            List<ProductResponse> products = productService.getAllActiveProducts();
+
+            // Export ra Excel
+            byte[] excelData = productExcelService.exportProductsToExcel(products);
+
+            // Tạo tên file với timestamp
+            String fileName = "danh_sach_san_pham_" +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", fileName);
+            headers.setContentLength(excelData.length);
+
+            log.info("Export Excel thành công với {} sản phẩm", products.size());
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelData);
+
+        } catch (IOException e) {
+            log.error("Lỗi khi export Excel: ", e);
+            return ResponseEntity.internalServerError().build();
+        } catch (Exception e) {
+            log.error("Lỗi khi export sản phẩm: ", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * API import sản phẩm từ file Excel
+     */
+    @PostMapping("/import")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Import sản phẩm từ Excel", description = "Import danh sách sản phẩm từ file Excel")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Import thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "File không hợp lệ hoặc dữ liệu lỗi"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<ApiResponse<String>> importProductsFromExcel(
+            @Parameter(description = "File Excel chứa danh sách sản phẩm")
+            @RequestParam("file") MultipartFile file) {
+        log.info("API import sản phẩm từ file Excel: {}", file.getOriginalFilename());
+
+        try {
+            // Validate file
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("File không được để trống"));
+            }
+
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls"))) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("File phải có định dạng Excel (.xlsx hoặc .xls)"));
+            }
+
+            // Parse Excel file
+            List<ProductCreateRequest> products = productExcelService.importProductsFromExcel(file);
+
+            if (products.isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("File Excel không chứa dữ liệu sản phẩm hợp lệ"));
+            }
+
+            // Import products
+            int successCount = 0;
+            int errorCount = 0;
+            StringBuilder errorMessages = new StringBuilder();
+
+            for (int i = 0; i < products.size(); i++) {
+                try {
+                    ProductCreateRequest product = products.get(i);
+                    productService.createProduct(product);
+                    successCount++;
+                } catch (Exception e) {
+                    errorCount++;
+                    errorMessages.append("Dòng ").append(i + 2).append(": ").append(e.getMessage()).append("; ");
+                    log.warn("Lỗi khi import sản phẩm dòng {}: {}", i + 2, e.getMessage());
+                }
+            }
+
+            String message = String.format("Import hoàn tất: %d thành công, %d lỗi", successCount, errorCount);
+            if (errorCount > 0) {
+                message += ". Chi tiết lỗi: " + errorMessages.toString();
+            }
+
+            log.info("Import Excel hoàn tất: {} thành công, {} lỗi", successCount, errorCount);
+            return ResponseEntity.ok(ApiResponse.success(message));
+
+        } catch (IOException e) {
+            log.error("Lỗi khi đọc file Excel: ", e);
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Lỗi khi đọc file Excel: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("Lỗi khi import sản phẩm: ", e);
+            return ResponseEntity.badRequest()
+                .body(ApiResponse.error("Lỗi khi import: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * API tải template Excel để import sản phẩm
+     */
+    @GetMapping("/import/template")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(summary = "Tải template Excel", description = "Tải file template Excel để import sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tải template thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi server"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
+    })
+    public ResponseEntity<byte[]> downloadImportTemplate() {
+        log.info("API tải template Excel import sản phẩm");
+
+        try {
+            byte[] templateData = productExcelService.createImportTemplate();
+
+            String fileName = "template_import_san_pham.xlsx";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", fileName);
+            headers.setContentLength(templateData.length);
+
+            log.info("Tải template Excel thành công");
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(templateData);
+
+        } catch (IOException e) {
+            log.error("Lỗi khi tạo template Excel: ", e);
+            return ResponseEntity.internalServerError().build();
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo template: ", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

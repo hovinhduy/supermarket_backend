@@ -68,9 +68,9 @@ public class ReturnInvoiceDetail {
     private ReturnInvoiceHeader returnInvoice;
 
     /**
-     * Biến thể sản phẩm được trả
+     * Đơn vị sản phẩm được trả
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "variant_id", nullable = false)
-    private ProductVariant variant;
+    @JoinColumn(name = "product_unit_id", nullable = false)
+    private ProductUnit productUnit;
 }

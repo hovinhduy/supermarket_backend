@@ -46,12 +46,14 @@ public class ProductImageServiceImpl implements ProductImageService {
 
         // Kiểm tra sản phẩm có tồn tại không
         Product product = productRepository.findById(request.getProductId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + request.getProductId()));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " +
+                        request.getProductId()));
 
         // Kiểm tra số lượng ảnh hiện tại
         long currentImageCount = productImageRepository.countByProductId(request.getProductId());
         if (currentImageCount >= maxImageCount) {
-            throw new RuntimeException("Đã đạt giới hạn số lượng ảnh cho sản phẩm (" + maxImageCount + " ảnh)");
+            throw new RuntimeException("Đã đạt giới hạn số lượng ảnh cho sản phẩm (" +
+                    maxImageCount + " ảnh)");
         }
 
         // Validate file
@@ -61,7 +63,8 @@ public class ProductImageServiceImpl implements ProductImageService {
 
         try {
             // Upload file lên S3
-            String imageUrl = s3FileUploadService.uploadFile(request.getImageFile(), "products");
+            String imageUrl = s3FileUploadService.uploadFile(request.getImageFile(),
+                    "products");
 
             // Tạo entity ProductImage
             ProductImage productImage = new ProductImage();
@@ -69,14 +72,9 @@ public class ProductImageServiceImpl implements ProductImageService {
             productImage.setImageAlt(request.getImageAlt());
             productImage.setProduct(product);
 
-            // Xử lý variant nếu có
+            // Variant functionality not implemented yet
             if (request.getVariantId() != null) {
-                // TODO: Tìm variant và set vào productImage
-                // ProductVariant variant =
-                // productVariantRepository.findById(request.getVariantId())
-                // .orElseThrow(() -> new RuntimeException("Không tìm thấy biến thể với ID: " +
-                // request.getVariantId()));
-                // productImage.setVariant(variant);
+                log.warn("Variant functionality not supported yet. Ignoring variantId: {}", request.getVariantId());
             }
 
             // Xử lý sort order
@@ -91,7 +89,8 @@ public class ProductImageServiceImpl implements ProductImageService {
             // Lưu vào database
             productImage = productImageRepository.save(productImage);
 
-            log.info("Upload ảnh thành công cho sản phẩm ID: {}, Image ID: {}", request.getProductId(),
+            log.info("Upload ảnh thành công cho sản phẩm ID: {}, Image ID: {}",
+                    request.getProductId(),
                     productImage.getImageId());
 
             return new ProductImageUploadResponse(
@@ -103,7 +102,8 @@ public class ProductImageServiceImpl implements ProductImageService {
                     request.getImageFile().getContentType());
 
         } catch (Exception e) {
-            log.error("Lỗi khi upload ảnh cho sản phẩm ID: {}", request.getProductId(), e);
+            log.error("Lỗi khi upload ảnh cho sản phẩm ID: {}", request.getProductId(),
+                    e);
             throw new RuntimeException("Upload ảnh thất bại: " + e.getMessage());
         }
     }
@@ -112,9 +112,11 @@ public class ProductImageServiceImpl implements ProductImageService {
      * Upload nhiều hình ảnh cho sản phẩm
      */
     @Override
-    public List<ProductImageUploadResponse> uploadMultipleImages(Long productId, Long variantId,
+    public List<ProductImageUploadResponse> uploadMultipleImages(Long productId,
+            Long variantId,
             List<MultipartFile> files) {
-        log.info("Bắt đầu upload {} ảnh cho sản phẩm ID: {}", files.size(), productId);
+        log.info("Bắt đầu upload {} ảnh cho sản phẩm ID: {}", files.size(),
+                productId);
 
         List<ProductImageUploadResponse> responses = new ArrayList<>();
 
@@ -134,7 +136,8 @@ public class ProductImageServiceImpl implements ProductImageService {
             }
         }
 
-        log.info("Hoàn thành upload multiple images, thành công: {}/{}", responses.size(), files.size());
+        log.info("Hoàn thành upload multiple images, thành công: {}/{}",
+                responses.size(), files.size());
         return responses;
     }
 
@@ -146,24 +149,20 @@ public class ProductImageServiceImpl implements ProductImageService {
     public List<ProductImageDto> getProductImages(Long productId) {
         log.info("Lấy danh sách ảnh của sản phẩm ID: {}", productId);
 
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
+        List<ProductImage> images = productImageRepository.findByProduct_IdOrderBySortOrderAscCreatedAtAsc(productId);
         return images.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Lấy hình ảnh của biến thể cụ thể
+     * Lấy hình ảnh của biến thể cụ thể (hiện tại không hỗ trợ variant)
      */
     @Override
     @Transactional(readOnly = true)
     public List<ProductImageDto> getVariantImages(Long variantId) {
-        log.info("Lấy danh sách ảnh của biến thể ID: {}", variantId);
-
-        List<ProductImage> images = productImageRepository.findByVariantIdOrderBySortOrder(variantId);
-        return images.stream()
-                .map(this::mapToDto)
-                .collect(Collectors.toList());
+        log.info("Chức năng variant chưa được hỗ trợ, trả về danh sách rỗng cho variantId: {}", variantId);
+        return new ArrayList<>();
     }
 
     /**
@@ -176,6 +175,18 @@ public class ProductImageServiceImpl implements ProductImageService {
 
         Optional<ProductImage> mainImage = productImageRepository.findMainImageByProductId(productId);
         return mainImage.map(this::mapToDto).orElse(null);
+    }
+
+    /**
+     * Lấy thông tin hình ảnh theo ID
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductImageDto getImageById(Integer imageId) {
+        log.info("Lấy thông tin ảnh theo ID: {}", imageId);
+
+        Optional<ProductImage> image = productImageRepository.findById(imageId);
+        return image.map(this::mapToDto).orElse(null);
     }
 
     /**
@@ -220,7 +231,7 @@ public class ProductImageServiceImpl implements ProductImageService {
     public int deleteAllProductImages(Long productId) {
         log.info("Xóa tất cả ảnh của sản phẩm ID: {}", productId);
 
-        List<ProductImage> images = productImageRepository.findByProductIdOrderBySortOrder(productId);
+        List<ProductImage> images = productImageRepository.findByProduct_IdOrderBySortOrderAscCreatedAtAsc(productId);
         int deletedCount = 0;
 
         for (ProductImage image : images) {
@@ -229,7 +240,8 @@ public class ProductImageServiceImpl implements ProductImageService {
             }
         }
 
-        log.info("Đã xóa {}/{} ảnh của sản phẩm ID: {}", deletedCount, images.size(), productId);
+        log.info("Đã xóa {}/{} ảnh của sản phẩm ID: {}", deletedCount, images.size(),
+                productId);
         return deletedCount;
     }
 
@@ -238,19 +250,8 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     @Override
     public int deleteAllVariantImages(Long variantId) {
-        log.info("Xóa tất cả ảnh của biến thể ID: {}", variantId);
-
-        List<ProductImage> images = productImageRepository.findByVariantIdOrderBySortOrder(variantId);
-        int deletedCount = 0;
-
-        for (ProductImage image : images) {
-            if (deleteProductImage(image.getImageId())) {
-                deletedCount++;
-            }
-        }
-
-        log.info("Đã xóa {}/{} ảnh của biến thể ID: {}", deletedCount, images.size(), variantId);
-        return deletedCount;
+        log.info("Chức năng variant chưa được hỗ trợ, không có ảnh nào để xóa cho variantId: {}", variantId);
+        return 0;
     }
 
     /**
@@ -258,10 +259,12 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     @Override
     public ProductImageDto updateImageSortOrder(Integer imageId, Integer newSortOrder) {
-        log.info("Cập nhật sort order cho ảnh ID: {}, sort order mới: {}", imageId, newSortOrder);
+        log.info("Cập nhật sort order cho ảnh ID: {}, sort order mới: {}", imageId,
+                newSortOrder);
 
         ProductImage image = productImageRepository.findById(imageId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với ID: " + imageId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với ID: " +
+                        imageId));
 
         image.setSortOrder(newSortOrder);
         image = productImageRepository.save(image);
@@ -278,7 +281,8 @@ public class ProductImageServiceImpl implements ProductImageService {
         log.info("Cập nhật image alt cho ảnh ID: {}", imageId);
 
         ProductImage image = productImageRepository.findById(imageId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với ID: " + imageId));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với ID: " +
+                        imageId));
 
         image.setImageAlt(imageAlt);
         image = productImageRepository.save(image);
@@ -302,7 +306,8 @@ public class ProductImageServiceImpl implements ProductImageService {
     @Override
     @Transactional(readOnly = true)
     public long countVariantImages(Long variantId) {
-        return productImageRepository.countByVariantId(variantId);
+        log.info("Chức năng variant chưa được hỗ trợ, trả về 0 cho variantId: {}", variantId);
+        return 0;
     }
 
     /**
@@ -317,9 +322,8 @@ public class ProductImageServiceImpl implements ProductImageService {
         dto.setCreatedAt(image.getCreatedAt());
         dto.setProductId(image.getProduct().getId());
 
-        if (image.getVariant() != null) {
-            dto.setVariantId(image.getVariant().getVariantId());
-        }
+        // Variant functionality not supported yet
+        dto.setVariantId(null);
 
         return dto;
     }

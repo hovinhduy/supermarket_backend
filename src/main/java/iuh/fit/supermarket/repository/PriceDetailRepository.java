@@ -24,32 +24,34 @@ public interface PriceDetailRepository extends JpaRepository<PriceDetail, Long> 
     List<PriceDetail> findByPricePriceId(Long priceId);
 
     /**
-     * Tìm chi tiết giá theo ID bảng giá và ID biến thể
+     * Tìm chi tiết giá theo ID bảng giá và ID đơn vị sản phẩm
      */
-    Optional<PriceDetail> findByPricePriceIdAndVariantVariantId(Long priceId, Long variantId);
+    Optional<PriceDetail> findByPricePriceIdAndProductUnitId(Long priceId, Long productUnitId);
 
     /**
-     * Kiểm tra biến thể đã tồn tại trong bảng giá chưa
+     * Kiểm tra đơn vị sản phẩm đã tồn tại trong bảng giá chưa
      */
-    boolean existsByPricePriceIdAndVariantVariantId(Long priceId, Long variantId);
+    boolean existsByPricePriceIdAndProductUnitId(Long priceId, Long productUnitId);
 
     /**
-     * Tìm chi tiết giá theo mã biến thể
+     * Tìm chi tiết giá theo mã đơn vị sản phẩm
      */
-    @Query("SELECT pd FROM PriceDetail pd WHERE pd.variant.variantCode = :variantCode")
-    List<PriceDetail> findByVariantCode(@Param("variantCode") String variantCode);
+    @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.code = :unitCode")
+    List<PriceDetail> findByProductUnitCode(@Param("unitCode") String unitCode);
 
     /**
-     * Tìm giá hiện tại của biến thể sản phẩm (từ bảng giá CURRENT)
+     * Tìm giá hiện tại của đơn vị sản phẩm (từ bảng giá CURRENT)
      */
-    @Query("SELECT pd FROM PriceDetail pd WHERE pd.variant.variantId = :variantId AND pd.price.status = :status")
-    Optional<PriceDetail> findCurrentPriceByVariantId(@Param("variantId") Long variantId, @Param("status") PriceType status);
+    @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.id = :productUnitId AND pd.price.status = :status")
+    Optional<PriceDetail> findCurrentPriceByProductUnitId(@Param("productUnitId") Long productUnitId,
+            @Param("status") PriceType status);
 
     /**
-     * Tìm tất cả giá của biến thể sản phẩm theo trạng thái bảng giá
+     * Tìm tất cả giá của đơn vị sản phẩm theo trạng thái bảng giá
      */
-    @Query("SELECT pd FROM PriceDetail pd WHERE pd.variant.variantId = :variantId AND pd.price.status = :status")
-    List<PriceDetail> findByVariantIdAndPriceStatus(@Param("variantId") Long variantId, @Param("status") PriceType status);
+    @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.id = :productUnitId AND pd.price.status = :status")
+    List<PriceDetail> findByProductUnitIdAndPriceStatus(@Param("productUnitId") Long productUnitId,
+            @Param("status") PriceType status);
 
     /**
      * Xóa tất cả chi tiết giá theo ID bảng giá
@@ -77,32 +79,33 @@ public interface PriceDetailRepository extends JpaRepository<PriceDetail, Long> 
     List<PriceDetail> findByPriceRange(@Param("minPrice") BigDecimal minPrice, @Param("maxPrice") BigDecimal maxPrice);
 
     /**
-     * Tìm chi tiết giá theo ID bảng giá với thông tin biến thể
+     * Tìm chi tiết giá theo ID bảng giá với thông tin đơn vị sản phẩm
      */
     @Query("SELECT pd FROM PriceDetail pd " +
-           "JOIN FETCH pd.variant v " +
-           "WHERE pd.price.priceId = :priceId")
+            "JOIN FETCH pd.productUnit pu " +
+            "WHERE pd.price.priceId = :priceId")
     List<PriceDetail> findByPriceIdWithVariant(@Param("priceId") Long priceId);
 
     /**
-     * Tìm chi tiết giá theo danh sách ID biến thể và trạng thái bảng giá
+     * Tìm chi tiết giá theo danh sách ID đơn vị sản phẩm và trạng thái bảng giá
      */
-    @Query("SELECT pd FROM PriceDetail pd WHERE pd.variant.variantId IN :variantIds AND pd.price.status = :status")
-    List<PriceDetail> findByVariantIdsAndPriceStatus(@Param("variantIds") List<Long> variantIds, @Param("status") PriceType status);
+    @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.id IN :productUnitIds AND pd.price.status = :status")
+    List<PriceDetail> findByProductUnitIdsAndPriceStatus(@Param("productUnitIds") List<Long> productUnitIds,
+            @Param("status") PriceType status);
 
     /**
-     * Kiểm tra biến thể có tồn tại trong bảng giá CURRENT khác không
+     * Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
      */
     @Query("SELECT COUNT(pd) > 0 FROM PriceDetail pd WHERE " +
-           "pd.variant.variantId = :variantId AND pd.price.status = :status AND pd.price.priceId != :excludePriceId")
-    boolean existsVariantInOtherCurrentPrice(@Param("variantId") Long variantId, 
-                                           @Param("status") PriceType status, 
-                                           @Param("excludePriceId") Long excludePriceId);
+            "pd.productUnit.id = :productUnitId AND pd.price.status = :status AND pd.price.priceId != :excludePriceId")
+    boolean existsProductUnitInOtherCurrentPrice(@Param("productUnitId") Long productUnitId,
+            @Param("status") PriceType status,
+            @Param("excludePriceId") Long excludePriceId);
 
     /**
      * Lấy thống kê giá theo bảng giá
      */
     @Query("SELECT MIN(pd.salePrice), MAX(pd.salePrice), AVG(pd.salePrice), COUNT(pd) " +
-           "FROM PriceDetail pd WHERE pd.price.priceId = :priceId")
+            "FROM PriceDetail pd WHERE pd.price.priceId = :priceId")
     Object[] getPriceStatistics(@Param("priceId") Long priceId);
 }

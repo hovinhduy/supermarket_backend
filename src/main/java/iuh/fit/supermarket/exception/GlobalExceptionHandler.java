@@ -39,6 +39,97 @@ public class GlobalExceptionHandler {
         }
 
         /**
+         * Xử lý ngoại lệ liên quan đến sản phẩm
+         */
+        @ExceptionHandler(ProductException.class)
+        public ResponseEntity<ApiResponse<String>> handleProductException(
+                        ProductException ex) {
+
+                log.warn("Product exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ liên quan đến khách hàng
+         */
+        @ExceptionHandler(CustomerException.class)
+        public ResponseEntity<ApiResponse<String>> handleCustomerException(
+                        CustomerException ex) {
+
+                log.warn("Customer exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ khi không tìm thấy khách hàng
+         */
+        @ExceptionHandler(CustomerNotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handleCustomerNotFoundException(
+                        CustomerNotFoundException ex) {
+
+                log.warn("Customer not found: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ khi khách hàng đã tồn tại
+         */
+        @ExceptionHandler(DuplicateCustomerException.class)
+        public ResponseEntity<ApiResponse<String>> handleDuplicateCustomerException(
+                        DuplicateCustomerException ex) {
+
+                log.warn("Duplicate customer: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ validation khách hàng
+         */
+        @ExceptionHandler(CustomerValidationException.class)
+        public ResponseEntity<ApiResponse<String>> handleCustomerValidationException(
+                        CustomerValidationException ex) {
+
+                log.warn("Customer validation error: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ không tìm thấy sản phẩm
+         */
+        @ExceptionHandler(ProductNotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handleProductNotFoundException(
+                        ProductNotFoundException ex) {
+
+                log.warn("Product not found exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ sản phẩm trùng lặp
+         */
+        @ExceptionHandler(DuplicateProductException.class)
+        public ResponseEntity<ApiResponse<String>> handleDuplicateProductException(
+                        DuplicateProductException ex) {
+
+                log.warn("Duplicate product exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
          * Xử lý ngoại lệ chung liên quan đến bảng giá
          */
         @ExceptionHandler(PriceException.class)
@@ -208,6 +299,71 @@ public class GlobalExceptionHandler {
 
                 ApiResponse<Object> response = ApiResponse.error(ex.getMessage());
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        /**
+         * Xử lý ngoại lệ chung liên quan đến promotion
+         */
+        @ExceptionHandler(PromotionException.class)
+        public ResponseEntity<ApiResponse<String>> handlePromotionException(
+                        PromotionException ex) {
+
+                log.warn("Promotion exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ không tìm thấy promotion
+         */
+        @ExceptionHandler(PromotionNotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handlePromotionNotFoundException(
+                        PromotionNotFoundException ex) {
+
+                log.warn("Promotion not found: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ validation promotion
+         */
+        @ExceptionHandler(PromotionValidationException.class)
+        public ResponseEntity<ApiResponse<String>> handlePromotionValidationException(
+                        PromotionValidationException ex) {
+
+                log.warn("Promotion validation error: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ xung đột promotion
+         */
+        @ExceptionHandler(PromotionConflictException.class)
+        public ResponseEntity<ApiResponse<String>> handlePromotionConflictException(
+                        PromotionConflictException ex) {
+
+                log.warn("Promotion conflict: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ promotion trùng lặp
+         */
+        @ExceptionHandler(DuplicatePromotionException.class)
+        public ResponseEntity<ApiResponse<String>> handleDuplicatePromotionException(
+                        DuplicatePromotionException ex) {
+
+                log.warn("Duplicate promotion: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiResponse.error(ex.getMessage()));
         }
 
         /**
