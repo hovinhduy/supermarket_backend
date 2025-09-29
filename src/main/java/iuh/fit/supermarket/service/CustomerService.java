@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -286,7 +287,7 @@ public class CustomerService {
 
     /**
      * Xóa mềm khách hàng
-     * 
+     *
      * @param customerId ID khách hàng
      */
     @Transactional
@@ -300,6 +301,64 @@ public class CustomerService {
         customerRepository.save(customer);
 
         log.info("Đã xóa khách hàng với ID: {}", customerId);
+    }
+
+    /**
+     * Xóa mềm nhiều khách hàng cùng lúc
+     *
+     * @param request yêu cầu xóa nhiều khách hàng
+     * @return BulkDeleteCustomersResponse
+     */
+    @Transactional
+    public BulkDeleteCustomersResponse bulkDeleteCustomers(BulkDeleteCustomersRequest request) {
+        log.info("Bắt đầu xóa nhiều khách hàng - Tổng số: {}", request.getIdsCount());
+
+        // Validate request
+        validateBulkDeleteRequest(request);
+
+        // Loại bỏ ID trùng lặp
+        request.removeDuplicates();
+
+        List<Integer> successIds = new ArrayList<>();
+        List<Integer> failedIds = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        // Xử lý từng ID
+        for (Integer customerId : request.getCustomerIds()) {
+            try {
+                // Kiểm tra khách hàng có tồn tại và chưa bị xóa không
+                Optional<Customer> customerOpt = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId);
+
+                if (customerOpt.isPresent()) {
+                    Customer customer = customerOpt.get();
+                    customer.setIsDeleted(true);
+                    customerRepository.save(customer);
+
+                    successIds.add(customerId);
+                    log.debug("Đã xóa thành công khách hàng với ID: {}", customerId);
+                } else {
+                    failedIds.add(customerId);
+                    errors.add("Khách hàng với ID " + customerId + " không tồn tại hoặc đã bị xóa");
+                    log.warn("Không tìm thấy khách hàng với ID: {}", customerId);
+                }
+            } catch (Exception e) {
+                failedIds.add(customerId);
+                errors.add("Lỗi khi xóa khách hàng ID " + customerId + ": " + e.getMessage());
+                log.error("Lỗi khi xóa khách hàng với ID: {}", customerId, e);
+            }
+        }
+
+        // Tạo response
+        BulkDeleteCustomersResponse response = BulkDeleteCustomersResponse.withErrors(
+                request.getIdsCount(),
+                successIds,
+                failedIds,
+                errors);
+
+        log.info("Hoàn thành xóa nhiều khách hàng - Thành công: {}, Thất bại: {}",
+                response.getSuccessCount(), response.getFailedCount());
+
+        return response;
     }
 
     /**
@@ -391,8 +450,36 @@ public class CustomerService {
     }
 
     /**
+     * Tìm kiếm khách hàng nâng cao với nhiều tiêu chí tùy chọn
+     *
+     * @param request yêu cầu tìm kiếm nâng cao
+     * @return Page<CustomerDto>
+     */
+    @Transactional(readOnly = true)
+    public Page<CustomerDto> searchCustomersAdvanced(CustomerAdvancedSearchRequest request) {
+        log.debug("Tìm kiếm khách hàng nâng cao với từ khóa: {}, giới tính: {}, loại: {}",
+                request.getTrimmedSearchTerm(), request.getGender(), request.getCustomerType());
+
+        // Validate request
+        validateAdvancedSearchRequest(request);
+
+        // Tạo Pageable với sắp xếp
+        Sort sort = Sort.by(Sort.Direction.fromString(request.getSortDirection()), request.getSortBy());
+        Pageable pageable = PageRequest.of(request.getPage(), request.getLimit(), sort);
+
+        // Gọi repository method với các tham số
+        Page<Customer> customers = customerRepository.searchCustomersAdvanced(
+                request.getTrimmedSearchTerm(),
+                request.getGender(),
+                request.getCustomerType(),
+                pageable);
+
+        return customers.map(CustomerDto::fromEntity);
+    }
+
+    /**
      * Tìm kiếm khách hàng theo tên
-     * 
+     *
      * @param name tên khách hàng
      * @return List<CustomerDto>
      */
@@ -613,6 +700,68 @@ public class CustomerService {
 
         if (!customerValidator.isValidAddress(request.getAddress())) {
             throw new CustomerValidationException("address", "Địa chỉ không được vượt quá 255 ký tự");
+        }
+    }
+
+    /**
+     * Validate CustomerAdvancedSearchRequest
+     */
+    private void validateAdvancedSearchRequest(CustomerAdvancedSearchRequest request) {
+        // Validate page number
+        if (request.getPage() < 0) {
+            throw new CustomerValidationException("page", "Số trang phải >= 0");
+        }
+
+        // Validate limit
+        if (request.getLimit() < 1 || request.getLimit() > 100) {
+            throw new CustomerValidationException("limit", "Limit phải từ 1 đến 100");
+        }
+
+        // Validate sortBy field
+        String[] allowedSortFields = { "name", "email", "phone", "createdAt", "updatedAt", "customerType", "gender" };
+        boolean isValidSortField = false;
+        for (String field : allowedSortFields) {
+            if (field.equals(request.getSortBy())) {
+                isValidSortField = true;
+                break;
+            }
+        }
+        if (!isValidSortField) {
+            throw new CustomerValidationException("sortBy",
+                    "Trường sắp xếp không hợp lệ. Chỉ cho phép: " + String.join(", ", allowedSortFields));
+        }
+
+        // Validate sortDirection
+        if (!"asc".equalsIgnoreCase(request.getSortDirection())
+                && !"desc".equalsIgnoreCase(request.getSortDirection())) {
+            throw new CustomerValidationException("sortDirection", "Hướng sắp xếp chỉ cho phép 'asc' hoặc 'desc'");
+        }
+
+        // Validate searchTerm length if provided
+        if (request.hasSearchTerm() && request.getTrimmedSearchTerm().length() > 100) {
+            throw new CustomerValidationException("searchTerm", "Từ khóa tìm kiếm không được vượt quá 100 ký tự");
+        }
+    }
+
+    /**
+     * Validate BulkDeleteCustomersRequest
+     */
+    private void validateBulkDeleteRequest(BulkDeleteCustomersRequest request) {
+        // Kiểm tra danh sách ID không null và không rỗng
+        if (request.getCustomerIds() == null || request.getCustomerIds().isEmpty()) {
+            throw new CustomerValidationException("customerIds", "Danh sách ID khách hàng không được rỗng");
+        }
+
+        // Kiểm tra số lượng ID không vượt quá giới hạn
+        if (request.getCustomerIds().size() > 100) {
+            throw new CustomerValidationException("customerIds", "Không thể xóa quá 100 khách hàng cùng lúc");
+        }
+
+        // Kiểm tra tất cả ID phải là số dương
+        for (Integer customerId : request.getCustomerIds()) {
+            if (customerId == null || customerId <= 0) {
+                throw new CustomerValidationException("customerIds", "Tất cả ID khách hàng phải là số dương");
+            }
         }
     }
 }

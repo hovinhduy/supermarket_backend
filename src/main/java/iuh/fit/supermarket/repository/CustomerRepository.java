@@ -2,6 +2,7 @@ package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.Customer;
 import iuh.fit.supermarket.enums.CustomerType;
+import iuh.fit.supermarket.enums.Gender;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -21,6 +22,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo email
+     * 
      * @param email email của khách hàng
      * @return Optional<Customer>
      */
@@ -28,6 +30,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo email và chưa bị xóa
+     * 
      * @param email email của khách hàng
      * @return Optional<Customer>
      */
@@ -35,6 +38,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo số điện thoại
+     * 
      * @param phone số điện thoại của khách hàng
      * @return Optional<Customer>
      */
@@ -42,6 +46,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo số điện thoại và chưa bị xóa
+     * 
      * @param phone số điện thoại của khách hàng
      * @return Optional<Customer>
      */
@@ -49,6 +54,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Kiểm tra email đã tồn tại chưa
+     * 
      * @param email email cần kiểm tra
      * @return true nếu email đã tồn tại
      */
@@ -56,7 +62,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Kiểm tra email đã tồn tại chưa (loại trừ khách hàng hiện tại)
-     * @param email email cần kiểm tra
+     * 
+     * @param email      email cần kiểm tra
      * @param customerId ID khách hàng hiện tại
      * @return true nếu email đã tồn tại
      */
@@ -64,6 +71,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Kiểm tra số điện thoại đã tồn tại chưa
+     * 
      * @param phone số điện thoại cần kiểm tra
      * @return true nếu số điện thoại đã tồn tại
      */
@@ -71,7 +79,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Kiểm tra số điện thoại đã tồn tại chưa (loại trừ khách hàng hiện tại)
-     * @param phone số điện thoại cần kiểm tra
+     * 
+     * @param phone      số điện thoại cần kiểm tra
      * @param customerId ID khách hàng hiện tại
      * @return true nếu số điện thoại đã tồn tại
      */
@@ -79,12 +88,14 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm tất cả khách hàng chưa bị xóa
+     * 
      * @return List<Customer>
      */
     List<Customer> findAllByIsDeletedFalse();
 
     /**
      * Tìm tất cả khách hàng chưa bị xóa với phân trang
+     * 
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
@@ -92,6 +103,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo loại khách hàng
+     * 
      * @param customerType loại khách hàng
      * @return List<Customer>
      */
@@ -99,14 +111,16 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo loại khách hàng với phân trang
+     * 
      * @param customerType loại khách hàng
-     * @param pageable thông tin phân trang
+     * @param pageable     thông tin phân trang
      * @return Page<Customer>
      */
     Page<Customer> findByCustomerTypeAndIsDeletedFalse(CustomerType customerType, Pageable pageable);
 
     /**
      * Tìm khách hàng theo ID và chưa bị xóa
+     * 
      * @param customerId ID khách hàng
      * @return Optional<Customer>
      */
@@ -114,6 +128,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo tên (tìm kiếm gần đúng)
+     * 
      * @param name tên khách hàng
      * @return List<Customer>
      */
@@ -122,7 +137,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo tên với phân trang
-     * @param name tên khách hàng
+     * 
+     * @param name     tên khách hàng
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
@@ -131,6 +147,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo email (tìm kiếm gần đúng)
+     * 
      * @param email email khách hàng
      * @return List<Customer>
      */
@@ -139,6 +156,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng theo số điện thoại (tìm kiếm gần đúng)
+     * 
      * @param phone số điện thoại khách hàng
      * @return List<Customer>
      */
@@ -147,17 +165,19 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm kiếm khách hàng theo nhiều tiêu chí
+     * 
      * @param searchTerm từ khóa tìm kiếm
-     * @param pageable thông tin phân trang
+     * @param pageable   thông tin phân trang
      * @return Page<Customer>
      */
     @Query("SELECT c FROM Customer c WHERE " +
-           "(c.name LIKE %:searchTerm% OR c.email LIKE %:searchTerm% OR c.phone LIKE %:searchTerm%) " +
-           "AND c.isDeleted = false")
+            "(c.name LIKE %:searchTerm% OR c.email LIKE %:searchTerm% OR c.phone LIKE %:searchTerm%) " +
+            "AND c.isDeleted = false")
     Page<Customer> searchCustomers(@Param("searchTerm") String searchTerm, Pageable pageable);
 
     /**
      * Đếm số lượng khách hàng theo loại
+     * 
      * @param customerType loại khách hàng
      * @return số lượng khách hàng
      */
@@ -166,16 +186,18 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng sinh nhật trong khoảng thời gian
+     * 
      * @param startDate ngày bắt đầu
-     * @param endDate ngày kết thúc
+     * @param endDate   ngày kết thúc
      * @return List<Customer>
      */
     @Query("SELECT c FROM Customer c WHERE c.dateOfBirth BETWEEN :startDate AND :endDate AND c.isDeleted = false")
-    List<Customer> findCustomersWithBirthdayBetween(@Param("startDate") LocalDate startDate, 
-                                                   @Param("endDate") LocalDate endDate);
+    List<Customer> findCustomersWithBirthdayBetween(@Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 
     /**
      * Tìm khách hàng theo địa chỉ
+     * 
      * @param address địa chỉ khách hàng
      * @return List<Customer>
      */
@@ -184,6 +206,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng VIP
+     * 
      * @return List<Customer>
      */
     @Query("SELECT c FROM Customer c WHERE c.customerType = 'VIP' AND c.isDeleted = false")
@@ -191,9 +214,33 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
      * Tìm khách hàng VIP với phân trang
+     *
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
     @Query("SELECT c FROM Customer c WHERE c.customerType = 'VIP' AND c.isDeleted = false")
     Page<Customer> findVipCustomers(Pageable pageable);
+
+    /**
+     * Tìm kiếm khách hàng nâng cao với nhiều tiêu chí tùy chọn
+     *
+     * @param searchTerm   từ khóa tìm kiếm (tìm trong tên, email, số điện thoại)
+     * @param gender       giới tính (có thể null)
+     * @param customerType loại khách hàng (có thể null)
+     * @param pageable     thông tin phân trang
+     * @return Page<Customer>
+     */
+    @Query("SELECT c FROM Customer c WHERE " +
+            "c.isDeleted = false " +
+            "AND (:searchTerm IS NULL OR :searchTerm = '' OR " +
+            "     LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     c.phone LIKE CONCAT('%', :searchTerm, '%')) " +
+            "AND (:gender IS NULL OR c.gender = :gender) " +
+            "AND (:customerType IS NULL OR c.customerType = :customerType)")
+    Page<Customer> searchCustomersAdvanced(
+            @Param("searchTerm") String searchTerm,
+            @Param("gender") Gender gender,
+            @Param("customerType") CustomerType customerType,
+            Pageable pageable);
 }

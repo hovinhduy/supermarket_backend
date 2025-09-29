@@ -36,24 +36,6 @@ public class CustomerController {
     private final CustomerService customerService;
 
     /**
-     * Lấy danh sách tất cả khách hàng (chỉ ADMIN và MANAGER)
-     */
-    @Operation(summary = "Lấy danh sách tất cả khách hàng", description = "Lấy danh sách tất cả khách hàng trong hệ thống. Chỉ ADMIN và MANAGER mới có quyền truy cập.")
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công", content = @Content(schema = @Schema(implementation = CustomerDto.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
-    })
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> getAllCustomers() {
-        log.info("Nhận yêu cầu lấy danh sách tất cả khách hàng");
-
-        List<CustomerDto> customers = customerService.getAllCustomers();
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khách hàng thành công", customers));
-    }
-
-    /**
      * Lấy danh sách khách hàng với phân trang
      */
     @Operation(summary = "Lấy danh sách khách hàng với phân trang", description = "Lấy danh sách khách hàng với phân trang và sắp xếp")
@@ -85,38 +67,6 @@ public class CustomerController {
         log.info("Nhận yêu cầu lấy thông tin khách hàng với ID: {}", customerId);
 
         CustomerDto customer = customerService.getCustomerById(customerId);
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khách hàng thành công", customer));
-    }
-
-    /**
-     * Lấy thông tin khách hàng theo email
-     */
-    @Operation(summary = "Lấy thông tin khách hàng theo email", description = "Lấy thông tin chi tiết của một khách hàng theo email")
-    @GetMapping("/email/{email}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<CustomerDto>> getCustomerByEmail(
-            @Parameter(description = "Email khách hàng") @PathVariable String email) {
-
-        log.info("Nhận yêu cầu lấy thông tin khách hàng với email: {}", email);
-
-        CustomerDto customer = customerService.getCustomerByEmail(email);
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khách hàng thành công", customer));
-    }
-
-    /**
-     * Lấy thông tin khách hàng theo số điện thoại
-     */
-    @Operation(summary = "Lấy thông tin khách hàng theo số điện thoại", description = "Lấy thông tin chi tiết của một khách hàng theo số điện thoại")
-    @GetMapping("/phone/{phone}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<CustomerDto>> getCustomerByPhone(
-            @Parameter(description = "Số điện thoại khách hàng") @PathVariable String phone) {
-
-        log.info("Nhận yêu cầu lấy thông tin khách hàng với phone: {}", phone);
-
-        CustomerDto customer = customerService.getCustomerByPhone(phone);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin khách hàng thành công", customer));
     }
@@ -189,6 +139,48 @@ public class CustomerController {
     }
 
     /**
+     * Xóa nhiều khách hàng cùng lúc (bulk delete)
+     */
+    @Operation(summary = "Xóa nhiều khách hàng cùng lúc", description = "Xóa mềm nhiều khách hàng dựa trên danh sách ID. Trả về thống kê chi tiết về kết quả xóa.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Xóa thành công (có thể một phần)", content = @Content(schema = @Schema(implementation = BulkDeleteCustomersResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập - Chỉ ADMIN và MANAGER")
+    })
+    @DeleteMapping("/bulk-delete")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<ApiResponse<BulkDeleteCustomersResponse>> bulkDeleteCustomers(
+            @Parameter(description = "Danh sách ID khách hàng cần xóa", required = true) @Valid @RequestBody BulkDeleteCustomersRequest request) {
+
+        log.info("Nhận yêu cầu xóa nhiều khách hàng - Số lượng: {}, IDs: {}",
+                request.getIdsCount(), request.getCustomerIds());
+
+        BulkDeleteCustomersResponse result = customerService.bulkDeleteCustomers(request);
+
+        // Log kết quả chi tiết cho audit
+        log.info("Hoàn thành xóa nhiều khách hàng - Tổng: {}, Thành công: {}, Thất bại: {}",
+                result.getTotalRequested(), result.getSuccessCount(), result.getFailedCount());
+
+        if (result.hasErrors()) {
+            log.warn("Có lỗi khi xóa khách hàng - IDs thất bại: {}, Lỗi: {}",
+                    result.getFailedIds(), result.getErrors());
+        }
+
+        // Tạo message phù hợp
+        String message;
+        if (result.isAllSuccess()) {
+            message = "Xóa tất cả khách hàng thành công";
+        } else if (result.getSuccessCount() > 0) {
+            message = String.format("Xóa một phần thành công - %d/%d khách hàng",
+                    result.getSuccessCount(), result.getTotalRequested());
+        } else {
+            message = "Không thể xóa khách hàng nào";
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(message, result));
+    }
+
+    /**
      * Khôi phục khách hàng đã bị xóa
      */
     @Operation(summary = "Khôi phục khách hàng", description = "Khôi phục một khách hàng đã bị xóa mềm")
@@ -222,20 +214,30 @@ public class CustomerController {
     }
 
     /**
-     * Tìm kiếm khách hàng theo nhiều tiêu chí
+     * Tìm kiếm khách hàng nâng cao với nhiều tiêu chí tùy chọn
      */
-    @Operation(summary = "Tìm kiếm khách hàng", description = "Tìm kiếm khách hàng theo tên, email, số điện thoại hoặc loại khách hàng")
-    @PostMapping("/search")
+    @Operation(summary = "Tìm kiếm khách hàng nâng cao", description = "API tìm kiếm khách hàng với nhiều tiêu chí: tên, email, số điện thoại, giới tính, loại khách hàng và hỗ trợ phân trang")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tìm kiếm thành công", content = @Content(schema = @Schema(implementation = CustomerDto.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    @PostMapping("/list")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<Page<CustomerDto>>> searchCustomers(
-            @Valid @RequestBody CustomerSearchRequest request) {
+    public ResponseEntity<ApiResponse<Page<CustomerDto>>> searchCustomersAdvanced(
+            @Parameter(description = "Thông tin tìm kiếm nâng cao", required = true) @Valid @RequestBody CustomerAdvancedSearchRequest request) {
 
-        log.info("Nhận yêu cầu tìm kiếm khách hàng với từ khóa: {}, loại: {}",
-                request.getSearchTerm(), request.getCustomerType());
+        log.info(
+                "Nhận yêu cầu tìm kiếm khách hàng nâng cao - từ khóa: '{}', giới tính: {}, loại: {}, trang: {}, limit: {}",
+                request.getSearchTerm(), request.getGender(), request.getCustomerType(),
+                request.getPage(), request.getLimit());
 
-        Page<CustomerDto> customers = customerService.searchCustomers(request);
+        Page<CustomerDto> customers = customerService.searchCustomersAdvanced(request);
 
-        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm khách hàng thành công", customers));
+        log.info("Tìm kiếm khách hàng nâng cao hoàn thành - tìm thấy {} khách hàng trên tổng số {} khách hàng",
+                customers.getNumberOfElements(), customers.getTotalElements());
+
+        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm khách hàng nâng cao thành công", customers));
     }
 
     /**
@@ -252,69 +254,6 @@ public class CustomerController {
         List<CustomerDto> customers = customerService.searchCustomersByName(name);
 
         return ResponseEntity.ok(ApiResponse.success("Tìm kiếm khách hàng theo tên thành công", customers));
-    }
-
-    /**
-     * Tìm kiếm khách hàng theo email
-     */
-    @Operation(summary = "Tìm kiếm khách hàng theo email", description = "Tìm kiếm khách hàng theo email (tìm kiếm gần đúng)")
-    @GetMapping("/search/email")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> searchCustomersByEmail(
-            @Parameter(description = "Email khách hàng") @RequestParam String email) {
-
-        log.info("Nhận yêu cầu tìm kiếm khách hàng theo email: {}", email);
-
-        List<CustomerDto> customers = customerService.searchCustomersByEmail(email);
-
-        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm khách hàng theo email thành công", customers));
-    }
-
-    /**
-     * Tìm kiếm khách hàng theo số điện thoại
-     */
-    @Operation(summary = "Tìm kiếm khách hàng theo số điện thoại", description = "Tìm kiếm khách hàng theo số điện thoại (tìm kiếm gần đúng)")
-    @GetMapping("/search/phone")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> searchCustomersByPhone(
-            @Parameter(description = "Số điện thoại khách hàng") @RequestParam String phone) {
-
-        log.info("Nhận yêu cầu tìm kiếm khách hàng theo phone: {}", phone);
-
-        List<CustomerDto> customers = customerService.searchCustomersByPhone(phone);
-
-        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm khách hàng theo số điện thoại thành công", customers));
-    }
-
-    /**
-     * Lấy khách hàng theo loại
-     */
-    @Operation(summary = "Lấy khách hàng theo loại", description = "Lấy danh sách khách hàng theo loại (REGULAR/VIP)")
-    @GetMapping("/type/{customerType}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> getCustomersByType(
-            @Parameter(description = "Loại khách hàng") @PathVariable CustomerType customerType) {
-
-        log.info("Nhận yêu cầu lấy khách hàng theo loại: {}", customerType);
-
-        List<CustomerDto> customers = customerService.getCustomersByType(customerType);
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khách hàng theo loại thành công", customers));
-    }
-
-    /**
-     * Lấy danh sách khách hàng VIP
-     */
-    @Operation(summary = "Lấy danh sách khách hàng VIP", description = "Lấy danh sách tất cả khách hàng VIP")
-    @GetMapping("/vip")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
-    public ResponseEntity<ApiResponse<List<CustomerDto>>> getVipCustomers() {
-
-        log.info("Nhận yêu cầu lấy danh sách khách hàng VIP");
-
-        List<CustomerDto> customers = customerService.getVipCustomers();
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách khách hàng VIP thành công", customers));
     }
 
     /**
