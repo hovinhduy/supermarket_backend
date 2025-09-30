@@ -84,10 +84,4 @@ public class Category {
      */
     @OneToMany(mappedBy = "category", fetch = FetchType.LAZY)
     private List<Product> products;
-
-    /**
-     * Danh sách chi tiết khuyến mãi áp dụng cho danh mục này
-     */
-    @OneToMany(mappedBy = "conditionCategory", fetch = FetchType.LAZY)
-    private List<PromotionDetail> promotionDetails;
 }

@@ -1,234 +1,151 @@
 package iuh.fit.supermarket.service;
 
 import iuh.fit.supermarket.dto.promotion.*;
-import iuh.fit.supermarket.entity.PromotionHeader;
-import iuh.fit.supermarket.entity.PromotionLine;
 import iuh.fit.supermarket.enums.PromotionStatus;
 import iuh.fit.supermarket.enums.PromotionType;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Service interface cho quản lý promotion
+ * Service interface cho quản lý khuyến mãi
  */
 public interface PromotionService {
 
-    // ==================== PROMOTION HEADER OPERATIONS ====================
-    
     /**
-     * Tạo chương trình khuyến mãi mới
+     * Tạo mới chương trình khuyến mãi
+     * 
+     * @param request thông tin chương trình khuyến mãi cần tạo
+     * @return PromotionHeaderDTO đã được tạo
      */
     PromotionHeaderDTO createPromotion(PromotionCreateRequest request);
-    
+
     /**
      * Cập nhật chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
+     * @param request     thông tin cập nhật
+     * @return PromotionHeaderDTO đã được cập nhật
      */
-    PromotionHeaderDTO updatePromotion(Long promotionId, PromotionCreateRequest request);
-    
+    PromotionHeaderDTO updatePromotion(Long promotionId, PromotionUpdateRequest request);
+
     /**
      * Xóa chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
      */
     void deletePromotion(Long promotionId);
-    
+
     /**
-     * Lấy thông tin chương trình khuyến mãi theo ID
+     * Lấy thông tin chi tiết chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
+     * @return PromotionHeaderDTO
      */
     PromotionHeaderDTO getPromotionById(Long promotionId);
-    
-    /**
-     * Lấy danh sách tất cả chương trình khuyến mãi
-     */
-    Page<PromotionHeaderDTO> getAllPromotions(Pageable pageable);
-    
-    /**
-     * Tìm kiếm chương trình khuyến mãi theo tên
-     */
-    Page<PromotionHeaderDTO> searchPromotionsByName(String keyword, Pageable pageable);
-    
-    /**
-     * Lấy danh sách chương trình khuyến mãi theo trạng thái
-     */
-    Page<PromotionHeaderDTO> getPromotionsByStatus(PromotionStatus status, Pageable pageable);
-    
-    /**
-     * Lấy danh sách chương trình khuyến mãi đang hoạt động
-     */
-    List<PromotionHeaderDTO> getCurrentActivePromotions();
-    
-    /**
-     * Lấy danh sách chương trình khuyến mãi sắp hết hạn
-     */
-    List<PromotionHeaderDTO> getPromotionsExpiringWithin(int days);
 
-    // ==================== PROMOTION LINE OPERATIONS ====================
-    
     /**
-     * Tạo dòng khuyến mãi mới
+     * Lấy thông tin chi tiết chương trình khuyến mãi theo mã
+     * 
+     * @param promotionCode mã chương trình khuyến mãi
+     * @return PromotionHeaderDTO
      */
-    PromotionLineDTO createPromotionLine(Long promotionId, PromotionLineCreateRequest request);
-    
-    /**
-     * Cập nhật dòng khuyến mãi
-     */
-    PromotionLineDTO updatePromotionLine(Long lineId, PromotionLineCreateRequest request);
-    
-    /**
-     * Xóa dòng khuyến mãi
-     */
-    void deletePromotionLine(Long lineId);
-    
-    /**
-     * Lấy thông tin dòng khuyến mãi theo ID
-     */
-    PromotionLineDTO getPromotionLineById(Long lineId);
-    
-    /**
-     * Lấy danh sách dòng khuyến mãi theo promotion ID
-     */
-    List<PromotionLineDTO> getPromotionLinesByPromotionId(Long promotionId);
-    
-    /**
-     * Lấy danh sách dòng khuyến mãi theo loại
-     */
-    List<PromotionLineDTO> getPromotionLinesByType(PromotionType promotionType);
+    PromotionHeaderDTO getPromotionByCode(String promotionCode);
 
-    // ==================== PROMOTION DETAIL OPERATIONS ====================
-    
     /**
-     * Tạo chi tiết khuyến mãi mới
+     * Lấy tất cả chương trình khuyến mãi với phân trang
+     * 
+     * @param page          số trang (bắt đầu từ 0)
+     * @param size          số lượng bản ghi mỗi trang
+     * @param sortBy        trường sắp xếp
+     * @param sortDirection hướng sắp xếp (ASC hoặc DESC)
+     * @return Page chứa danh sách PromotionHeaderDTO
      */
-    PromotionDetailDTO createPromotionDetail(Long lineId, PromotionDetailCreateRequest request);
-    
-    /**
-     * Cập nhật chi tiết khuyến mãi
-     */
-    PromotionDetailDTO updatePromotionDetail(Long detailId, PromotionDetailCreateRequest request);
-    
-    /**
-     * Xóa chi tiết khuyến mãi
-     */
-    void deletePromotionDetail(Long detailId);
-    
-    /**
-     * Lấy danh sách chi tiết khuyến mãi theo line ID
-     */
-    List<PromotionDetailDTO> getPromotionDetailsByLineId(Long lineId);
+    Page<PromotionHeaderDTO> getAllPromotions(Integer page, Integer size, String sortBy, String sortDirection);
 
-    // ==================== BUSINESS LOGIC OPERATIONS ====================
-    
     /**
-     * Tính toán discount cho đơn hàng
+     * Tìm kiếm chương trình khuyến mãi theo từ khóa
+     * 
+     * @param keyword từ khóa tìm kiếm
+     * @param page    số trang
+     * @param size    số lượng bản ghi mỗi trang
+     * @return Page chứa danh sách PromotionHeaderDTO
      */
-    PromotionDiscountResult calculateDiscount(BigDecimal orderAmount, List<OrderItemDTO> orderItems);
-    
-    /**
-     * Tính toán discount cho sản phẩm cụ thể
-     */
-    PromotionDiscountResult calculateProductDiscount(Long productUnitId, Integer quantity, BigDecimal unitPrice);
-    
-    /**
-     * Lấy danh sách promotion áp dụng cho sản phẩm
-     */
-    List<PromotionLineDTO> getApplicablePromotionsForProduct(Long productUnitId);
-    
-    /**
-     * Lấy danh sách promotion áp dụng cho category
-     */
-    List<PromotionLineDTO> getApplicablePromotionsForCategory(Long categoryId);
-    
-    /**
-     * Kiểm tra xung đột promotion
-     */
-    void validatePromotionConflicts(PromotionCreateRequest request);
-    
-    /**
-     * Kiểm tra xung đột promotion line
-     */
-    void validatePromotionLineConflicts(Long promotionId, PromotionLineCreateRequest request);
+    Page<PromotionHeaderDTO> searchPromotions(String keyword, Integer page, Integer size);
 
-    // ==================== VALIDATION OPERATIONS ====================
-    
     /**
-     * Validate promotion data
+     * Tìm kiếm chương trình khuyến mãi theo nhiều tiêu chí
+     * 
+     * @param searchRequest tiêu chí tìm kiếm
+     * @return Page chứa danh sách PromotionHeaderDTO
      */
-    void validatePromotionData(PromotionCreateRequest request);
-    
-    /**
-     * Validate promotion line data
-     */
-    void validatePromotionLineData(PromotionLineCreateRequest request);
-    
-    /**
-     * Validate promotion detail data
-     */
-    void validatePromotionDetailData(PromotionDetailCreateRequest request);
+    Page<PromotionHeaderDTO> searchPromotionsAdvanced(PromotionSearchRequest searchRequest);
 
-    // ==================== UTILITY OPERATIONS ====================
-    
     /**
-     * Kích hoạt promotion
+     * Lấy danh sách khuyến mãi theo trạng thái
+     * 
+     * @param status trạng thái khuyến mãi
+     * @param page   số trang
+     * @param size   số lượng bản ghi mỗi trang
+     * @return Page chứa danh sách PromotionHeaderDTO
      */
-    PromotionHeaderDTO activatePromotion(Long promotionId);
-    
+    Page<PromotionHeaderDTO> getPromotionsByStatus(PromotionStatus status, Integer page, Integer size);
+
     /**
-     * Tạm dừng promotion
+     * Lấy danh sách khuyến mãi theo loại
+     * 
+     * @param promotionType loại khuyến mãi
+     * @param page          số trang
+     * @param size          số lượng bản ghi mỗi trang
+     * @return Page chứa danh sách PromotionHeaderDTO
      */
-    PromotionHeaderDTO pausePromotion(Long promotionId);
-    
+    Page<PromotionHeaderDTO> getPromotionsByType(PromotionType promotionType, Integer page, Integer size);
+
     /**
-     * Kết thúc promotion
+     * Lấy danh sách khuyến mãi đang hoạt động
+     * 
+     * @return danh sách PromotionHeaderDTO
      */
-    PromotionHeaderDTO expirePromotion(Long promotionId);
-    
+    List<PromotionHeaderDTO> getActivePromotions();
+
     /**
-     * Bulk operations - tạo nhiều promotion
+     * Lấy danh sách khuyến mãi sắp hết hạn (trong vòng N ngày)
+     * 
+     * @param days số ngày
+     * @return danh sách PromotionHeaderDTO
      */
-    List<PromotionHeaderDTO> createBulkPromotions(List<PromotionCreateRequest> requests);
-    
+    List<PromotionHeaderDTO> getExpiringPromotions(int days);
+
     /**
-     * Bulk operations - cập nhật trạng thái nhiều promotion
+     * Cập nhật trạng thái chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
+     * @param status      trạng thái mới
+     * @return PromotionHeaderDTO đã được cập nhật
      */
-    void updateBulkPromotionStatus(List<Long> promotionIds, PromotionStatus status);
-    
+    PromotionHeaderDTO updatePromotionStatus(Long promotionId, PromotionStatus status);
+
     /**
-     * Lấy thống kê promotion
+     * Tăng số lần sử dụng khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
      */
-    PromotionStatisticsDTO getPromotionStatistics();
-    
+    void incrementUsageCount(Long promotionId);
+
     /**
-     * DTO cho OrderItem
+     * Kiểm tra xem mã khuyến mãi đã tồn tại chưa
+     * 
+     * @param promotionCode mã khuyến mãi
+     * @return true nếu đã tồn tại, ngược lại false
      */
-    class OrderItemDTO {
-        private Long productUnitId;
-        private Integer quantity;
-        private BigDecimal unitPrice;
-        private Long categoryId;
-        
-        // Constructors, getters, setters
-        public OrderItemDTO() {}
-        
-        public OrderItemDTO(Long productUnitId, Integer quantity, BigDecimal unitPrice, Long categoryId) {
-            this.productUnitId = productUnitId;
-            this.quantity = quantity;
-            this.unitPrice = unitPrice;
-            this.categoryId = categoryId;
-        }
-        
-        // Getters and setters
-        public Long getProductUnitId() { return productUnitId; }
-        public void setProductUnitId(Long productUnitId) { this.productUnitId = productUnitId; }
-        
-        public Integer getQuantity() { return quantity; }
-        public void setQuantity(Integer quantity) { this.quantity = quantity; }
-        
-        public BigDecimal getUnitPrice() { return unitPrice; }
-        public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
-        
-        public Long getCategoryId() { return categoryId; }
-        public void setCategoryId(Long categoryId) { this.categoryId = categoryId; }
-    }
+    boolean isPromotionCodeExists(String promotionCode);
+
+    /**
+     * Đếm số lượng khuyến mãi theo trạng thái
+     * 
+     * @param status trạng thái
+     * @return số lượng khuyến mãi
+     */
+    long countByStatus(PromotionStatus status);
 }
+

@@ -1,39 +1,29 @@
 package iuh.fit.supermarket.enums;
 
 /**
- * Enum định nghĩa loại chi tiết khuyến mãi trong hệ thống
- * Tương ứng với cột detail_type trong bảng promotion_details
+ * Enum định nghĩa loại khuyến mãi trong hệ thống
+ * Tương ứng với cột promotion_type trong bảng promotion_header
  */
 public enum PromotionType {
     /**
-     * Giảm giá theo phần trăm cho toàn đơn hàng
-     */
-    PERCENT_ORDER("PERCENT_ORDER"),
-
-    /**
-     * Giảm giá cố định cho toàn đơn hàng
-     */
-    FIXED_ORDER("FIXED_ORDER"),
-
-    /**
-     * Giảm giá theo phần trăm cho sản phẩm
-     */
-    PERCENT_PRODUCT("PERCENT_PRODUCT"),
-
-    /**
-     * Giảm giá cố định cho sản phẩm
-     */
-    FIXED_PRODUCT("FIXED_PRODUCT"),
-
-    /**
      * Mua X tặng Y
      */
-    BUY_X_GET_Y("BUY_X_GET_Y");
+    BUY_X_GET_Y("BUY_X_GET_Y"),
+
+    /**
+     * Giảm giá đơn hàng
+     */
+    ORDER_DISCOUNT("ORDER_DISCOUNT"),
+
+    /**
+     * Giảm giá sản phẩm
+     */
+    PRODUCT_DISCOUNT("PRODUCT_DISCOUNT");
 
     private final String value;
 
     /**
-     * Constructor cho PromotionDetailType
+     * Constructor cho PromotionType
      * 
      * @param value giá trị string tương ứng trong database
      */
@@ -54,7 +44,7 @@ public enum PromotionType {
      * Chuyển đổi từ string sang enum
      * 
      * @param value giá trị string
-     * @return PromotionDetailType tương ứng
+     * @return PromotionType tương ứng
      */
     public static PromotionType fromValue(String value) {
         for (PromotionType type : PromotionType.values()) {
@@ -62,6 +52,6 @@ public enum PromotionType {
                 return type;
             }
         }
-        throw new IllegalArgumentException("Unknown PromotionDetailType: " + value);
+        throw new IllegalArgumentException("Unknown PromotionType: " + value);
     }
 }

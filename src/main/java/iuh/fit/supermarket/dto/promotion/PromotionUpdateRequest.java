@@ -13,32 +13,23 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO cho yêu cầu tạo mới chương trình khuyến mãi
+ * DTO cho yêu cầu cập nhật chương trình khuyến mãi
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PromotionCreateRequest {
-
-    /**
-     * Mã chương trình khuyến mãi
-     */
-    @NotBlank(message = "Mã khuyến mãi không được để trống")
-    @Size(max = 50, message = "Mã khuyến mãi không được vượt quá 50 ký tự")
-    private String promotionCode;
+public class PromotionUpdateRequest {
 
     /**
      * Tên chương trình khuyến mãi
      */
-    @NotBlank(message = "Tên khuyến mãi không được để trống")
     @Size(max = 200, message = "Tên khuyến mãi không được vượt quá 200 ký tự")
     private String promotionName;
 
     /**
      * Loại khuyến mãi
      */
-    @NotNull(message = "Loại khuyến mãi không được để trống")
     private PromotionType promotionType;
 
     /**
@@ -50,20 +41,16 @@ public class PromotionCreateRequest {
     /**
      * Ngày bắt đầu
      */
-    @NotNull(message = "Ngày bắt đầu không được để trống")
-    @Future(message = "Ngày bắt đầu phải là thời điểm trong tương lai")
     private LocalDateTime startDate;
 
     /**
      * Ngày kết thúc
      */
-    @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime endDate;
 
     /**
      * Trạng thái khuyến mãi
      */
-    @NotNull(message = "Trạng thái không được để trống")
     private PromotionStatus status;
 
     /**
@@ -81,7 +68,7 @@ public class PromotionCreateRequest {
     /**
      * Danh sách chi tiết khuyến mãi
      */
-    @NotEmpty(message = "Phải có ít nhất một chi tiết khuyến mãi")
     @Valid
     private List<PromotionDetailCreateRequest> promotionDetails;
 }
+

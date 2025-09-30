@@ -1,10 +1,9 @@
 package iuh.fit.supermarket.dto.promotion;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import iuh.fit.supermarket.enums.PromotionStatus;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import iuh.fit.supermarket.enums.PromotionType;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,33 +11,82 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * DTO cho PromotionHeader
+ * DTO đại diện cho thông tin chương trình khuyến mãi
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PromotionHeaderDTO {
-    
+
+    /**
+     * ID duy nhất của chương trình khuyến mãi
+     */
     private Long promotionId;
-    
-    @NotBlank(message = "Tên chương trình khuyến mãi không được để trống")
-    private String name;
-    
+
+    /**
+     * Mã chương trình khuyến mãi
+     */
+    private String promotionCode;
+
+    /**
+     * Tên chương trình khuyến mãi
+     */
+    private String promotionName;
+
+    /**
+     * Loại khuyến mãi
+     */
+    private PromotionType promotionType;
+
+    /**
+     * Mô tả chương trình
+     */
     private String description;
-    
-    @NotNull(message = "Ngày bắt đầu không được để trống")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+
+    /**
+     * Ngày bắt đầu
+     */
     private LocalDateTime startDate;
-    
-    @NotNull(message = "Ngày kết thúc không được để trống")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+
+    /**
+     * Ngày kết thúc
+     */
     private LocalDateTime endDate;
-    
-    @NotNull(message = "Trạng thái không được để trống")
+
+    /**
+     * Trạng thái khuyến mãi
+     */
     private PromotionStatus status;
-    
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+
+    /**
+     * Giới hạn số lần sử dụng mỗi khách hàng
+     */
+    private Integer maxUsagePerCustomer;
+
+    /**
+     * Giới hạn tổng số lần sử dụng
+     */
+    private Integer maxUsageTotal;
+
+    /**
+     * Số lần đã sử dụng hiện tại
+     */
+    private Integer currentUsageCount;
+
+    /**
+     * Thời gian tạo
+     */
     private LocalDateTime createdAt;
-    
-    private List<PromotionLineDTO> promotionLines;
+
+    /**
+     * Thời gian cập nhật gần nhất
+     */
+    private LocalDateTime updatedAt;
+
+    /**
+     * Danh sách chi tiết khuyến mãi
+     */
+    private List<PromotionDetailDTO> promotionDetails;
 }
+

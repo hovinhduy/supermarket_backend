@@ -1,123 +1,88 @@
 package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.PromotionDetail;
+import iuh.fit.supermarket.entity.PromotionHeader;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Repository interface cho PromotionDetail entity
+ * Repository để thao tác với bảng promotion_detail
  */
 @Repository
 public interface PromotionDetailRepository extends JpaRepository<PromotionDetail, Long> {
 
     /**
-     * Tìm promotion detail theo promotion line ID
+     * Tìm tất cả chi tiết khuyến mãi theo ID chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
+     * @return danh sách PromotionDetail
      */
-    List<PromotionDetail> findByPromotionLineLineId(Long lineId);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.promotion.promotionId = :promotionId")
+    List<PromotionDetail> findByPromotionId(@Param("promotionId") Long promotionId);
 
     /**
-     * Tìm promotion detail theo product unit ID (điều kiện)
+     * Xóa tất cả chi tiết khuyến mãi theo ID chương trình khuyến mãi
+     * 
+     * @param promotionId ID chương trình khuyến mãi
      */
-    List<PromotionDetail> findByConditionProductUnitId(Long productUnitId);
+    @Query("DELETE FROM PromotionDetail pd WHERE pd.promotion.promotionId = :promotionId")
+    void deleteByPromotionId(@Param("promotionId") Long promotionId);
 
     /**
-     * Tìm promotion detail theo category ID (điều kiện)
+     * Tìm chi tiết khuyến mãi theo sản phẩm mua (BUY_X_GET_Y)
+     * 
+     * @param productId ID sản phẩm
+     * @return danh sách PromotionDetail
      */
-    List<PromotionDetail> findByConditionCategoryCategoryId(Long categoryId);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.buyProduct.id = :productId")
+    List<PromotionDetail> findByBuyProductId(@Param("productId") Long productId);
 
     /**
-     * Tìm promotion detail theo gift product unit ID
+     * Tìm chi tiết khuyến mãi theo sản phẩm được tặng (BUY_X_GET_Y)
+     * 
+     * @param productId ID sản phẩm
+     * @return danh sách PromotionDetail
      */
-    List<PromotionDetail> findByGiftProductUnitId(Long productUnitId);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.giftProduct.id = :productId")
+    List<PromotionDetail> findByGiftProductId(@Param("productId") Long productId);
 
     /**
-     * Tìm promotion detail có giá trị đơn hàng tối thiểu
+     * Tìm chi tiết khuyến mãi theo danh mục (BUY_X_GET_Y)
+     * 
+     * @param categoryId ID danh mục
+     * @return danh sách PromotionDetail
      */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.minOrderValue <= :orderValue")
-    List<PromotionDetail> findByMinOrderValueLessThanEqual(@Param("orderValue") BigDecimal orderValue);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.buyCategory.categoryId = :categoryId")
+    List<PromotionDetail> findByBuyCategoryId(@Param("categoryId") Integer categoryId);
 
     /**
-     * Tìm promotion detail theo promotion line và có điều kiện product unit
+     * Tìm chi tiết khuyến mãi theo sản phẩm áp dụng (PRODUCT_DISCOUNT)
+     * 
+     * @param productId ID sản phẩm
+     * @return danh sách PromotionDetail
      */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.promotionLine.lineId = :lineId " +
-           "AND pd.conditionProductUnit.id = :productUnitId")
-    List<PromotionDetail> findByPromotionLineAndConditionProductUnit(
-            @Param("lineId") Long lineId,
-            @Param("productUnitId") Long productUnitId);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.applyToProduct.id = :productId")
+    List<PromotionDetail> findByApplyToProductId(@Param("productId") Long productId);
 
     /**
-     * Tìm promotion detail theo promotion line và có điều kiện category
+     * Tìm chi tiết khuyến mãi theo danh mục áp dụng (PRODUCT_DISCOUNT)
+     * 
+     * @param categoryId ID danh mục
+     * @return danh sách PromotionDetail
      */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.promotionLine.lineId = :lineId " +
-           "AND pd.conditionCategory.categoryId = :categoryId")
-    List<PromotionDetail> findByPromotionLineAndConditionCategory(
-            @Param("lineId") Long lineId,
-            @Param("categoryId") Long categoryId);
+    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.applyToCategory.categoryId = :categoryId")
+    List<PromotionDetail> findByApplyToCategoryId(@Param("categoryId") Integer categoryId);
 
     /**
-     * Tìm promotion detail có loại BUY_X_GET_Y
+     * Đếm số lượng chi tiết khuyến mãi theo chương trình khuyến mãi
+     * 
+     * @param promotion chương trình khuyến mãi
+     * @return số lượng chi tiết
      */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.conditionBuyQuantity IS NOT NULL " +
-           "AND pd.giftQuantity IS NOT NULL")
-    List<PromotionDetail> findBuyXGetYPromotionDetails();
-
-    /**
-     * Tìm promotion detail có giá trị giảm giá tối đa
-     */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.maxDiscountValue IS NOT NULL")
-    List<PromotionDetail> findPromotionDetailsWithMaxDiscount();
-
-    /**
-     * Tìm promotion detail áp dụng cho product unit cụ thể
-     */
-    @Query("SELECT pd FROM PromotionDetail pd " +
-           "JOIN pd.promotionLine pl " +
-           "WHERE pl.status = 'ACTIVE' " +
-           "AND pl.startDate <= CURRENT_TIMESTAMP " +
-           "AND pl.endDate >= CURRENT_TIMESTAMP " +
-           "AND (pd.conditionProductUnit.id = :productUnitId " +
-           "OR pd.conditionCategory.categoryId IN " +
-           "(SELECT p.category.categoryId FROM ProductUnit pu " +
-           "JOIN pu.product p WHERE pu.id = :productUnitId))")
-    List<PromotionDetail> findApplicablePromotionDetailsForProductUnit(@Param("productUnitId") Long productUnitId);
-
-    /**
-     * Tìm promotion detail áp dụng cho category cụ thể
-     */
-    @Query("SELECT pd FROM PromotionDetail pd " +
-           "JOIN pd.promotionLine pl " +
-           "WHERE pl.status = 'ACTIVE' " +
-           "AND pl.startDate <= CURRENT_TIMESTAMP " +
-           "AND pl.endDate >= CURRENT_TIMESTAMP " +
-           "AND pd.conditionCategory.categoryId = :categoryId")
-    List<PromotionDetail> findApplicablePromotionDetailsForCategory(@Param("categoryId") Long categoryId);
-
-    /**
-     * Đếm số lượng promotion detail theo promotion line
-     */
-    long countByPromotionLineLineId(Long lineId);
-
-    /**
-     * Tìm promotion detail có giá trị khuyến mãi trong khoảng
-     */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.value BETWEEN :minValue AND :maxValue")
-    List<PromotionDetail> findByValueBetween(
-            @Param("minValue") BigDecimal minValue,
-            @Param("maxValue") BigDecimal maxValue);
-
-    /**
-     * Xóa tất cả promotion detail theo promotion line ID
-     */
-    void deleteByPromotionLineLineId(Long lineId);
-
-    /**
-     * Tìm promotion detail có gift product unit
-     */
-    @Query("SELECT pd FROM PromotionDetail pd WHERE pd.giftProductUnit IS NOT NULL")
-    List<PromotionDetail> findPromotionDetailsWithGiftProduct();
+    long countByPromotion(PromotionHeader promotion);
 }
+
