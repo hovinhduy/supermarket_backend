@@ -67,10 +67,10 @@ public class PriceCreateRequest {
     public static class PriceDetailCreateRequest {
 
         /**
-         * ID biến thể sản phẩm
+         * ID đơn vị sản phẩm
          */
-        @NotNull(message = "ID biến thể sản phẩm không được để trống")
-        private Long variantId;
+        @NotNull(message = "ID đơn vị sản phẩm không được để trống")
+        private Long productUnitId;
 
         /**
          * Giá bán

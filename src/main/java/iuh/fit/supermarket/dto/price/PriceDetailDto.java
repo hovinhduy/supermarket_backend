@@ -21,19 +21,24 @@ public class PriceDetailDto {
     private Long priceDetailId;
 
     /**
-     * ID của biến thể sản phẩm
+     * ID của đơn vị sản phẩm
      */
-    private Long variantId;
+    private Long productUnitId;
 
     /**
-     * Mã biến thể sản phẩm
+     * Mã đơn vị sản phẩm
      */
-    private String variantCode;
+    private String productUnitCode;
 
     /**
-     * Tên biến thể sản phẩm
+     * Tên đơn vị sản phẩm
      */
-    private String variantName;
+    private String productUnitName;
+
+    /**
+     * Mã vạch của sản phẩm
+     */
+    private String barcode;
 
     /**
      * Giá bán

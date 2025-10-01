@@ -149,5 +149,5 @@ public interface PriceService {
      * @param productUnitId ID đơn vị sản phẩm
      * @return chi tiết giá hiện tại
      */
-    PriceDetailDto getCurrentPriceByVariantId(Long productUnitId);
+    PriceDetailDto getCurrentPriceByProductUnitId(Long productUnitId);
 }

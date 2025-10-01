@@ -353,13 +353,13 @@ public class PriceController {
     @GetMapping("/product-unit/{productUnitId}/current-price")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('EMPLOYEE')")
     @Operation(summary = "Lấy giá hiện tại của đơn vị sản phẩm", description = "Lấy giá hiện tại đang áp dụng của đơn vị sản phẩm")
-    public ResponseEntity<ApiResponse<PriceDetailDto>> getCurrentPriceByVariantId(
+    public ResponseEntity<ApiResponse<PriceDetailDto>> getCurrentPriceByProductUnitId(
             @Parameter(description = "ID đơn vị sản phẩm") @PathVariable Long productUnitId) {
 
         log.info("API lấy giá hiện tại của đơn vị sản phẩm ID: {}", productUnitId);
 
         try {
-            PriceDetailDto priceDetail = priceService.getCurrentPriceByVariantId(productUnitId);
+            PriceDetailDto priceDetail = priceService.getCurrentPriceByProductUnitId(productUnitId);
 
             if (priceDetail != null) {
                 ApiResponse<PriceDetailDto> response = ApiResponse.success(
