@@ -15,11 +15,11 @@ public interface ImportService {
 
     /**
      * Tạo phiếu nhập hàng mới
-     * Xử lý nhập hàng theo từng biến thể sản phẩm:
-     * - Kiểm tra biến thể có tồn tại và active không
+     * Xử lý nhập hàng theo từng đơn vị sản phẩm:
+     * - Kiểm tra đơn vị sản phẩm có tồn tại và active không
      * - Cập nhật tồn kho trong Warehouse (tạo mới hoặc cập nhật)
      * - Ghi nhận giao dịch vào WarehouseTransaction
-     * 
+     *
      * @param request    thông tin phiếu nhập hàng
      * @param employeeId ID nhân viên tạo phiếu
      * @return ImportResponse thông tin phiếu nhập đã tạo

@@ -107,43 +107,43 @@ public class ImportResponse {
         private LocalDateTime createdAt;
 
         /**
-         * Thông tin biến thể sản phẩm
+         * Thông tin đơn vị sản phẩm
          */
-        @Schema(description = "Thông tin biến thể sản phẩm")
-        private ProductVariantInfo variant;
+        @Schema(description = "Thông tin đơn vị sản phẩm")
+        private ProductUnitInfo productUnit;
 
         /**
-         * DTO đơn giản cho thông tin biến thể sản phẩm
+         * DTO đơn giản cho thông tin đơn vị sản phẩm
          */
         @Data
         @NoArgsConstructor
         @AllArgsConstructor
-        @Schema(description = "Thông tin biến thể sản phẩm")
-        public static class ProductVariantInfo {
+        @Schema(description = "Thông tin đơn vị sản phẩm")
+        public static class ProductUnitInfo {
 
             /**
-             * ID biến thể
+             * ID đơn vị sản phẩm
              */
-            @Schema(description = "ID biến thể", example = "1")
-            private Long variantId;
+            @Schema(description = "ID đơn vị sản phẩm", example = "1")
+            private Long productUnitId;
 
             /**
-             * Tên biến thể
+             * Mã đơn vị sản phẩm (SKU)
              */
-            @Schema(description = "Tên biến thể", example = "Áo Thun Polo - Đỏ - L - Cái")
-            private String variantName;
-
-            /**
-             * Mã biến thể (SKU)
-             */
-            @Schema(description = "Mã biến thể (SKU)", example = "SKU001")
-            private String variantCode;
+            @Schema(description = "Mã đơn vị sản phẩm (SKU)", example = "SKU001")
+            private String code;
 
             /**
              * Mã vạch
              */
             @Schema(description = "Mã vạch", example = "1234567890123")
             private String barcode;
+
+            /**
+             * Tỷ lệ quy đổi
+             */
+            @Schema(description = "Tỷ lệ quy đổi", example = "1")
+            private Integer conversionValue;
 
             /**
              * Tên sản phẩm
