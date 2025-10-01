@@ -56,11 +56,11 @@ public class StocktakeCreateRequest {
     public static class StocktakeDetailCreateRequest {
 
         /**
-         * ID biến thể sản phẩm
+         * ID đơn vị sản phẩm
          */
-        @NotNull(message = "ID biến thể sản phẩm không được để trống")
-        @Schema(description = "ID biến thể sản phẩm", example = "1", required = true)
-        private Long variantId;
+        @NotNull(message = "ID đơn vị sản phẩm không được để trống")
+        @Schema(description = "ID đơn vị sản phẩm", example = "1", required = true)
+        private Long productUnitId;
 
         /**
          * Số lượng thực tế đếm được

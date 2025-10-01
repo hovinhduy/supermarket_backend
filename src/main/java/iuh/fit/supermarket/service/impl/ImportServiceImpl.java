@@ -293,7 +293,7 @@ public class ImportServiceImpl implements ImportService {
             response.setTotalQuantity(detailResponses.stream()
                     .mapToInt(ImportResponse.ImportDetailResponse::getQuantity)
                     .sum());
-            response.setTotalVariants(detailResponses.size());
+            response.setTotalUnits(detailResponses.size());
         }
 
         return response;

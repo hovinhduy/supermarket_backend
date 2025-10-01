@@ -77,7 +77,7 @@ public class ImportResponse {
      * Số lượng loại sản phẩm khác nhau
      */
     @Schema(description = "Số lượng loại sản phẩm khác nhau", example = "5")
-    private Integer totalVariants;
+    private Integer totalUnits;
 
     /**
      * DTO cho chi tiết nhập hàng

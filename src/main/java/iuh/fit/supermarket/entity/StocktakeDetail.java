@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "stocktake_details", uniqueConstraints = @UniqueConstraint(columnNames = { "stocktake_id",
-        "variant_id" }))
+        "product_unit_id" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

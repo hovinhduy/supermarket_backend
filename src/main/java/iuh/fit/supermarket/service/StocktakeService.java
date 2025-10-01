@@ -142,12 +142,13 @@ public interface StocktakeService {
     /**
      * Tạo phiếu kiểm kê từ danh sách tồn kho hiện tại
      *
-     * @param notes      ghi chú
-     * @param variantIds danh sách ID biến thể cần kiểm kê (null = tất cả)
-     * @param status     trạng thái phiếu kiểm kê (mặc định PENDING)
+     * @param notes          ghi chú
+     * @param productUnitIds danh sách ID đơn vị sản phẩm cần kiểm kê (null = tất
+     *                       cả)
+     * @param status         trạng thái phiếu kiểm kê (mặc định PENDING)
      * @return thông tin phiếu kiểm kê đã tạo
      */
-    StocktakeDto createStocktakeFromCurrentStock(String notes, List<Long> variantIds, StocktakeStatus status);
+    StocktakeDto createStocktakeFromCurrentStock(String notes, List<Long> productUnitIds, StocktakeStatus status);
 
     /**
      * Kiểm tra xem có phiếu kiểm kê nào đang PENDING không

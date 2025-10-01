@@ -24,11 +24,11 @@ public class StocktakeDetailCreateRequest {
     private Integer stocktakeId;
 
     /**
-     * ID biến thể sản phẩm
+     * ID đơn vị sản phẩm
      */
-    @NotNull(message = "ID biến thể sản phẩm không được để trống")
-    @Schema(description = "ID biến thể sản phẩm", example = "1", required = true)
-    private Long variantId;
+    @NotNull(message = "ID đơn vị sản phẩm không được để trống")
+    @Schema(description = "ID đơn vị sản phẩm", example = "1", required = true)
+    private Long productUnitId;
 
     /**
      * Số lượng thực tế đếm được
@@ -46,14 +46,14 @@ public class StocktakeDetailCreateRequest {
 
     /**
      * Constructor đơn giản
-     * 
-     * @param stocktakeId ID phiếu kiểm kê
-     * @param variantId ID biến thể sản phẩm
+     *
+     * @param stocktakeId     ID phiếu kiểm kê
+     * @param productUnitId   ID đơn vị sản phẩm
      * @param quantityCounted số lượng thực tế đếm được
      */
-    public StocktakeDetailCreateRequest(Integer stocktakeId, Long variantId, Integer quantityCounted) {
+    public StocktakeDetailCreateRequest(Integer stocktakeId, Long productUnitId, Integer quantityCounted) {
         this.stocktakeId = stocktakeId;
-        this.variantId = variantId;
+        this.productUnitId = productUnitId;
         this.quantityCounted = quantityCounted;
     }
 }
