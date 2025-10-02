@@ -21,7 +21,12 @@ public enum PromotionStatus {
     /**
      * Đã hết hiệu lực
      */
-    EXPIRED("expired");
+    EXPIRED("expired"),
+
+    /**
+     * Đã hủy
+     */
+    CANCELLED("cancelled");
 
     private final String value;
 

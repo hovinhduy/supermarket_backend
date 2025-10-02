@@ -2,10 +2,8 @@ package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.PromotionHeader;
 import iuh.fit.supermarket.enums.PromotionStatus;
-import iuh.fit.supermarket.enums.PromotionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,148 +14,155 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Repository để thao tác với bảng promotion_header
+ * Repository interface cho PromotionHeader entity
+ * Cung cấp các phương thức truy vấn dữ liệu chương trình khuyến mãi
  */
 @Repository
 public interface PromotionHeaderRepository extends JpaRepository<PromotionHeader, Long> {
 
     /**
-     * Tìm kiếm khuyến mãi theo mã
+     * Tìm chương trình khuyến mãi theo tên (không phân biệt hoa thường)
      * 
-     * @param promotionCode mã khuyến mãi
+     * @param promotionName tên chương trình khuyến mãi
      * @return Optional chứa PromotionHeader nếu tìm thấy
      */
-    Optional<PromotionHeader> findByPromotionCode(String promotionCode);
+    Optional<PromotionHeader> findByPromotionNameIgnoreCase(String promotionName);
 
     /**
-     * Kiểm tra xem mã khuyến mãi đã tồn tại chưa
+     * Kiểm tra xem tên chương trình đã tồn tại chưa (trừ chương trình hiện tại)
      * 
-     * @param promotionCode mã khuyến mãi
-     * @return true nếu đã tồn tại, ngược lại false
+     * @param promotionName tên chương trình
+     * @param promotionId ID chương trình hiện tại (để loại trừ)
+     * @return true nếu tên đã tồn tại
      */
-    boolean existsByPromotionCode(String promotionCode);
+    boolean existsByPromotionNameIgnoreCaseAndPromotionIdNot(String promotionName, Long promotionId);
 
     /**
-     * Tìm tất cả khuyến mãi theo trạng thái
+     * Tìm tất cả chương trình theo trạng thái
      * 
-     * @param status   trạng thái khuyến mãi
+     * @param status trạng thái cần tìm
      * @param pageable thông tin phân trang
      * @return Page chứa danh sách PromotionHeader
      */
     Page<PromotionHeader> findByStatus(PromotionStatus status, Pageable pageable);
 
     /**
-     * Tìm tất cả khuyến mãi theo loại
+     * Tìm chương trình theo khoảng thời gian bắt đầu
      * 
-     * @param promotionType loại khuyến mãi
-     * @param pageable      thông tin phân trang
-     * @return Page chứa danh sách PromotionHeader
-     */
-    Page<PromotionHeader> findByPromotionType(PromotionType promotionType, Pageable pageable);
-
-    /**
-     * Tìm khuyến mãi theo ID với chi tiết khuyến mãi
-     * 
-     * @param promotionId ID khuyến mãi
-     * @return Optional chứa PromotionHeader với chi tiết nếu tìm thấy
-     */
-    @EntityGraph(attributePaths = { "promotionDetails" })
-    @Query("SELECT p FROM PromotionHeader p WHERE p.promotionId = :promotionId")
-    Optional<PromotionHeader> findByIdWithDetails(@Param("promotionId") Long promotionId);
-
-    /**
-     * Tìm tất cả khuyến mãi đang hoạt động trong khoảng thời gian
-     * 
-     * @param currentDate thời điểm hiện tại
-     * @param status      trạng thái ACTIVE
-     * @return danh sách PromotionHeader
-     */
-    @EntityGraph(attributePaths = { "promotionDetails" })
-    @Query("SELECT p FROM PromotionHeader p WHERE p.status = :status " +
-            "AND p.startDate <= :currentDate AND p.endDate >= :currentDate")
-    List<PromotionHeader> findActivePromotions(
-            @Param("currentDate") LocalDateTime currentDate,
-            @Param("status") PromotionStatus status);
-
-    /**
-     * Tìm kiếm khuyến mãi theo từ khóa (tên hoặc mã)
-     * 
-     * @param keyword  từ khóa tìm kiếm
+     * @param startDate ngày bắt đầu từ
+     * @param endDate ngày bắt đầu đến
      * @param pageable thông tin phân trang
      * @return Page chứa danh sách PromotionHeader
      */
-    @Query("SELECT p FROM PromotionHeader p WHERE " +
-            "LOWER(p.promotionName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(p.promotionCode) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    Page<PromotionHeader> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
+    Page<PromotionHeader> findByStartDateBetween(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable);
 
     /**
-     * Tìm kiếm khuyến mãi theo nhiều tiêu chí
+     * Tìm chương trình đang hoạt động tại thời điểm hiện tại
      * 
-     * @param keyword       từ khóa tìm kiếm
-     * @param promotionType loại khuyến mãi
-     * @param status        trạng thái
+     * @param currentTime thời điểm hiện tại
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách PromotionHeader đang hoạt động
+     */
+    @Query("SELECT ph FROM PromotionHeader ph WHERE ph.status = 'ACTIVE' " +
+           "AND ph.startDate <= :currentTime AND ph.endDate >= :currentTime")
+    Page<PromotionHeader> findActivePromotions(@Param("currentTime") LocalDateTime currentTime, Pageable pageable);
+
+    /**
+     * Tìm chương trình sắp diễn ra
+     * 
+     * @param currentTime thời điểm hiện tại
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách PromotionHeader sắp diễn ra
+     */
+    @Query("SELECT ph FROM PromotionHeader ph WHERE ph.status IN ('UPCOMING', 'ACTIVE') " +
+           "AND ph.startDate > :currentTime")
+    Page<PromotionHeader> findUpcomingPromotions(@Param("currentTime") LocalDateTime currentTime, Pageable pageable);
+
+    /**
+     * Tìm chương trình đã hết hạn
+     * 
+     * @param currentTime thời điểm hiện tại
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách PromotionHeader đã hết hạn
+     */
+    @Query("SELECT ph FROM PromotionHeader ph WHERE ph.endDate < :currentTime")
+    Page<PromotionHeader> findExpiredPromotions(@Param("currentTime") LocalDateTime currentTime, Pageable pageable);
+
+    /**
+     * Tìm kiếm chương trình theo từ khóa (tên hoặc mô tả)
+     * 
+     * @param keyword từ khóa tìm kiếm
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách PromotionHeader phù hợp
+     */
+    @Query("SELECT ph FROM PromotionHeader ph WHERE " +
+           "LOWER(ph.promotionName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(ph.description) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<PromotionHeader> findByKeyword(@Param("keyword") String keyword, Pageable pageable);
+
+    /**
+     * Tìm kiếm chương trình với nhiều điều kiện
+     * 
+     * @param keyword từ khóa tìm kiếm
+     * @param status trạng thái
      * @param startDateFrom ngày bắt đầu từ
-     * @param startDateTo   ngày bắt đầu đến
-     * @param endDateFrom   ngày kết thúc từ
-     * @param endDateTo     ngày kết thúc đến
-     * @param pageable      thông tin phân trang
-     * @return Page chứa danh sách PromotionHeader
+     * @param startDateTo ngày bắt đầu đến
+     * @param endDateFrom ngày kết thúc từ
+     * @param endDateTo ngày kết thúc đến
+     * @param pageable thông tin phân trang
+     * @return Page chứa danh sách PromotionHeader phù hợp
      */
-    @Query("SELECT p FROM PromotionHeader p WHERE " +
-            "(:keyword IS NULL OR LOWER(p.promotionName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(p.promotionCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
-            "(:promotionType IS NULL OR p.promotionType = :promotionType) AND " +
-            "(:status IS NULL OR p.status = :status) AND " +
-            "(:startDateFrom IS NULL OR p.startDate >= :startDateFrom) AND " +
-            "(:startDateTo IS NULL OR p.startDate <= :startDateTo) AND " +
-            "(:endDateFrom IS NULL OR p.endDate >= :endDateFrom) AND " +
-            "(:endDateTo IS NULL OR p.endDate <= :endDateTo)")
-    Page<PromotionHeader> searchPromotions(
-            @Param("keyword") String keyword,
-            @Param("promotionType") PromotionType promotionType,
-            @Param("status") PromotionStatus status,
-            @Param("startDateFrom") LocalDateTime startDateFrom,
-            @Param("startDateTo") LocalDateTime startDateTo,
-            @Param("endDateFrom") LocalDateTime endDateFrom,
-            @Param("endDateTo") LocalDateTime endDateTo,
-            Pageable pageable);
+    @Query("SELECT ph FROM PromotionHeader ph WHERE " +
+           "(:keyword IS NULL OR LOWER(ph.promotionName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           " LOWER(ph.description) LIKE LOWER(CONCAT('%', :keyword, '%'))) AND " +
+           "(:status IS NULL OR ph.status = :status) AND " +
+           "(:startDateFrom IS NULL OR ph.startDate >= :startDateFrom) AND " +
+           "(:startDateTo IS NULL OR ph.startDate <= :startDateTo) AND " +
+           "(:endDateFrom IS NULL OR ph.endDate >= :endDateFrom) AND " +
+           "(:endDateTo IS NULL OR ph.endDate <= :endDateTo)")
+    Page<PromotionHeader> findWithCriteria(
+        @Param("keyword") String keyword,
+        @Param("status") PromotionStatus status,
+        @Param("startDateFrom") LocalDateTime startDateFrom,
+        @Param("startDateTo") LocalDateTime startDateTo,
+        @Param("endDateFrom") LocalDateTime endDateFrom,
+        @Param("endDateTo") LocalDateTime endDateTo,
+        Pageable pageable
+    );
 
     /**
-     * Tìm các khuyến mãi đang sắp hết hạn
+     * Đếm số lượng chương trình theo trạng thái
      * 
-     * @param currentDate    thời điểm hiện tại
-     * @param expirationDate thời điểm sắp hết hạn
-     * @param status         trạng thái ACTIVE
-     * @return danh sách PromotionHeader
-     */
-    @Query("SELECT p FROM PromotionHeader p WHERE p.status = :status " +
-            "AND p.endDate > :currentDate AND p.endDate <= :expirationDate")
-    List<PromotionHeader> findExpiringPromotions(
-            @Param("currentDate") LocalDateTime currentDate,
-            @Param("expirationDate") LocalDateTime expirationDate,
-            @Param("status") PromotionStatus status);
-
-    /**
-     * Đếm số lượng khuyến mãi theo trạng thái
-     * 
-     * @param status trạng thái khuyến mãi
-     * @return số lượng khuyến mãi
+     * @param status trạng thái cần đếm
+     * @return số lượng chương trình
      */
     long countByStatus(PromotionStatus status);
 
     /**
-     * Tìm các khuyến mãi theo loại và trạng thái
+     * Tìm chương trình có thời gian trùng lặp
      * 
-     * @param promotionType loại khuyến mãi
-     * @param status        trạng thái
-     * @return danh sách PromotionHeader
+     * @param startDate ngày bắt đầu
+     * @param endDate ngày kết thúc
+     * @param excludeId ID chương trình cần loại trừ
+     * @return danh sách chương trình trùng lặp thời gian
      */
-    @EntityGraph(attributePaths = { "promotionDetails" })
-    @Query("SELECT p FROM PromotionHeader p WHERE p.promotionType = :promotionType " +
-            "AND p.status = :status")
-    List<PromotionHeader> findByTypeAndStatus(
-            @Param("promotionType") PromotionType promotionType,
-            @Param("status") PromotionStatus status);
-}
+    @Query("SELECT ph FROM PromotionHeader ph WHERE " +
+           "(:excludeId IS NULL OR ph.promotionId != :excludeId) AND " +
+           "ph.status IN ('ACTIVE', 'UPCOMING') AND " +
+           "((ph.startDate <= :endDate AND ph.endDate >= :startDate))")
+    List<PromotionHeader> findOverlappingPromotions(
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate,
+        @Param("excludeId") Long excludeId
+    );
 
+    /**
+     * Cập nhật trạng thái chương trình đã hết hạn
+     * 
+     * @param currentTime thời điểm hiện tại
+     * @return số lượng bản ghi được cập nhật
+     */
+    @Query("UPDATE PromotionHeader ph SET ph.status = 'EXPIRED' " +
+           "WHERE ph.endDate < :currentTime AND ph.status IN ('ACTIVE', 'UPCOMING')")
+    int updateExpiredPromotions(@Param("currentTime") LocalDateTime currentTime);
+}

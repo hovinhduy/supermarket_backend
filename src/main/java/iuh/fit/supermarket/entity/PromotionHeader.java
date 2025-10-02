@@ -8,7 +8,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import iuh.fit.supermarket.enums.PromotionStatus;
-import iuh.fit.supermarket.enums.PromotionType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,23 +31,10 @@ public class PromotionHeader {
     private Long promotionId;
 
     /**
-     * Mã chương trình khuyến mãi
-     */
-    @Column(name = "promotion_code", length = 50, nullable = false, unique = true)
-    private String promotionCode;
-
-    /**
      * Tên chương trình khuyến mãi
      */
     @Column(name = "promotion_name", length = 200, nullable = false)
     private String promotionName;
-
-    /**
-     * Loại khuyến mãi (BUY_X_GET_Y, ORDER_DISCOUNT, PRODUCT_DISCOUNT)
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "promotion_type", length = 20, nullable = false)
-    private PromotionType promotionType;
 
     /**
      * Mô tả chương trình
@@ -75,30 +61,6 @@ public class PromotionHeader {
     @Column(name = "status", nullable = false)
     private PromotionStatus status;
 
-    // /**
-    // * Độ ưu tiên khi áp dụng nhiều khuyến mãi (số lớn hơn = ưu tiên cao hơn)
-    // */
-    // @Column(name = "priority", nullable = false)
-    // private Integer priority = 0;
-
-    /**
-     * Giới hạn số lần sử dụng mỗi khách hàng
-     */
-    @Column(name = "max_usage_per_customer")
-    private Integer maxUsagePerCustomer;
-
-    /**
-     * Giới hạn tổng số lần sử dụng
-     */
-    @Column(name = "max_usage_total")
-    private Integer maxUsageTotal;
-
-    /**
-     * Số lần đã sử dụng hiện tại
-     */
-    @Column(name = "current_usage_count", nullable = false)
-    private Integer currentUsageCount = 0;
-
     /**
      * Thời gian tạo
      */
@@ -114,8 +76,8 @@ public class PromotionHeader {
     private LocalDateTime updatedAt;
 
     /**
-     * Các chi tiết khuyến mãi thuộc về chương trình này
+     * Các line khuyến mãi thuộc về chương trình này
      */
-    @OneToMany(mappedBy = "promotion", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<PromotionDetail> promotionDetails;
+    @OneToMany(mappedBy = "header", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<PromotionLine> promotionLines;
 }

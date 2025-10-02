@@ -31,9 +31,9 @@ public class PromotionDetail {
     /**
      * Chương trình khuyến mãi mà chi tiết này thuộc về
      */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "promotion_id", nullable = false)
-    private PromotionHeader promotion;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promotion_line_id", nullable = false)
+    private PromotionLine promotionLine;
 
     // =====================================================
     // LOẠI 1: MUA X TẶNG Y (BUY_X_GET_Y)
@@ -43,7 +43,7 @@ public class PromotionDetail {
      * Sản phẩm phải mua
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "buy_product_id", nullable = false)
+    @JoinColumn(name = "buy_product_id")
     private ProductUnit buyProduct;
 
     /**
