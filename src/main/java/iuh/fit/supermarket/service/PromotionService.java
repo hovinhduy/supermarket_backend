@@ -392,6 +392,63 @@ public class PromotionService {
     }
 
     /**
+     * Xóa promotion line và detail của nó
+     * 
+     * @param lineId ID của promotion line cần xóa
+     * @throws PromotionNotFoundException   nếu không tìm thấy promotion line
+     * @throws PromotionValidationException nếu promotion line không thể xóa
+     */
+    @Transactional
+    public void deletePromotionLine(Long lineId) {
+        log.info("Bắt đầu xóa promotion line ID: {}", lineId);
+
+        // Tìm promotion line
+        PromotionLine line = promotionLineRepository.findById(lineId)
+                .orElseThrow(() -> new PromotionNotFoundException(
+                        "Không tìm thấy promotion line với ID: " + lineId));
+
+        // Kiểm tra xem có thể xóa không (dựa vào header và trạng thái line)
+        validatePromotionLineCanBeDeleted(line);
+
+        // Xóa detail trước nếu có
+        if (line.getDetail() != null) {
+            log.info("Xóa promotion detail ID: {}", line.getDetail().getDetailId());
+            promotionDetailRepository.delete(line.getDetail());
+        }
+
+        // Xóa line
+        promotionLineRepository.delete(line);
+
+        log.info("Đã xóa thành công promotion line ID: {}", lineId);
+    }
+
+    /**
+     * Kiểm tra xem promotion line có thể xóa không
+     * 
+     * @param line promotion line cần kiểm tra
+     * @throws PromotionValidationException nếu không thể xóa
+     */
+    private void validatePromotionLineCanBeDeleted(PromotionLine line) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // Không cho phép xóa nếu line đang hoạt động
+        if (line.getStatus() == PromotionStatus.ACTIVE &&
+                now.isAfter(line.getStartDate()) &&
+                now.isBefore(line.getEndDate())) {
+            throw new PromotionValidationException("Không thể xóa promotion line đang hoạt động");
+        }
+
+        // Không cho phép xóa nếu đã có người sử dụng
+        if (line.getCurrentUsageCount() != null && line.getCurrentUsageCount() > 0) {
+            throw new PromotionValidationException(
+                    "Không thể xóa promotion line đã được sử dụng " + line.getCurrentUsageCount() + " lần");
+        }
+
+        // Kiểm tra header có thể cập nhật không (tương tự như khi cập nhật)
+        validatePromotionCanBeUpdated(line.getHeader());
+    }
+
+    /**
      * Lấy danh sách promotion lines theo header ID với lọc
      * 
      * @param promotionId   ID của promotion header

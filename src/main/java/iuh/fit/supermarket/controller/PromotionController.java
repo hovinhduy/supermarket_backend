@@ -47,7 +47,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "409", description = "Tên chương trình đã tồn tại"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionHeaderResponseDTO> createPromotionHeader(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> createPromotionHeader(
             @Valid @RequestBody PromotionHeaderOnlyRequestDTO requestDTO) {
 
         log.info("API: Tạo promotion header mới - {}", requestDTO.getPromotionName());
@@ -55,7 +55,8 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.createPromotionHeaderOnly(requestDTO);
 
         log.info("API: Đã tạo thành công promotion header ID: {}", responseDTO.getPromotionId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion header thành công", responseDTO));
     }
 
     /**
@@ -77,7 +78,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "409", description = "Mã khuyến mãi đã tồn tại"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionLineResponseDTO> createPromotionLine(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionLineResponseDTO>> createPromotionLine(
             @Parameter(description = "ID của promotion header", required = true) @PathVariable Long headerId,
             @Valid @RequestBody PromotionLineOnlyRequestDTO requestDTO) {
 
@@ -86,7 +87,8 @@ public class PromotionController {
         PromotionLineResponseDTO responseDTO = promotionService.createPromotionLineOnly(headerId, requestDTO);
 
         log.info("API: Đã tạo thành công promotion line ID: {}", responseDTO.getPromotionLineId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion line thành công", responseDTO));
     }
 
     /**
@@ -105,7 +107,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion line"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionDetailResponseDTO> createPromotionDetail(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionDetailResponseDTO>> createPromotionDetail(
             @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId,
             @Valid @RequestBody PromotionDetailWithLineRequestDTO requestDTO) {
 
@@ -114,7 +116,8 @@ public class PromotionController {
         PromotionDetailResponseDTO responseDTO = promotionService.createPromotionDetail(lineId, requestDTO);
 
         log.info("API: Đã tạo thành công promotion detail ID: {}", responseDTO.getDetailId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion detail thành công", responseDTO));
     }
 
     /**
@@ -132,7 +135,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "409", description = "Tên chương trình hoặc mã khuyến mãi đã tồn tại"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionHeaderResponseDTO> createPromotion(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> createPromotion(
             @Valid @RequestBody PromotionHeaderRequestDTO requestDTO) {
 
         log.info("API: Tạo chương trình khuyến mãi mới (full) - {}", requestDTO.getPromotionName());
@@ -140,7 +143,8 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.createPromotion(requestDTO);
 
         log.info("API: Đã tạo thành công chương trình khuyến mãi ID: {}", responseDTO.getPromotionId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(responseDTO);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo chương trình khuyến mãi thành công", responseDTO));
     }
 
     /**
@@ -161,7 +165,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "409", description = "Tên chương trình đã tồn tại"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionHeaderResponseDTO> updatePromotionHeader(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> updatePromotionHeader(
             @Parameter(description = "ID của promotion header", required = true) @PathVariable Long promotionId,
             @Valid @RequestBody PromotionHeaderOnlyRequestDTO requestDTO) {
 
@@ -170,7 +174,7 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.updatePromotionHeaderOnly(promotionId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion header ID: {}", promotionId);
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion header thành công", responseDTO));
     }
 
     /**
@@ -190,7 +194,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "409", description = "Mã khuyến mãi đã tồn tại"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionLineResponseDTO> updatePromotionLine(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionLineResponseDTO>> updatePromotionLine(
             @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId,
             @Valid @RequestBody PromotionLineOnlyRequestDTO requestDTO) {
 
@@ -199,7 +203,7 @@ public class PromotionController {
         PromotionLineResponseDTO responseDTO = promotionService.updatePromotionLine(lineId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion line ID: {}", lineId);
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion line thành công", responseDTO));
     }
 
     /**
@@ -218,7 +222,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion detail"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<PromotionDetailResponseDTO> updatePromotionDetail(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionDetailResponseDTO>> updatePromotionDetail(
             @Parameter(description = "ID của promotion detail", required = true) @PathVariable Long detailId,
             @Valid @RequestBody PromotionDetailRequestDTO requestDTO) {
 
@@ -227,7 +231,7 @@ public class PromotionController {
         PromotionDetailResponseDTO responseDTO = promotionService.updatePromotionDetail(detailId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion detail ID: {}", detailId);
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion detail thành công", responseDTO));
     }
 
     /**
@@ -251,7 +255,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
     @Deprecated
-    public ResponseEntity<PromotionHeaderResponseDTO> updatePromotion(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> updatePromotion(
             @Parameter(description = "ID của chương trình khuyến mãi", required = true) @PathVariable Long promotionId,
             @Valid @RequestBody PromotionHeaderRequestDTO requestDTO) {
 
@@ -261,25 +265,25 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.updatePromotion(promotionId, requestDTO);
 
         log.info("API: Đã cập nhật thành công chương trình khuyến mãi ID: {}", promotionId);
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật chương trình khuyến mãi thành công", responseDTO));
     }
 
     /**
      * Xóa chương trình khuyến mãi
      * 
      * @param promotionId ID của chương trình cần xóa
-     * @return ResponseEntity với status 204 No Content
+     * @return ResponseEntity với ApiResponse
      */
     @DeleteMapping("/{promotionId}")
     @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
     @Operation(summary = "Xóa chương trình khuyến mãi", description = "Xóa một chương trình khuyến mãi (chỉ cho phép xóa khi chưa bắt đầu)")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Xóa chương trình khuyến mãi thành công"),
+            @ApiResponse(responseCode = "200", description = "Xóa chương trình khuyến mãi thành công"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy chương trình khuyến mãi"),
             @ApiResponse(responseCode = "400", description = "Không thể xóa chương trình khuyến mãi này"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
-    public ResponseEntity<Void> deletePromotion(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<Void>> deletePromotion(
             @Parameter(description = "ID của chương trình khuyến mãi", required = true) @PathVariable Long promotionId) {
 
         log.info("API: Xóa chương trình khuyến mãi ID: {}", promotionId);
@@ -287,7 +291,7 @@ public class PromotionController {
         promotionService.deletePromotion(promotionId);
 
         log.info("API: Đã xóa thành công chương trình khuyến mãi ID: {}", promotionId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa chương trình khuyến mãi thành công", null));
     }
 
     /**
@@ -304,14 +308,14 @@ public class PromotionController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy chương trình khuyến mãi"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
-    public ResponseEntity<PromotionHeaderResponseDTO> getPromotionById(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> getPromotionById(
             @Parameter(description = "ID của chương trình khuyến mãi", required = true) @PathVariable Long promotionId) {
 
         log.debug("API: Lấy thông tin chương trình khuyến mãi ID: {}", promotionId);
 
         PromotionHeaderResponseDTO responseDTO = promotionService.getPromotionById(promotionId);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(responseDTO));
     }
 
     /**
@@ -328,14 +332,40 @@ public class PromotionController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion line"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
-    public ResponseEntity<PromotionLineResponseDTO> getPromotionLineById(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionLineResponseDTO>> getPromotionLineById(
             @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId) {
 
         log.debug("API: Lấy thông tin promotion line ID: {}", lineId);
 
         PromotionLineResponseDTO responseDTO = promotionService.getPromotionLineById(lineId);
 
-        return ResponseEntity.ok(responseDTO);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(responseDTO));
+    }
+
+    /**
+     * Xóa promotion line và detail của nó
+     * 
+     * @param lineId ID của promotion line cần xóa
+     * @return ResponseEntity với ApiResponse
+     */
+    @DeleteMapping("/lines/{lineId}")
+    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
+    @Operation(summary = "Xóa promotion line", description = "Xóa một promotion line và detail của nó (chỉ cho phép xóa khi chưa được sử dụng và chưa hoạt động)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Xóa promotion line thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion line"),
+            @ApiResponse(responseCode = "400", description = "Không thể xóa promotion line này (đang hoạt động hoặc đã được sử dụng)"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
+    })
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<Void>> deletePromotionLine(
+            @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId) {
+
+        log.info("API: Xóa promotion line ID: {}", lineId);
+
+        promotionService.deletePromotionLine(lineId);
+
+        log.info("API: Đã xóa thành công promotion line ID: {}", lineId);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa promotion line thành công", null));
     }
 
     /**
@@ -357,7 +387,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion header"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
-    public ResponseEntity<List<PromotionLineResponseDTO>> getPromotionLinesByHeaderId(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<List<PromotionLineResponseDTO>>> getPromotionLinesByHeaderId(
             @Parameter(description = "ID của promotion header", required = true) @PathVariable Long promotionId,
 
             @Parameter(description = "Loại khuyến mãi để lọc") @RequestParam(required = false) String promotionType,
@@ -392,7 +422,7 @@ public class PromotionController {
                 promotionId, type, startFrom, startTo, endFrom, endTo);
 
         log.debug("API: Tìm thấy {} promotion lines", lines.size());
-        return ResponseEntity.ok(lines);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(lines));
     }
 
     /**
@@ -409,7 +439,7 @@ public class PromotionController {
             @ApiResponse(responseCode = "400", description = "Tham số tìm kiếm không hợp lệ"),
             @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
-    public ResponseEntity<Page<PromotionHeaderResponseDTO>> searchPromotions(
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<Page<PromotionHeaderResponseDTO>>> searchPromotions(
             @Parameter(description = "Từ khóa tìm kiếm (tên hoặc mô tả)") @RequestParam(required = false) String keyword,
 
             @Parameter(description = "Trạng thái chương trình") @RequestParam(required = false) String status,
@@ -449,7 +479,7 @@ public class PromotionController {
         Page<PromotionHeaderResponseDTO> result = promotionService.searchPromotions(searchDTO);
 
         log.debug("API: Tìm thấy {} chương trình khuyến mãi", result.getTotalElements());
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(result));
     }
 
     /**
