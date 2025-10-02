@@ -6,6 +6,7 @@ import iuh.fit.supermarket.entity.Brand;
 import iuh.fit.supermarket.entity.Category;
 import iuh.fit.supermarket.entity.Product;
 import iuh.fit.supermarket.entity.ProductUnit;
+import iuh.fit.supermarket.entity.ProductUnitImage;
 import iuh.fit.supermarket.entity.Unit;
 import iuh.fit.supermarket.exception.DuplicateProductException;
 import iuh.fit.supermarket.exception.ProductException;
@@ -42,6 +43,8 @@ public class ProductServiceImpl implements ProductService {
     private final BrandRepository brandRepository;
     private final UnitRepository unitRepository;
     private final ProductUnitRepository productUnitRepository;
+    private final iuh.fit.supermarket.repository.WarehouseRepository warehouseRepository;
+    private final iuh.fit.supermarket.service.PriceService priceService;
 
     /**
      * Tạo sản phẩm mới
@@ -936,6 +939,27 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
+     * Tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductUnitResponse> searchProductUnits(String searchTerm) {
+        log.info("Tìm kiếm ProductUnit với từ khóa: {}", searchTerm);
+
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            log.warn("Từ khóa tìm kiếm rỗng");
+            return List.of();
+        }
+
+        List<ProductUnit> productUnits = productUnitRepository.searchProductUnits(searchTerm.trim());
+        log.info("Tìm thấy {} ProductUnit", productUnits.size());
+
+        return productUnits.stream()
+                .map(this::mapToProductUnitResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Chuyển đổi ProductUnit entity sang ProductUnitResponse DTO
      */
     private ProductUnitResponse mapToProductUnitResponse(ProductUnit productUnit) {
@@ -948,6 +972,25 @@ public class ProductServiceImpl implements ProductService {
         unitDto.setCreatedAt(productUnit.getUnit().getCreatedAt());
         unitDto.setUpdatedAt(productUnit.getUnit().getUpdatedAt());
 
+        // Map danh sách hình ảnh của ProductUnit
+        List<ProductUnitImageDto> images = List.of();
+        if (productUnit.getProductUnitImages() != null && !productUnit.getProductUnitImages().isEmpty()) {
+            images = productUnit.getProductUnitImages().stream()
+                    .filter(pui -> pui.getIsActive() != null && pui.getIsActive())
+                    .sorted((a, b) -> {
+                        // Sắp xếp: primary trước, sau đó theo displayOrder
+                        if (a.getIsPrimary() && !b.getIsPrimary())
+                            return -1;
+                        if (!a.getIsPrimary() && b.getIsPrimary())
+                            return 1;
+                        return Integer.compare(
+                                a.getDisplayOrder() != null ? a.getDisplayOrder() : 0,
+                                b.getDisplayOrder() != null ? b.getDisplayOrder() : 0);
+                    })
+                    .map(this::mapToProductUnitImageDto)
+                    .collect(Collectors.toList());
+        }
+
         return new ProductUnitResponse(
                 productUnit.getId(),
                 productUnit.getCode(),
@@ -957,8 +1000,37 @@ public class ProductServiceImpl implements ProductService {
                 productUnit.getIsActive(),
                 unitDto,
                 productUnit.getProduct().getId(),
+                images,
                 productUnit.getCreatedAt(),
                 productUnit.getUpdatedAt());
+    }
+
+    /**
+     * Chuyển đổi ProductUnitImage entity sang ProductUnitImageDto
+     */
+    private ProductUnitImageDto mapToProductUnitImageDto(ProductUnitImage productUnitImage) {
+        ProductUnitImageDto dto = new ProductUnitImageDto();
+        dto.setId(productUnitImage.getId());
+        dto.setDisplayOrder(productUnitImage.getDisplayOrder());
+        dto.setIsPrimary(productUnitImage.getIsPrimary());
+        dto.setIsActive(productUnitImage.getIsActive());
+        dto.setCreatedAt(productUnitImage.getCreatedAt());
+        dto.setProductUnitId(productUnitImage.getProductUnit().getId());
+
+        // Map ProductImage
+        if (productUnitImage.getProductImage() != null) {
+            ProductImageDto imageDto = new ProductImageDto();
+            imageDto.setImageId(productUnitImage.getProductImage().getImageId());
+            imageDto.setImageUrl(productUnitImage.getProductImage().getImageUrl());
+            imageDto.setImageAlt(productUnitImage.getProductImage().getImageAlt());
+            imageDto.setSortOrder(productUnitImage.getProductImage().getSortOrder());
+            imageDto.setCreatedAt(productUnitImage.getProductImage().getCreatedAt());
+            imageDto.setProductId(productUnitImage.getProductImage().getProduct().getId());
+
+            dto.setProductImage(imageDto);
+        }
+
+        return dto;
     }
 
     /**
@@ -980,5 +1052,93 @@ public class ProductServiceImpl implements ProductService {
         }
 
         return summary;
+    }
+
+    /**
+     * Lấy thông tin chi tiết đầy đủ của ProductUnit
+     * Bao gồm tên sản phẩm, tên đơn vị, số lượng tồn kho và giá hiện tại
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductUnitDetailResponse getProductUnitDetails(Long productUnitId) {
+        log.info("Lấy thông tin chi tiết đầy đủ của ProductUnit ID: {}", productUnitId);
+
+        // Tìm ProductUnit
+        ProductUnit productUnit = productUnitRepository.findById(productUnitId)
+                .orElseThrow(() -> new ProductNotFoundException(
+                        "Không tìm thấy đơn vị sản phẩm với ID: " + productUnitId));
+
+        // Lấy thông tin sản phẩm
+        Product product = productUnit.getProduct();
+        if (product == null) {
+            throw new ProductException("ProductUnit không có thông tin sản phẩm");
+        }
+
+        // Lấy thông tin đơn vị tính
+        Unit unit = productUnit.getUnit();
+        if (unit == null) {
+            throw new ProductException("ProductUnit không có thông tin đơn vị tính");
+        }
+
+        // Build response cơ bản
+        ProductUnitDetailResponse.ProductUnitDetailResponseBuilder builder = ProductUnitDetailResponse.builder()
+                .productUnitId(productUnit.getId())
+                .productUnitCode(productUnit.getCode())
+                .barcode(productUnit.getBarcode())
+                .conversionValue(productUnit.getConversionValue())
+                .isBaseUnit(productUnit.getIsBaseUnit())
+                .isActive(productUnit.getIsActive())
+                .productId(product.getId())
+                .productName(product.getName())
+                .productCode(null) // Product entity không có trường productCode
+                .unitId(unit.getId())
+                .unitName(unit.getName());
+
+        // Lấy số lượng tồn kho
+        try {
+            Optional<iuh.fit.supermarket.entity.Warehouse> warehouseOpt = warehouseRepository
+                    .findByProductUnitId(productUnitId);
+            if (warehouseOpt.isPresent()) {
+                builder.quantityOnHand(warehouseOpt.get().getQuantityOnHand());
+                log.info("Tồn kho của ProductUnit ID {}: {}", productUnitId, warehouseOpt.get().getQuantityOnHand());
+            } else {
+                builder.quantityOnHand(0);
+                log.info("Không tìm thấy thông tin tồn kho cho ProductUnit ID: {}, đặt mặc định là 0", productUnitId);
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi lấy thông tin tồn kho cho ProductUnit ID {}: {}", productUnitId, e.getMessage());
+            builder.quantityOnHand(0);
+        }
+
+        // Lấy giá hiện tại từ bảng giá đang áp dụng
+        try {
+            iuh.fit.supermarket.dto.price.PriceDetailDto currentPrice = priceService
+                    .getCurrentPriceByProductUnitId(productUnitId);
+            if (currentPrice != null) {
+                builder.currentPrice(currentPrice.getSalePrice());
+                log.info("Giá hiện tại của ProductUnit ID {}: {}", productUnitId, currentPrice.getSalePrice());
+
+                // Lấy thông tin bảng giá nếu có
+                if (currentPrice.getPriceDetailId() != null) {
+                    try {
+                        // Lấy thông tin bảng giá từ PriceDetail
+                        // Note: Cần thêm logic để lấy thông tin Price từ PriceDetail
+                        log.debug("ProductUnit ID {} có giá trong bảng giá ID: {}", productUnitId,
+                                currentPrice.getPriceDetailId());
+                    } catch (Exception ex) {
+                        log.warn("Không thể lấy thông tin bảng giá: {}", ex.getMessage());
+                    }
+                }
+            } else {
+                log.info("Không tìm thấy giá hiện tại cho ProductUnit ID: {}", productUnitId);
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi lấy giá hiện tại cho ProductUnit ID {}: {}", productUnitId, e.getMessage());
+        }
+
+        ProductUnitDetailResponse response = builder.build();
+        log.info("Đã lấy thông tin chi tiết đầy đủ của ProductUnit ID: {}", productUnitId);
+
+        return response;
     }
 }

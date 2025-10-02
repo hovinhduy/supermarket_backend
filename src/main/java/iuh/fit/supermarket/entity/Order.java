@@ -44,6 +44,18 @@ public class Order {
     private BigDecimal totalAmount;
 
     /**
+     * Thành tiền
+     */
+    @Column(name = "subtotal", precision = 10, scale = 2, nullable = false)
+    private BigDecimal subtotal;
+
+    /**
+     * Tiền khách trả
+     */
+    @Column(name = "amount_paid", precision = 10, scale = 2, nullable = false)
+    private BigDecimal amountPaid;
+
+    /**
      * Trạng thái đơn hàng
      */
     @Enumerated(EnumType.STRING)

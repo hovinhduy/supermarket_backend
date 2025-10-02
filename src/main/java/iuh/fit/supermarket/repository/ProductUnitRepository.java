@@ -155,4 +155,24 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
      */
     boolean existsByBarcodeAndIdNot(String barcode, Long excludeId);
 
+    /**
+     * Tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode
+     *
+     * @param searchTerm từ khóa tìm kiếm
+     * @return danh sách ProductUnit tìm được
+     */
+    @Query("SELECT DISTINCT pu FROM ProductUnit pu " +
+            "LEFT JOIN FETCH pu.product p " +
+            "LEFT JOIN FETCH pu.unit u " +
+            "LEFT JOIN FETCH pu.productUnitImages pui " +
+            "LEFT JOIN FETCH pui.productImage pi " +
+            "WHERE pu.isDeleted = false " +
+            "AND pu.isActive = true " +
+            "AND p.isDeleted = false " +
+            "AND p.isActive = true " +
+            "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(pu.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(pu.barcode) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
+    List<ProductUnit> searchProductUnits(@Param("searchTerm") String searchTerm);
+
 }

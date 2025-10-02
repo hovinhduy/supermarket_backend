@@ -193,4 +193,21 @@ public interface ProductService {
      * @return thông tin đơn vị cơ bản
      */
     ProductUnitResponse getBaseProductUnit(Long productId);
+
+    /**
+     * Tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode
+     * 
+     * @param searchTerm từ khóa tìm kiếm
+     * @return danh sách ProductUnit tìm được
+     */
+    List<ProductUnitResponse> searchProductUnits(String searchTerm);
+
+    /**
+     * Lấy thông tin chi tiết đầy đủ của ProductUnit
+     * Bao gồm tên sản phẩm, tên đơn vị, số lượng tồn kho và giá hiện tại
+     * 
+     * @param productUnitId ID đơn vị sản phẩm
+     * @return thông tin chi tiết đầy đủ của ProductUnit
+     */
+    iuh.fit.supermarket.dto.product.ProductUnitDetailResponse getProductUnitDetails(Long productUnitId);
 }

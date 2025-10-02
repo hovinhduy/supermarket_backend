@@ -11,6 +11,7 @@ import iuh.fit.supermarket.dto.product.ProductListResponse;
 import iuh.fit.supermarket.dto.product.ProductPageableRequest;
 import iuh.fit.supermarket.dto.product.ProductResponse;
 import iuh.fit.supermarket.dto.product.ProductUpdateRequest;
+import iuh.fit.supermarket.dto.product.ProductUnitDetailResponse;
 import iuh.fit.supermarket.dto.product.ProductUnitRequest;
 import iuh.fit.supermarket.dto.product.ProductUnitUpdateRequest;
 import iuh.fit.supermarket.dto.product.ProductUnitResponse;
@@ -511,6 +512,51 @@ public class ProductController {
         }
     }
 
+    /**
+     * API tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode
+     */
+    @GetMapping("/units/search")
+    @Operation(summary = "Tìm kiếm ProductUnit", description = "Tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tìm kiếm thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Từ khóa tìm kiếm không hợp lệ")
+    })
+    public ResponseEntity<ApiResponse<List<ProductUnitResponse>>> searchProductUnits(
+            @Parameter(description = "Từ khóa tìm kiếm (tên sản phẩm, code, barcode)") @RequestParam String searchTerm) {
+        log.info("API tìm kiếm ProductUnit với từ khóa: {}", searchTerm);
+
+        try {
+            List<ProductUnitResponse> productUnits = productService.searchProductUnits(searchTerm);
+            String message = String.format("Tìm thấy %d kết quả", productUnits.size());
+            return ResponseEntity.ok(ApiResponse.success(message, productUnits));
+        } catch (Exception e) {
+            log.error("Lỗi khi tìm kiếm ProductUnit: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * API lấy thông tin chi tiết đầy đủ của ProductUnit
+     */
+    @GetMapping("/units/{productUnitId}/details")
+    @Operation(summary = "Lấy thông tin chi tiết ProductUnit", description = "Lấy thông tin chi tiết đầy đủ của ProductUnit bao gồm tên sản phẩm, tên đơn vị, số lượng tồn kho và giá hiện tại")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy ProductUnit")
+    })
+    public ResponseEntity<ApiResponse<ProductUnitDetailResponse>> getProductUnitDetails(
+            @Parameter(description = "ID của ProductUnit") @PathVariable Long productUnitId) {
+        log.info("API lấy thông tin chi tiết ProductUnit ID: {}", productUnitId);
+
+        try {
+            ProductUnitDetailResponse details = productService.getProductUnitDetails(productUnitId);
+            return ResponseEntity.ok(ApiResponse.success("Lấy thông tin chi tiết thành công", details));
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy thông tin chi tiết ProductUnit: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
     // ==================== EXCEL IMPORT/EXPORT ====================
 
     /**
@@ -536,7 +582,7 @@ public class ProductController {
 
             // Tạo tên file với timestamp
             String fileName = "danh_sach_san_pham_" +
-                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
@@ -569,21 +615,20 @@ public class ProductController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
     })
     public ResponseEntity<ApiResponse<String>> importProductsFromExcel(
-            @Parameter(description = "File Excel chứa danh sách sản phẩm")
-            @RequestParam("file") MultipartFile file) {
+            @Parameter(description = "File Excel chứa danh sách sản phẩm") @RequestParam("file") MultipartFile file) {
         log.info("API import sản phẩm từ file Excel: {}", file.getOriginalFilename());
 
         try {
             // Validate file
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("File không được để trống"));
+                        .body(ApiResponse.error("File không được để trống"));
             }
 
             String fileName = file.getOriginalFilename();
             if (fileName == null || (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls"))) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("File phải có định dạng Excel (.xlsx hoặc .xls)"));
+                        .body(ApiResponse.error("File phải có định dạng Excel (.xlsx hoặc .xls)"));
             }
 
             // Parse Excel file
@@ -591,7 +636,7 @@ public class ProductController {
 
             if (products.isEmpty()) {
                 return ResponseEntity.badRequest()
-                    .body(ApiResponse.error("File Excel không chứa dữ liệu sản phẩm hợp lệ"));
+                        .body(ApiResponse.error("File Excel không chứa dữ liệu sản phẩm hợp lệ"));
             }
 
             // Import products
@@ -622,11 +667,11 @@ public class ProductController {
         } catch (IOException e) {
             log.error("Lỗi khi đọc file Excel: ", e);
             return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Lỗi khi đọc file Excel: " + e.getMessage()));
+                    .body(ApiResponse.error("Lỗi khi đọc file Excel: " + e.getMessage()));
         } catch (Exception e) {
             log.error("Lỗi khi import sản phẩm: ", e);
             return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Lỗi khi import: " + e.getMessage()));
+                    .body(ApiResponse.error("Lỗi khi import: " + e.getMessage()));
         }
     }
 

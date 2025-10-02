@@ -56,7 +56,8 @@ public class PromotionController {
 
         log.info("API: Đã tạo thành công promotion header ID: {}", responseDTO.getPromotionId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion header thành công", responseDTO));
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion header thành công",
+                        responseDTO));
     }
 
     /**
@@ -117,7 +118,8 @@ public class PromotionController {
 
         log.info("API: Đã tạo thành công promotion detail ID: {}", responseDTO.getDetailId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion detail thành công", responseDTO));
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion detail thành công",
+                        responseDTO));
     }
 
     /**
@@ -144,7 +146,8 @@ public class PromotionController {
 
         log.info("API: Đã tạo thành công chương trình khuyến mãi ID: {}", responseDTO.getPromotionId());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo chương trình khuyến mãi thành công", responseDTO));
+                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo chương trình khuyến mãi thành công",
+                        responseDTO));
     }
 
     /**
@@ -174,7 +177,8 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.updatePromotionHeaderOnly(promotionId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion header ID: {}", promotionId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion header thành công", responseDTO));
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse
+                .success("Cập nhật promotion header thành công", responseDTO));
     }
 
     /**
@@ -203,7 +207,8 @@ public class PromotionController {
         PromotionLineResponseDTO responseDTO = promotionService.updatePromotionLine(lineId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion line ID: {}", lineId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion line thành công", responseDTO));
+        return ResponseEntity.ok(
+                iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion line thành công", responseDTO));
     }
 
     /**
@@ -231,7 +236,8 @@ public class PromotionController {
         PromotionDetailResponseDTO responseDTO = promotionService.updatePromotionDetail(detailId, requestDTO);
 
         log.info("API: Đã cập nhật thành công promotion detail ID: {}", detailId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion detail thành công", responseDTO));
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse
+                .success("Cập nhật promotion detail thành công", responseDTO));
     }
 
     /**
@@ -265,7 +271,8 @@ public class PromotionController {
         PromotionHeaderResponseDTO responseDTO = promotionService.updatePromotion(promotionId, requestDTO);
 
         log.info("API: Đã cập nhật thành công chương trình khuyến mãi ID: {}", promotionId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật chương trình khuyến mãi thành công", responseDTO));
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse
+                .success("Cập nhật chương trình khuyến mãi thành công", responseDTO));
     }
 
     /**
@@ -291,7 +298,8 @@ public class PromotionController {
         promotionService.deletePromotion(promotionId);
 
         log.info("API: Đã xóa thành công chương trình khuyến mãi ID: {}", promotionId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa chương trình khuyến mãi thành công", null));
+        return ResponseEntity
+                .ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa chương trình khuyến mãi thành công", null));
     }
 
     /**
@@ -365,7 +373,8 @@ public class PromotionController {
         promotionService.deletePromotionLine(lineId);
 
         log.info("API: Đã xóa thành công promotion line ID: {}", lineId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa promotion line thành công", null));
+        return ResponseEntity
+                .ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa promotion line thành công", null));
     }
 
     /**
