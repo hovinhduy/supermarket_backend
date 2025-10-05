@@ -10,6 +10,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Entity đại diện cho từng line khuyến mãi thuộc một PromotionHeader
@@ -90,10 +91,10 @@ public class PromotionLine {
     private PromotionHeader header;
 
     /**
-     * Chi tiết cho line này (inverse side)
+     * Các chi tiết cho line này (một line có thể có nhiều detail)
      */
-    @OneToOne(mappedBy = "promotionLine", fetch = FetchType.LAZY)
-    private PromotionDetail detail;
+    @OneToMany(mappedBy = "promotionLine", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<PromotionDetail> details;
 
     /**
      * Thời gian tạo

@@ -2,7 +2,6 @@ package iuh.fit.supermarket.dto.promotion;
 
 import iuh.fit.supermarket.enums.PromotionStatus;
 import iuh.fit.supermarket.enums.PromotionType;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,8 +12,8 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
- * DTO cho request tạo mới promotion line
- * Có thể bao gồm detail hoặc không (detail là optional)
+ * DTO cho request tạo mới promotion line (không bao gồm detail)
+ * Detail phải được tạo riêng thông qua endpoint /lines/{lineId}/details
  */
 @Data
 @NoArgsConstructor
@@ -83,14 +82,6 @@ public class PromotionLineOnlyRequestDTO {
      */
     @Min(value = 1, message = "Giới hạn số lần sử dụng mỗi khách hàng phải là số dương")
     private Integer maxUsagePerCustomer;
-
-    /**
-     * Chi tiết khuyến mãi cho line này (OPTIONAL)
-     * Nếu cung cấp, detail sẽ được tạo cùng lúc với line
-     * Nếu không cung cấp, có thể tạo detail sau bằng API riêng
-     */
-    @Valid
-    private PromotionDetailRequestDTO detail;
 
     /**
      * Validation tùy chỉnh để kiểm tra ngày kết thúc phải sau ngày bắt đầu

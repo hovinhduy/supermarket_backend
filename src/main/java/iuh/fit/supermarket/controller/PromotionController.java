@@ -61,17 +61,17 @@ public class PromotionController {
     }
 
     /**
-     * Tạo mới promotion line (có thể bao gồm detail hoặc không)
+     * Tạo mới promotion line (không bao gồm detail)
+     * Detail phải được tạo riêng thông qua endpoint POST /lines/{lineId}/details
      * 
      * @param headerId   ID của promotion header (từ URL)
-     * @param requestDTO thông tin line cần tạo (có thể bao gồm detail)
+     * @param requestDTO thông tin line cần tạo (không bao gồm detail)
      * @return ResponseEntity chứa thông tin line đã tạo
      */
     @PostMapping("/headers/{headerId}/lines")
     @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
-    @Operation(summary = "Tạo promotion line mới", description = "Tạo promotion line cho một header đã tồn tại. " +
-            "Có thể bao gồm detail trong request (trường 'detail' là optional). " +
-            "Nếu không truyền detail, có thể thêm detail sau bằng API riêng.")
+    @Operation(summary = "Tạo promotion line mới", description = "Tạo promotion line cho một header đã tồn tại (không bao gồm detail). " +
+            "Sau khi tạo line, phải tạo detail riêng thông qua endpoint POST /lines/{lineId}/details.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Tạo promotion line thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
@@ -94,6 +94,7 @@ public class PromotionController {
 
     /**
      * Tạo mới promotion detail cho một line đã tồn tại
+     * Một line có thể có nhiều details
      * 
      * @param lineId     ID của promotion line (từ URL)
      * @param requestDTO thông tin detail cần tạo
@@ -101,10 +102,10 @@ public class PromotionController {
      */
     @PostMapping("/lines/{lineId}/details")
     @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
-    @Operation(summary = "Tạo promotion detail mới", description = "Tạo promotion detail cho một line đã tồn tại")
+    @Operation(summary = "Tạo promotion detail mới", description = "Tạo promotion detail cho một line đã tồn tại. Một line có thể có nhiều details.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "201", description = "Tạo promotion detail thành công"),
-            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc line đã có detail"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
             @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion line"),
             @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
     })
@@ -120,6 +121,37 @@ public class PromotionController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo promotion detail thành công",
                         responseDTO));
+    }
+    
+    /**
+     * Lấy danh sách tất cả promotion details của một line
+     * 
+     * @param lineId ID của promotion line
+     * @return ResponseEntity chứa danh sách details
+     */
+    @GetMapping("/lines/{lineId}/details")
+    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER, EmployeeRole.STAFF })
+    @Operation(summary = "Lấy danh sách promotion details của line", description = "Lấy tất cả promotion details thuộc một promotion line")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion line"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<List<PromotionDetailResponseDTO>>> getPromotionDetailsByLineId(
+            @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId) {
+
+        log.debug("API: Lấy danh sách promotion details cho line ID: {}", lineId);
+
+        // Lấy line với tất cả details
+        PromotionLineResponseDTO lineDTO = promotionService.getPromotionLineById(lineId);
+        
+        List<PromotionDetailResponseDTO> details = lineDTO.getDetails();
+        if (details == null) {
+            details = new java.util.ArrayList<>();
+        }
+
+        log.debug("API: Tìm thấy {} promotion details", details.size());
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(details));
     }
 
     /**
@@ -182,15 +214,17 @@ public class PromotionController {
     }
 
     /**
-     * Cập nhật promotion line (bao gồm cả detail nếu có)
+     * Cập nhật promotion line (không bao gồm detail)
+     * Detail phải được cập nhật riêng thông qua endpoint PUT /details/{detailId}
      * 
      * @param lineId     ID của promotion line cần cập nhật
-     * @param requestDTO thông tin cập nhật (bao gồm cả detail)
+     * @param requestDTO thông tin cập nhật (không bao gồm detail)
      * @return ResponseEntity chứa thông tin line đã cập nhật
      */
     @PutMapping("/lines/{lineId}")
     @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
-    @Operation(summary = "Cập nhật promotion line", description = "Cập nhật thông tin của promotion line và detail của nó")
+    @Operation(summary = "Cập nhật promotion line", description = "Cập nhật thông tin của promotion line (không bao gồm detail). " +
+            "Detail phải được cập nhật riêng thông qua endpoint PUT /details/{detailId}.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Cập nhật promotion line thành công"),
             @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
@@ -209,6 +243,30 @@ public class PromotionController {
         log.info("API: Đã cập nhật thành công promotion line ID: {}", lineId);
         return ResponseEntity.ok(
                 iuh.fit.supermarket.dto.common.ApiResponse.success("Cập nhật promotion line thành công", responseDTO));
+    }
+
+    /**
+     * Lấy thông tin chi tiết promotion detail theo ID
+     * 
+     * @param detailId ID của promotion detail
+     * @return ResponseEntity chứa thông tin detail
+     */
+    @GetMapping("/details/{detailId}")
+    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER, EmployeeRole.STAFF })
+    @Operation(summary = "Lấy thông tin promotion detail theo ID", description = "Lấy thông tin chi tiết của một promotion detail cụ thể")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Lấy thông tin thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion detail"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionDetailResponseDTO>> getPromotionDetailById(
+            @Parameter(description = "ID của promotion detail", required = true) @PathVariable Long detailId) {
+
+        log.debug("API: Lấy thông tin promotion detail ID: {}", detailId);
+
+        PromotionDetailResponseDTO responseDTO = promotionService.getPromotionDetailById(detailId);
+
+        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(responseDTO));
     }
 
     /**
@@ -238,6 +296,33 @@ public class PromotionController {
         log.info("API: Đã cập nhật thành công promotion detail ID: {}", detailId);
         return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse
                 .success("Cập nhật promotion detail thành công", responseDTO));
+    }
+    
+    /**
+     * Xóa một promotion detail cụ thể
+     * 
+     * @param detailId ID của promotion detail cần xóa
+     * @return ResponseEntity với ApiResponse
+     */
+    @DeleteMapping("/details/{detailId}")
+    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
+    @Operation(summary = "Xóa promotion detail", description = "Xóa một promotion detail cụ thể của line")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Xóa promotion detail thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy promotion detail"),
+            @ApiResponse(responseCode = "400", description = "Không thể xóa promotion detail này"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
+    })
+    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<Void>> deletePromotionDetail(
+            @Parameter(description = "ID của promotion detail", required = true) @PathVariable Long detailId) {
+
+        log.info("API: Xóa promotion detail ID: {}", detailId);
+
+        promotionService.deletePromotionDetail(detailId);
+
+        log.info("API: Đã xóa thành công promotion detail ID: {}", detailId);
+        return ResponseEntity
+                .ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa promotion detail thành công", null));
     }
 
     /**

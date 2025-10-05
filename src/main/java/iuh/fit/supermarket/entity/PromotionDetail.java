@@ -29,9 +29,9 @@ public class PromotionDetail {
     private Long detailId;
 
     /**
-     * Chương trình khuyến mãi mà chi tiết này thuộc về
+     * Promotion line mà chi tiết này thuộc về
      */
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "promotion_line_id", nullable = false)
     private PromotionLine promotionLine;
 

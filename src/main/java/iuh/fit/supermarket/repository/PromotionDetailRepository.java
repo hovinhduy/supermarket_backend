@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -16,15 +17,15 @@ import java.util.Optional;
 public interface PromotionDetailRepository extends JpaRepository<PromotionDetail, Long> {
 
     /**
-     * Tìm chi tiết khuyến mãi theo ID của promotion line
+     * Tìm tất cả chi tiết khuyến mãi theo ID của promotion line
      * 
      * @param promotionLineId ID của PromotionLine
-     * @return Optional chứa PromotionDetail nếu tìm thấy
+     * @return List chứa các PromotionDetail
      */
-    Optional<PromotionDetail> findByPromotionLine_PromotionLineId(Long promotionLineId);
+    List<PromotionDetail> findByPromotionLine_PromotionLineId(Long promotionLineId);
 
     /**
-     * Xóa chi tiết khuyến mãi theo ID của promotion line
+     * Xóa tất cả chi tiết khuyến mãi theo ID của promotion line
      * 
      * @param promotionLineId ID của PromotionLine
      */
@@ -37,4 +38,12 @@ public interface PromotionDetailRepository extends JpaRepository<PromotionDetail
      * @return true nếu đã có chi tiết
      */
     boolean existsByPromotionLine_PromotionLineId(Long promotionLineId);
+    
+    /**
+     * Đếm số lượng chi tiết của một promotion line
+     * 
+     * @param promotionLineId ID của PromotionLine
+     * @return số lượng chi tiết
+     */
+    long countByPromotionLine_PromotionLineId(Long promotionLineId);
 }

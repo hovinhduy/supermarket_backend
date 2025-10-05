@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * DTO cho response thông tin promotion line
@@ -82,9 +83,9 @@ public class PromotionLineResponseDTO {
     private LocalDateTime updatedAt;
 
     /**
-     * Chi tiết khuyến mãi cho line này
+     * Các chi tiết khuyến mãi cho line này (một line có thể có nhiều details)
      */
-    private PromotionDetailResponseDTO detail;
+    private List<PromotionDetailResponseDTO> details;
 
     /**
      * Tỷ lệ sử dụng hiện tại (computed field)

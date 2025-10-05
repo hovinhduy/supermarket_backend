@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -118,7 +119,12 @@ public class PromotionService {
             PromotionDetail detail = createPromotionDetailFromDTO(
                     createTempPromotionDetailFromDTO(requestDTO.getDetail()), line);
             detail = promotionDetailRepository.save(detail);
-            line.setDetail(detail);
+            
+            // Khởi tạo list nếu chưa có
+            if (line.getDetails() == null) {
+                line.setDetails(new ArrayList<>());
+            }
+            line.getDetails().add(detail);
         }
 
         log.info("Đã tạo thành công promotion line ID: {}", line.getPromotionLineId());
@@ -126,10 +132,11 @@ public class PromotionService {
     }
 
     /**
-     * Tạo mới promotion line (có thể bao gồm detail hoặc không)
+     * Tạo mới promotion line (không bao gồm detail)
+     * Detail phải được tạo riêng thông qua endpoint POST /lines/{lineId}/details
      * 
      * @param headerId   ID của header (từ URL path)
-     * @param requestDTO thông tin line cần tạo (có thể có hoặc không có detail)
+     * @param requestDTO thông tin line cần tạo (không bao gồm detail)
      * @return PromotionLineResponseDTO chứa thông tin line đã tạo
      * @throws PromotionNotFoundException   nếu không tìm thấy header
      * @throws PromotionValidationException nếu dữ liệu không hợp lệ
@@ -145,11 +152,6 @@ public class PromotionService {
 
         // Validation cơ bản
         validatePromotionLineOnlyRequest(requestDTO);
-
-        // Nếu có detail, validate detail theo loại khuyến mãi
-        if (requestDTO.getDetail() != null) {
-            validatePromotionDetailRequest(requestDTO.getDetail(), requestDTO.getPromotionType());
-        }
 
         // Kiểm tra trùng mã
         if (promotionLineRepository.existsByPromotionCodeIgnoreCase(requestDTO.getPromotionCode())) {
@@ -171,23 +173,14 @@ public class PromotionService {
 
         line = promotionLineRepository.save(line);
 
-        // Nếu có detail, tạo detail luôn
-        if (requestDTO.getDetail() != null) {
-            log.info("Tạo detail cho promotion line ID: {}", line.getPromotionLineId());
-            PromotionDetail tempDetail = createTempPromotionDetailFromDTO(requestDTO.getDetail());
-            PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
-            detail = promotionDetailRepository.save(detail);
-            line.setDetail(detail);
-        }
-
-        log.info("Đã tạo thành công promotion line ID: {} {}",
-                line.getPromotionLineId(),
-                requestDTO.getDetail() != null ? "(bao gồm detail)" : "(không có detail)");
+        log.info("Đã tạo thành công promotion line ID: {} (không có detail - detail phải được tạo riêng)",
+                line.getPromotionLineId());
         return convertToLineResponseDTO(line);
     }
 
     /**
      * Tạo mới promotion detail cho một line đã tồn tại
+     * Một line có thể có nhiều details
      * 
      * @param lineId     ID của line (từ URL path)
      * @param requestDTO thông tin detail cần tạo
@@ -204,12 +197,6 @@ public class PromotionService {
                 .orElseThrow(() -> new PromotionNotFoundException(
                         "Không tìm thấy promotion line với ID: " + lineId));
 
-        // Kiểm tra line đã có detail chưa
-        if (line.getDetail() != null) {
-            throw new PromotionValidationException(
-                    "Promotion line này đã có detail. Vui lòng cập nhật thay vì tạo mới.");
-        }
-
         // Validation theo loại khuyến mãi
         validatePromotionDetailRequest(requestDTO, line.getPromotionType());
 
@@ -218,7 +205,12 @@ public class PromotionService {
         PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
 
         detail = promotionDetailRepository.save(detail);
-        line.setDetail(detail);
+        
+        // Khởi tạo list nếu chưa có và thêm detail mới
+        if (line.getDetails() == null) {
+            line.setDetails(new ArrayList<>());
+        }
+        line.getDetails().add(detail);
         promotionLineRepository.save(line);
 
         log.info("Đã tạo thành công promotion detail ID: {}", detail.getDetailId());
@@ -261,9 +253,16 @@ public class PromotionService {
             line = promotionLineRepository.save(line);
 
             // Tạo và lưu detail cho mỗi line
-            PromotionDetail detail = createPromotionDetailFromDTO(line.getDetail(), line);
-            detail = promotionDetailRepository.save(detail);
-            line.setDetail(detail);
+            // line.getDetails() chứa các temp details từ createPromotionLinesFromDTO
+            if (line.getDetails() != null && !line.getDetails().isEmpty()) {
+                List<PromotionDetail> savedDetails = new ArrayList<>();
+                for (PromotionDetail tempDetail : line.getDetails()) {
+                    PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
+                    detail = promotionDetailRepository.save(detail);
+                    savedDetails.add(detail);
+                }
+                line.setDetails(savedDetails);
+            }
         }
 
         header.setPromotionLines(lines);
@@ -317,9 +316,16 @@ public class PromotionService {
         for (PromotionLine line : newLines) {
             line = promotionLineRepository.save(line);
 
-            PromotionDetail detail = createPromotionDetailFromDTO(line.getDetail(), line);
-            detail = promotionDetailRepository.save(detail);
-            line.setDetail(detail);
+            // line.getDetails() chứa các temp details từ createPromotionLinesFromDTO
+            if (line.getDetails() != null && !line.getDetails().isEmpty()) {
+                List<PromotionDetail> savedDetails = new ArrayList<>();
+                for (PromotionDetail tempDetail : line.getDetails()) {
+                    PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
+                    detail = promotionDetailRepository.save(detail);
+                    savedDetails.add(detail);
+                }
+                line.setDetails(savedDetails);
+            }
         }
 
         existingHeader.setPromotionLines(newLines);
@@ -392,7 +398,25 @@ public class PromotionService {
     }
 
     /**
-     * Xóa promotion line và detail của nó
+     * Lấy thông tin chi tiết promotion detail theo ID
+     * 
+     * @param detailId ID của promotion detail
+     * @return PromotionDetailResponseDTO chứa thông tin chi tiết
+     * @throws PromotionNotFoundException nếu không tìm thấy promotion detail
+     */
+    @Transactional(readOnly = true)
+    public PromotionDetailResponseDTO getPromotionDetailById(Long detailId) {
+        log.debug("Lấy thông tin promotion detail ID: {}", detailId);
+
+        PromotionDetail detail = promotionDetailRepository.findById(detailId)
+                .orElseThrow(() -> new PromotionNotFoundException(
+                        "Không tìm thấy promotion detail với ID: " + detailId));
+
+        return convertToDetailResponseDTO(detail);
+    }
+
+    /**
+     * Xóa promotion line và tất cả details của nó
      * 
      * @param lineId ID của promotion line cần xóa
      * @throws PromotionNotFoundException   nếu không tìm thấy promotion line
@@ -410,16 +434,44 @@ public class PromotionService {
         // Kiểm tra xem có thể xóa không (dựa vào header và trạng thái line)
         validatePromotionLineCanBeDeleted(line);
 
-        // Xóa detail trước nếu có
-        if (line.getDetail() != null) {
-            log.info("Xóa promotion detail ID: {}", line.getDetail().getDetailId());
-            promotionDetailRepository.delete(line.getDetail());
+        // Xóa tất cả details trước nếu có
+        if (line.getDetails() != null && !line.getDetails().isEmpty()) {
+            log.info("Xóa {} promotion details của line ID: {}", line.getDetails().size(), lineId);
+            promotionDetailRepository.deleteAll(line.getDetails());
         }
 
         // Xóa line
         promotionLineRepository.delete(line);
 
         log.info("Đã xóa thành công promotion line ID: {}", lineId);
+    }
+    
+    /**
+     * Xóa một promotion detail cụ thể
+     * 
+     * @param detailId ID của promotion detail cần xóa
+     * @throws PromotionNotFoundException   nếu không tìm thấy promotion detail
+     * @throws PromotionValidationException nếu promotion detail không thể xóa
+     */
+    @Transactional
+    public void deletePromotionDetail(Long detailId) {
+        log.info("Bắt đầu xóa promotion detail ID: {}", detailId);
+
+        // Tìm promotion detail
+        PromotionDetail detail = promotionDetailRepository.findById(detailId)
+                .orElseThrow(() -> new PromotionNotFoundException(
+                        "Không tìm thấy promotion detail với ID: " + detailId));
+
+        // Lấy promotion line để kiểm tra
+        PromotionLine line = detail.getPromotionLine();
+        
+        // Kiểm tra xem có thể xóa không (dựa vào header và trạng thái line)
+        validatePromotionCanBeUpdated(line.getHeader());
+
+        // Xóa detail
+        promotionDetailRepository.delete(detail);
+
+        log.info("Đã xóa thành công promotion detail ID: {}", detailId);
     }
 
     /**
@@ -839,9 +891,14 @@ public class PromotionService {
             line.setCurrentUsageCount(0); // Mặc định là 0 khi tạo mới
             line.setHeader(header);
 
-            // Tạo detail tạm thời để lưu thông tin
-            PromotionDetail tempDetail = createTempPromotionDetailFromDTO(lineDTO.getDetail());
-            line.setDetail(tempDetail);
+            // Tạo list detail tạm thời để lưu thông tin
+            // Hiện tại mỗi lineDTO chỉ có 1 detail, nhưng lưu trong list để tương thích
+            if (lineDTO.getDetail() != null) {
+                List<PromotionDetail> tempDetails = new ArrayList<>();
+                PromotionDetail tempDetail = createTempPromotionDetailFromDTO(lineDTO.getDetail());
+                tempDetails.add(tempDetail);
+                line.setDetails(tempDetails);
+            }
 
             return line;
         }).collect(Collectors.toList());
@@ -985,9 +1042,9 @@ public class PromotionService {
         List<PromotionLine> existingLines = promotionLineRepository.findByPromotionHeaderId(promotionId);
 
         for (PromotionLine line : existingLines) {
-            // Xóa detail trước
-            if (line.getDetail() != null) {
-                promotionDetailRepository.delete(line.getDetail());
+            // Xóa tất cả details của line trước
+            if (line.getDetails() != null && !line.getDetails().isEmpty()) {
+                promotionDetailRepository.deleteAll(line.getDetails());
             }
         }
 
@@ -1046,9 +1103,12 @@ public class PromotionService {
         responseDTO.setCreatedAt(line.getCreatedAt());
         responseDTO.setUpdatedAt(line.getUpdatedAt());
 
-        // Chuyển đổi detail nếu có
-        if (line.getDetail() != null) {
-            responseDTO.setDetail(convertToDetailResponseDTO(line.getDetail()));
+        // Chuyển đổi tất cả details nếu có
+        if (line.getDetails() != null && !line.getDetails().isEmpty()) {
+            List<PromotionDetailResponseDTO> detailResponseDTOs = line.getDetails().stream()
+                    .map(this::convertToDetailResponseDTO)
+                    .collect(Collectors.toList());
+            responseDTO.setDetails(detailResponseDTOs);
         }
 
         // Tính toán các trường computed
@@ -1188,10 +1248,11 @@ public class PromotionService {
     }
 
     /**
-     * Cập nhật promotion line (bao gồm cả detail nếu có)
+     * Cập nhật promotion line (không bao gồm detail)
+     * Detail phải được cập nhật riêng thông qua endpoint PUT /details/{detailId}
      * 
      * @param lineId     ID của promotion line cần cập nhật
-     * @param requestDTO thông tin cập nhật (có thể bao gồm detail)
+     * @param requestDTO thông tin cập nhật (không bao gồm detail)
      * @return PromotionLineResponseDTO chứa thông tin đã cập nhật
      * @throws PromotionNotFoundException   nếu không tìm thấy promotion line
      * @throws PromotionValidationException nếu dữ liệu không hợp lệ
@@ -1208,11 +1269,6 @@ public class PromotionService {
         // Validation cơ bản
         validatePromotionLineOnlyRequest(requestDTO);
 
-        // Nếu có detail trong request, validate detail theo loại khuyến mãi
-        if (requestDTO.getDetail() != null) {
-            validatePromotionDetailRequest(requestDTO.getDetail(), requestDTO.getPromotionType());
-        }
-
         // Kiểm tra trùng mã (trừ line hiện tại)
         if (promotionLineRepository.existsByPromotionCodeIgnoreCaseAndPromotionLineIdNot(
                 requestDTO.getPromotionCode(), lineId)) {
@@ -1222,7 +1278,7 @@ public class PromotionService {
         // Kiểm tra xem có thể cập nhật không (dựa vào header)
         validatePromotionCanBeUpdated(existingLine.getHeader());
 
-        // Cập nhật thông tin line
+        // Cập nhật thông tin line (không động chạm đến details)
         existingLine.setPromotionCode(requestDTO.getPromotionCode());
         existingLine.setPromotionType(requestDTO.getPromotionType());
         existingLine.setDescription(requestDTO.getDescription());
@@ -1234,25 +1290,7 @@ public class PromotionService {
 
         existingLine = promotionLineRepository.save(existingLine);
 
-        // Cập nhật hoặc tạo detail nếu có trong request
-        if (requestDTO.getDetail() != null) {
-            if (existingLine.getDetail() != null) {
-                // Cập nhật detail hiện có
-                log.info("Cập nhật detail cho promotion line ID: {}", lineId);
-                updateDetailFromDTO(existingLine.getDetail(), requestDTO.getDetail(),
-                        requestDTO.getPromotionType());
-                promotionDetailRepository.save(existingLine.getDetail());
-            } else {
-                // Tạo detail mới
-                log.info("Tạo detail mới cho promotion line ID: {}", lineId);
-                PromotionDetail tempDetail = createTempPromotionDetailFromDTO(requestDTO.getDetail());
-                PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, existingLine);
-                detail = promotionDetailRepository.save(detail);
-                existingLine.setDetail(detail);
-            }
-        }
-
-        log.info("Đã cập nhật thành công promotion line ID: {}", lineId);
+        log.info("Đã cập nhật thành công promotion line ID: {} (không cập nhật details)", lineId);
         return convertToLineResponseDTO(existingLine);
     }
 
