@@ -4,6 +4,7 @@ import iuh.fit.supermarket.dto.promotion.*;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.*;
 import iuh.fit.supermarket.exception.*;
+import iuh.fit.supermarket.factory.PromotionDetailFactory;
 import iuh.fit.supermarket.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ public class PromotionService {
     private final PromotionDetailRepository promotionDetailRepository;
     private final ProductUnitRepository productUnitRepository;
     private final CategoryRepository categoryRepository;
+    private final PromotionDetailFactory promotionDetailFactory;
 
     /**
      * Tạo mới chỉ promotion header (không bao gồm lines)
@@ -116,8 +118,7 @@ public class PromotionService {
 
         // Tạo detail nếu có
         if (requestDTO.getDetail() != null) {
-            PromotionDetail detail = createPromotionDetailFromDTO(
-                    createTempPromotionDetailFromDTO(requestDTO.getDetail()), line);
+            PromotionDetail detail = createPromotionDetailFromDTO(requestDTO.getDetail(), line);
             detail = promotionDetailRepository.save(detail);
             
             // Khởi tạo list nếu chưa có
@@ -201,9 +202,7 @@ public class PromotionService {
         validatePromotionDetailRequest(requestDTO, line.getPromotionType());
 
         // Tạo detail
-        PromotionDetail tempDetail = createTempPromotionDetailFromDTO(requestDTO);
-        PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
-
+        PromotionDetail detail = createPromotionDetailFromDTO(requestDTO, line);
         detail = promotionDetailRepository.save(detail);
         
         // Khởi tạo list nếu chưa có và thêm detail mới
@@ -246,23 +245,22 @@ public class PromotionService {
         header = promotionHeaderRepository.save(header);
 
         // Tạo các PromotionLines và PromotionDetails
-        List<PromotionLine> lines = createPromotionLinesFromDTO(requestDTO.getPromotionLines(), header);
-
-        // Lưu tất cả lines và details
-        for (PromotionLine line : lines) {
+        List<PromotionLine> lines = new ArrayList<>();
+        
+        for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
+            // Tạo và lưu PromotionLine
+            PromotionLine line = createPromotionLineFromDTO(lineDTO, header);
             line = promotionLineRepository.save(line);
 
-            // Tạo và lưu detail cho mỗi line
-            // line.getDetails() chứa các temp details từ createPromotionLinesFromDTO
-            if (line.getDetails() != null && !line.getDetails().isEmpty()) {
-                List<PromotionDetail> savedDetails = new ArrayList<>();
-                for (PromotionDetail tempDetail : line.getDetails()) {
-                    PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
-                    detail = promotionDetailRepository.save(detail);
-                    savedDetails.add(detail);
-                }
-                line.setDetails(savedDetails);
+            // Tạo và lưu detail cho line nếu có
+            if (lineDTO.getDetail() != null) {
+                PromotionDetail detail = createPromotionDetailFromDTO(lineDTO.getDetail(), line);
+                detail = promotionDetailRepository.save(detail);
+                
+                line.setDetails(List.of(detail));
             }
+            
+            lines.add(line);
         }
 
         header.setPromotionLines(lines);
@@ -311,21 +309,22 @@ public class PromotionService {
         existingHeader = promotionHeaderRepository.save(existingHeader);
 
         // Tạo lại các lines và details mới
-        List<PromotionLine> newLines = createPromotionLinesFromDTO(requestDTO.getPromotionLines(), existingHeader);
-
-        for (PromotionLine line : newLines) {
+        List<PromotionLine> newLines = new ArrayList<>();
+        
+        for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
+            // Tạo và lưu PromotionLine
+            PromotionLine line = createPromotionLineFromDTO(lineDTO, existingHeader);
             line = promotionLineRepository.save(line);
 
-            // line.getDetails() chứa các temp details từ createPromotionLinesFromDTO
-            if (line.getDetails() != null && !line.getDetails().isEmpty()) {
-                List<PromotionDetail> savedDetails = new ArrayList<>();
-                for (PromotionDetail tempDetail : line.getDetails()) {
-                    PromotionDetail detail = createPromotionDetailFromDTO(tempDetail, line);
-                    detail = promotionDetailRepository.save(detail);
-                    savedDetails.add(detail);
-                }
-                line.setDetails(savedDetails);
+            // Tạo và lưu detail cho line nếu có
+            if (lineDTO.getDetail() != null) {
+                PromotionDetail detail = createPromotionDetailFromDTO(lineDTO.getDetail(), line);
+                detail = promotionDetailRepository.save(detail);
+                
+                line.setDetails(List.of(detail));
             }
+            
+            newLines.add(line);
         }
 
         existingHeader.setPromotionLines(newLines);
@@ -874,165 +873,30 @@ public class PromotionService {
     }
 
     /**
-     * Tạo danh sách PromotionLine từ DTO
+     * Tạo PromotionLine từ DTO (không bao gồm details)
      */
-    private List<PromotionLine> createPromotionLinesFromDTO(List<PromotionLineRequestDTO> lineDTOs,
-            PromotionHeader header) {
-        return lineDTOs.stream().map(lineDTO -> {
-            PromotionLine line = new PromotionLine();
-            line.setPromotionCode(lineDTO.getPromotionCode());
-            line.setPromotionType(lineDTO.getPromotionType());
-            line.setDescription(lineDTO.getDescription());
-            line.setStartDate(lineDTO.getStartDate());
-            line.setEndDate(lineDTO.getEndDate());
-            line.setStatus(lineDTO.getStatus());
-            line.setMaxUsageTotal(lineDTO.getMaxUsageTotal());
-            line.setMaxUsagePerCustomer(lineDTO.getMaxUsagePerCustomer());
-            line.setCurrentUsageCount(0); // Mặc định là 0 khi tạo mới
-            line.setHeader(header);
-
-            // Tạo list detail tạm thời để lưu thông tin
-            // Hiện tại mỗi lineDTO chỉ có 1 detail, nhưng lưu trong list để tương thích
-            if (lineDTO.getDetail() != null) {
-                List<PromotionDetail> tempDetails = new ArrayList<>();
-                PromotionDetail tempDetail = createTempPromotionDetailFromDTO(lineDTO.getDetail());
-                tempDetails.add(tempDetail);
-                line.setDetails(tempDetails);
-            }
-
-            return line;
-        }).collect(Collectors.toList());
+    private PromotionLine createPromotionLineFromDTO(PromotionLineRequestDTO lineDTO, PromotionHeader header) {
+        PromotionLine line = new PromotionLine();
+        line.setPromotionCode(lineDTO.getPromotionCode());
+        line.setPromotionType(lineDTO.getPromotionType());
+        line.setDescription(lineDTO.getDescription());
+        line.setStartDate(lineDTO.getStartDate());
+        line.setEndDate(lineDTO.getEndDate());
+        line.setStatus(lineDTO.getStatus());
+        line.setMaxUsageTotal(lineDTO.getMaxUsageTotal());
+        line.setMaxUsagePerCustomer(lineDTO.getMaxUsagePerCustomer());
+        line.setCurrentUsageCount(0);
+        line.setHeader(header);
+        return line;
     }
 
     /**
-     * Tạo PromotionDetail tạm thời từ DTO (chưa lưu vào DB)
+     * Tạo PromotionDetail từ DTO sử dụng Factory Pattern
      */
-    private PromotionDetail createTempPromotionDetailFromDTO(PromotionDetailRequestDTO detailDTO) {
-        PromotionDetail detail = new PromotionDetail();
-
-        // Thiết lập thông tin chung
-        setBuyProductAndCategory(detail, detailDTO);
-        setGiftProductInfo(detail, detailDTO);
-        setOrderDiscountInfo(detail, detailDTO);
-        setProductDiscountInfo(detail, detailDTO);
-
-        return detail;
-    }
-
-    /**
-     * Tạo PromotionDetail thực tế từ DTO và lưu vào DB
-     */
-    private PromotionDetail createPromotionDetailFromDTO(PromotionDetail tempDetail, PromotionLine line) {
-        PromotionDetail detail = new PromotionDetail();
-
-        // Copy thông tin từ temp detail
-        copyPromotionDetailInfo(tempDetail, detail);
-
-        // Thiết lập quan hệ với line
+    private PromotionDetail createPromotionDetailFromDTO(PromotionDetailRequestDTO detailDTO, PromotionLine line) {
+        PromotionDetail detail = promotionDetailFactory.createDetail(line.getPromotionType(), detailDTO);
         detail.setPromotionLine(line);
-
         return detail;
-    }
-
-    /**
-     * Thiết lập thông tin sản phẩm mua và danh mục
-     */
-    private void setBuyProductAndCategory(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        if (detailDTO.getBuyProductId() != null) {
-            ProductUnit buyProduct = productUnitRepository.findById(detailDTO.getBuyProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm phải mua không tồn tại"));
-            detail.setBuyProduct(buyProduct);
-        }
-
-        if (detailDTO.getBuyCategoryId() != null) {
-            Category buyCategory = categoryRepository.findById(detailDTO.getBuyCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục phải mua không tồn tại"));
-            detail.setBuyCategory(buyCategory);
-        }
-
-        detail.setBuyMinQuantity(detailDTO.getBuyMinQuantity());
-        detail.setBuyMinValue(detailDTO.getBuyMinValue());
-    }
-
-    /**
-     * Thiết lập thông tin sản phẩm tặng
-     */
-    private void setGiftProductInfo(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        if (detailDTO.getGiftProductId() != null) {
-            ProductUnit giftProduct = productUnitRepository.findById(detailDTO.getGiftProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm tặng không tồn tại"));
-            detail.setGiftProduct(giftProduct);
-        }
-
-        detail.setGiftDiscountType(detailDTO.getGiftDiscountType());
-        detail.setGiftDiscountValue(detailDTO.getGiftDiscountValue());
-        detail.setGiftMaxQuantity(detailDTO.getGiftMaxQuantity());
-    }
-
-    /**
-     * Thiết lập thông tin giảm giá đơn hàng
-     */
-    private void setOrderDiscountInfo(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        detail.setOrderDiscountType(detailDTO.getOrderDiscountType());
-        detail.setOrderDiscountValue(detailDTO.getOrderDiscountValue());
-        detail.setOrderDiscountMaxValue(detailDTO.getOrderDiscountMaxValue());
-        detail.setOrderMinTotalValue(detailDTO.getOrderMinTotalValue());
-        detail.setOrderMinTotalQuantity(detailDTO.getOrderMinTotalQuantity());
-    }
-
-    /**
-     * Thiết lập thông tin giảm giá sản phẩm
-     */
-    private void setProductDiscountInfo(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        detail.setProductDiscountType(detailDTO.getProductDiscountType());
-        detail.setProductDiscountValue(detailDTO.getProductDiscountValue());
-        detail.setApplyToType(detailDTO.getApplyToType());
-
-        if (detailDTO.getApplyToProductId() != null) {
-            ProductUnit applyToProduct = productUnitRepository.findById(detailDTO.getApplyToProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm áp dụng không tồn tại"));
-            detail.setApplyToProduct(applyToProduct);
-        }
-
-        if (detailDTO.getApplyToCategoryId() != null) {
-            Category applyToCategory = categoryRepository.findById(detailDTO.getApplyToCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục áp dụng không tồn tại"));
-            detail.setApplyToCategory(applyToCategory);
-        }
-
-        detail.setProductMinOrderValue(detailDTO.getProductMinOrderValue());
-        detail.setProductMinPromotionValue(detailDTO.getProductMinPromotionValue());
-        detail.setProductMinPromotionQuantity(detailDTO.getProductMinPromotionQuantity());
-    }
-
-    /**
-     * Copy thông tin từ temp detail sang detail thực tế
-     */
-    private void copyPromotionDetailInfo(PromotionDetail source, PromotionDetail target) {
-        target.setBuyProduct(source.getBuyProduct());
-        target.setBuyCategory(source.getBuyCategory());
-        target.setBuyMinQuantity(source.getBuyMinQuantity());
-        target.setBuyMinValue(source.getBuyMinValue());
-
-        target.setGiftProduct(source.getGiftProduct());
-        target.setGiftDiscountType(source.getGiftDiscountType());
-        target.setGiftDiscountValue(source.getGiftDiscountValue());
-        target.setGiftMaxQuantity(source.getGiftMaxQuantity());
-
-        target.setOrderDiscountType(source.getOrderDiscountType());
-        target.setOrderDiscountValue(source.getOrderDiscountValue());
-        target.setOrderDiscountMaxValue(source.getOrderDiscountMaxValue());
-        target.setOrderMinTotalValue(source.getOrderMinTotalValue());
-        target.setOrderMinTotalQuantity(source.getOrderMinTotalQuantity());
-
-        target.setProductDiscountType(source.getProductDiscountType());
-        target.setProductDiscountValue(source.getProductDiscountValue());
-        target.setApplyToType(source.getApplyToType());
-        target.setApplyToProduct(source.getApplyToProduct());
-        target.setApplyToCategory(source.getApplyToCategory());
-        target.setProductMinOrderValue(source.getProductMinOrderValue());
-        target.setProductMinPromotionValue(source.getProductMinPromotionValue());
-        target.setProductMinPromotionQuantity(source.getProductMinPromotionQuantity());
     }
 
     /**
@@ -1122,49 +986,49 @@ public class PromotionService {
      */
     private PromotionDetailResponseDTO convertToDetailResponseDTO(PromotionDetail detail) {
         PromotionDetailResponseDTO responseDTO = new PromotionDetailResponseDTO();
-
-        // Thiết lập ID
         responseDTO.setDetailId(detail.getDetailId());
 
-        // Thiết lập thông tin BUY_X_GET_Y
-        if (detail.getBuyProduct() != null) {
-            responseDTO.setBuyProduct(convertToProductUnitInfo(detail.getBuyProduct()));
-        }
-        if (detail.getBuyCategory() != null) {
-            responseDTO.setBuyCategory(convertToCategoryInfo(detail.getBuyCategory()));
-        }
-        responseDTO.setBuyMinQuantity(detail.getBuyMinQuantity());
-        responseDTO.setBuyMinValue(detail.getBuyMinValue());
+        if (detail instanceof BuyXGetYDetail buyXGetY) {
+            // Thiết lập thông tin BUY_X_GET_Y
+            if (buyXGetY.getBuyProduct() != null) {
+                responseDTO.setBuyProduct(convertToProductUnitInfo(buyXGetY.getBuyProduct()));
+            }
+            if (buyXGetY.getBuyCategory() != null) {
+                responseDTO.setBuyCategory(convertToCategoryInfo(buyXGetY.getBuyCategory()));
+            }
+            responseDTO.setBuyMinQuantity(buyXGetY.getBuyMinQuantity());
+            responseDTO.setBuyMinValue(buyXGetY.getBuyMinValue());
 
-        if (detail.getGiftProduct() != null) {
-            responseDTO.setGiftProduct(convertToProductUnitInfo(detail.getGiftProduct()));
+            if (buyXGetY.getGiftProduct() != null) {
+                responseDTO.setGiftProduct(convertToProductUnitInfo(buyXGetY.getGiftProduct()));
+            }
+            responseDTO.setGiftDiscountType(buyXGetY.getGiftDiscountType());
+            responseDTO.setGiftDiscountValue(buyXGetY.getGiftDiscountValue());
+            responseDTO.setGiftMaxQuantity(buyXGetY.getGiftMaxQuantity());
+        } else if (detail instanceof OrderDiscountDetail orderDiscount) {
+            // Thiết lập thông tin ORDER_DISCOUNT
+            responseDTO.setOrderDiscountType(orderDiscount.getOrderDiscountType());
+            responseDTO.setOrderDiscountValue(orderDiscount.getOrderDiscountValue());
+            responseDTO.setOrderDiscountMaxValue(orderDiscount.getOrderDiscountMaxValue());
+            responseDTO.setOrderMinTotalValue(orderDiscount.getOrderMinTotalValue());
+            responseDTO.setOrderMinTotalQuantity(orderDiscount.getOrderMinTotalQuantity());
+        } else if (detail instanceof ProductDiscountDetail productDiscount) {
+            // Thiết lập thông tin PRODUCT_DISCOUNT
+            responseDTO.setProductDiscountType(productDiscount.getProductDiscountType());
+            responseDTO.setProductDiscountValue(productDiscount.getProductDiscountValue());
+            responseDTO.setApplyToType(productDiscount.getApplyToType());
+
+            if (productDiscount.getApplyToProduct() != null) {
+                responseDTO.setApplyToProduct(convertToProductUnitInfo(productDiscount.getApplyToProduct()));
+            }
+            if (productDiscount.getApplyToCategory() != null) {
+                responseDTO.setApplyToCategory(convertToCategoryInfo(productDiscount.getApplyToCategory()));
+            }
+
+            responseDTO.setProductMinOrderValue(productDiscount.getProductMinOrderValue());
+            responseDTO.setProductMinPromotionValue(productDiscount.getProductMinPromotionValue());
+            responseDTO.setProductMinPromotionQuantity(productDiscount.getProductMinPromotionQuantity());
         }
-        responseDTO.setGiftDiscountType(detail.getGiftDiscountType());
-        responseDTO.setGiftDiscountValue(detail.getGiftDiscountValue());
-        responseDTO.setGiftMaxQuantity(detail.getGiftMaxQuantity());
-
-        // Thiết lập thông tin ORDER_DISCOUNT
-        responseDTO.setOrderDiscountType(detail.getOrderDiscountType());
-        responseDTO.setOrderDiscountValue(detail.getOrderDiscountValue());
-        responseDTO.setOrderDiscountMaxValue(detail.getOrderDiscountMaxValue());
-        responseDTO.setOrderMinTotalValue(detail.getOrderMinTotalValue());
-        responseDTO.setOrderMinTotalQuantity(detail.getOrderMinTotalQuantity());
-
-        // Thiết lập thông tin PRODUCT_DISCOUNT
-        responseDTO.setProductDiscountType(detail.getProductDiscountType());
-        responseDTO.setProductDiscountValue(detail.getProductDiscountValue());
-        responseDTO.setApplyToType(detail.getApplyToType());
-
-        if (detail.getApplyToProduct() != null) {
-            responseDTO.setApplyToProduct(convertToProductUnitInfo(detail.getApplyToProduct()));
-        }
-        if (detail.getApplyToCategory() != null) {
-            responseDTO.setApplyToCategory(convertToCategoryInfo(detail.getApplyToCategory()));
-        }
-
-        responseDTO.setProductMinOrderValue(detail.getProductMinOrderValue());
-        responseDTO.setProductMinPromotionValue(detail.getProductMinPromotionValue());
-        responseDTO.setProductMinPromotionQuantity(detail.getProductMinPromotionQuantity());
 
         return responseDTO;
     }
@@ -1339,121 +1203,8 @@ public class PromotionService {
      */
     private void updateDetailFromDTO(PromotionDetail detail, PromotionDetailRequestDTO detailDTO,
             PromotionType promotionType) {
-
-        // Clear tất cả thông tin cũ
-        clearDetailInfo(detail);
-
-        // Cập nhật thông tin mới dựa trên loại khuyến mãi
-        switch (promotionType) {
-            case BUY_X_GET_Y:
-                updateBuyXGetYDetail(detail, detailDTO);
-                break;
-            case ORDER_DISCOUNT:
-                updateOrderDiscountDetail(detail, detailDTO);
-                break;
-            case PRODUCT_DISCOUNT:
-                updateProductDiscountDetail(detail, detailDTO);
-                break;
-            default:
-                throw new PromotionValidationException("Loại khuyến mãi không hợp lệ: " + promotionType);
-        }
+        promotionDetailFactory.updateDetail(detail, detailDTO);
     }
 
-    /**
-     * Clear tất cả thông tin trong detail
-     */
-    private void clearDetailInfo(PromotionDetail detail) {
-        // Clear BUY_X_GET_Y info
-        detail.setBuyProduct(null);
-        detail.setBuyCategory(null);
-        detail.setBuyMinQuantity(null);
-        detail.setBuyMinValue(null);
-        detail.setGiftProduct(null);
-        detail.setGiftDiscountType(null);
-        detail.setGiftDiscountValue(null);
-        detail.setGiftMaxQuantity(null);
 
-        // Clear ORDER_DISCOUNT info
-        detail.setOrderDiscountType(null);
-        detail.setOrderDiscountValue(null);
-        detail.setOrderDiscountMaxValue(null);
-        detail.setOrderMinTotalValue(null);
-        detail.setOrderMinTotalQuantity(null);
-
-        // Clear PRODUCT_DISCOUNT info
-        detail.setProductDiscountType(null);
-        detail.setProductDiscountValue(null);
-        detail.setApplyToType(null);
-        detail.setApplyToProduct(null);
-        detail.setApplyToCategory(null);
-        detail.setProductMinOrderValue(null);
-        detail.setProductMinPromotionValue(null);
-        detail.setProductMinPromotionQuantity(null);
-    }
-
-    /**
-     * Cập nhật detail cho loại BUY_X_GET_Y
-     */
-    private void updateBuyXGetYDetail(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        if (detailDTO.getBuyProductId() != null) {
-            ProductUnit buyProduct = productUnitRepository.findById(detailDTO.getBuyProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm phải mua không tồn tại"));
-            detail.setBuyProduct(buyProduct);
-        }
-
-        if (detailDTO.getBuyCategoryId() != null) {
-            Category buyCategory = categoryRepository.findById(detailDTO.getBuyCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục phải mua không tồn tại"));
-            detail.setBuyCategory(buyCategory);
-        }
-
-        detail.setBuyMinQuantity(detailDTO.getBuyMinQuantity());
-        detail.setBuyMinValue(detailDTO.getBuyMinValue());
-
-        if (detailDTO.getGiftProductId() != null) {
-            ProductUnit giftProduct = productUnitRepository.findById(detailDTO.getGiftProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm tặng không tồn tại"));
-            detail.setGiftProduct(giftProduct);
-        }
-
-        detail.setGiftDiscountType(detailDTO.getGiftDiscountType());
-        detail.setGiftDiscountValue(detailDTO.getGiftDiscountValue());
-        detail.setGiftMaxQuantity(detailDTO.getGiftMaxQuantity());
-    }
-
-    /**
-     * Cập nhật detail cho loại ORDER_DISCOUNT
-     */
-    private void updateOrderDiscountDetail(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        detail.setOrderDiscountType(detailDTO.getOrderDiscountType());
-        detail.setOrderDiscountValue(detailDTO.getOrderDiscountValue());
-        detail.setOrderDiscountMaxValue(detailDTO.getOrderDiscountMaxValue());
-        detail.setOrderMinTotalValue(detailDTO.getOrderMinTotalValue());
-        detail.setOrderMinTotalQuantity(detailDTO.getOrderMinTotalQuantity());
-    }
-
-    /**
-     * Cập nhật detail cho loại PRODUCT_DISCOUNT
-     */
-    private void updateProductDiscountDetail(PromotionDetail detail, PromotionDetailRequestDTO detailDTO) {
-        detail.setProductDiscountType(detailDTO.getProductDiscountType());
-        detail.setProductDiscountValue(detailDTO.getProductDiscountValue());
-        detail.setApplyToType(detailDTO.getApplyToType());
-
-        if (detailDTO.getApplyToProductId() != null) {
-            ProductUnit applyToProduct = productUnitRepository.findById(detailDTO.getApplyToProductId())
-                    .orElseThrow(() -> new PromotionValidationException("Sản phẩm áp dụng không tồn tại"));
-            detail.setApplyToProduct(applyToProduct);
-        }
-
-        if (detailDTO.getApplyToCategoryId() != null) {
-            Category applyToCategory = categoryRepository.findById(detailDTO.getApplyToCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục áp dụng không tồn tại"));
-            detail.setApplyToCategory(applyToCategory);
-        }
-
-        detail.setProductMinOrderValue(detailDTO.getProductMinOrderValue());
-        detail.setProductMinPromotionValue(detailDTO.getProductMinPromotionValue());
-        detail.setProductMinPromotionQuantity(detailDTO.getProductMinPromotionQuantity());
-    }
 }
