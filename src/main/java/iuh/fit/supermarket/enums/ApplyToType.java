@@ -12,12 +12,7 @@ public enum ApplyToType {
     /**
      * Áp dụng cho sản phẩm cụ thể
      */
-    PRODUCT("PRODUCT"),
-
-    /**
-     * Áp dụng cho danh mục sản phẩm
-     */
-    CATEGORY("CATEGORY");
+    PRODUCT("PRODUCT");
 
     private final String value;
 

@@ -51,13 +51,6 @@ public class ProductDiscountDetail extends PromotionDetail {
     private ProductUnit applyToProduct;
 
     /**
-     * Danh mục sản phẩm được áp dụng
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "apply_to_category_id")
-    private Category applyToCategory;
-
-    /**
      * Giá trị đơn hàng tối thiểu để áp dụng giảm giá sản phẩm
      */
     @Column(name = "product_min_order_value", precision = 18, scale = 2)
@@ -98,9 +91,6 @@ public class ProductDiscountDetail extends PromotionDetail {
         }
         if (applyToType == ApplyToType.PRODUCT && applyToProduct == null) {
             throw new IllegalArgumentException("Phải chỉ định sản phẩm khi áp dụng cho sản phẩm cụ thể");
-        }
-        if (applyToType == ApplyToType.CATEGORY && applyToCategory == null) {
-            throw new IllegalArgumentException("Phải chỉ định danh mục khi áp dụng cho danh mục");
         }
     }
 }

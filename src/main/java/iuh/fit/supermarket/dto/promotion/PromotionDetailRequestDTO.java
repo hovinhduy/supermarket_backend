@@ -32,11 +32,6 @@ public class PromotionDetailRequestDTO {
     private Long buyProductId;
 
     /**
-     * ID danh mục phải mua (tùy chọn cho BUY_X_GET_Y)
-     */
-    private Integer buyCategoryId;
-
-    /**
      * Số lượng tối thiểu phải mua
      */
     @Min(value = 1, message = "Số lượng tối thiểu phải mua phải là số dương")
@@ -133,11 +128,6 @@ public class PromotionDetailRequestDTO {
      * ID sản phẩm cụ thể được áp dụng
      */
     private Long applyToProductId;
-
-    /**
-     * ID danh mục sản phẩm được áp dụng
-     */
-    private Integer applyToCategoryId;
 
     /**
      * Giá trị đơn hàng tối thiểu để áp dụng giảm giá sản phẩm

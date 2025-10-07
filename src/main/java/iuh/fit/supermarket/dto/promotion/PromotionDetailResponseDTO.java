@@ -32,11 +32,6 @@ public class PromotionDetailResponseDTO {
     private ProductUnitInfo buyProduct;
 
     /**
-     * Thông tin danh mục phải mua
-     */
-    private CategoryInfo buyCategory;
-
-    /**
      * Số lượng tối thiểu phải mua
      */
     private Integer buyMinQuantity;
@@ -120,11 +115,6 @@ public class PromotionDetailResponseDTO {
     private ProductUnitInfo applyToProduct;
 
     /**
-     * Thông tin danh mục sản phẩm được áp dụng
-     */
-    private CategoryInfo applyToCategory;
-
-    /**
      * Giá trị đơn hàng tối thiểu để áp dụng giảm giá sản phẩm
      */
     private BigDecimal productMinOrderValue;
@@ -159,18 +149,6 @@ public class PromotionDetailResponseDTO {
     }
 
     /**
-     * Thông tin cơ bản về Category
-     */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CategoryInfo {
-        private Long categoryId;
-        private String categoryName;
-        private String description;
-    }
-
-    /**
      * Tạo mô tả ngắn gọn về khuyến mãi dựa trên loại
      */
     public String getPromotionSummary() {
@@ -179,8 +157,6 @@ public class PromotionDetailResponseDTO {
             StringBuilder summary = new StringBuilder("Mua ");
             if (buyProduct != null) {
                 summary.append(buyProduct.getProductName());
-            } else if (buyCategory != null) {
-                summary.append("sản phẩm ").append(buyCategory.getCategoryName());
             }
             
             if (buyMinQuantity != null) {
@@ -231,8 +207,6 @@ public class PromotionDetailResponseDTO {
             
             if (applyToType == ApplyToType.PRODUCT && applyToProduct != null) {
                 summary.append(" cho ").append(applyToProduct.getProductName());
-            } else if (applyToType == ApplyToType.CATEGORY && applyToCategory != null) {
-                summary.append(" cho danh mục ").append(applyToCategory.getCategoryName());
             } else if (applyToType == ApplyToType.ALL) {
                 summary.append(" cho tất cả sản phẩm");
             }

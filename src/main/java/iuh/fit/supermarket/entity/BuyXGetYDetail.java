@@ -30,13 +30,6 @@ public class BuyXGetYDetail extends PromotionDetail {
     private ProductUnit buyProduct;
 
     /**
-     * Danh mục phải mua
-     */
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "buy_category_id")
-    private Category buyCategory;
-
-    /**
      * Số lượng tối thiểu phải mua
      */
     @Column(name = "buy_min_quantity")
@@ -87,8 +80,8 @@ public class BuyXGetYDetail extends PromotionDetail {
         if (giftDiscountType == null) {
             throw new IllegalArgumentException("Loại giảm giá quà tặng không được để trống");
         }
-        if (buyProduct == null && buyCategory == null) {
-            throw new IllegalArgumentException("Phải chỉ định sản phẩm hoặc danh mục phải mua");
+        if (buyProduct == null) {
+            throw new IllegalArgumentException("Phải chỉ định sản phẩm phải mua");
         }
         if (buyMinQuantity == null && buyMinValue == null) {
             throw new IllegalArgumentException("Phải chỉ định số lượng hoặc giá trị tối thiểu phải mua");

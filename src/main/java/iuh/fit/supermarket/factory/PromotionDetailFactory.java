@@ -4,7 +4,6 @@ import iuh.fit.supermarket.dto.promotion.PromotionDetailRequestDTO;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.PromotionType;
 import iuh.fit.supermarket.exception.PromotionValidationException;
-import iuh.fit.supermarket.repository.CategoryRepository;
 import iuh.fit.supermarket.repository.ProductUnitRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,7 +17,6 @@ import org.springframework.stereotype.Component;
 public class PromotionDetailFactory {
 
     private final ProductUnitRepository productUnitRepository;
-    private final CategoryRepository categoryRepository;
 
     /**
      * Tạo PromotionDetail instance dựa trên PromotionType
@@ -44,12 +42,6 @@ public class PromotionDetailFactory {
             ProductUnit buyProduct = productUnitRepository.findById(dto.getBuyProductId())
                     .orElseThrow(() -> new PromotionValidationException("Sản phẩm phải mua không tồn tại"));
             detail.setBuyProduct(buyProduct);
-        }
-
-        if (dto.getBuyCategoryId() != null) {
-            Category buyCategory = categoryRepository.findById(dto.getBuyCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục phải mua không tồn tại"));
-            detail.setBuyCategory(buyCategory);
         }
 
         detail.setBuyMinQuantity(dto.getBuyMinQuantity());
@@ -99,12 +91,6 @@ public class PromotionDetailFactory {
             detail.setApplyToProduct(applyToProduct);
         }
 
-        if (dto.getApplyToCategoryId() != null) {
-            Category applyToCategory = categoryRepository.findById(dto.getApplyToCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục áp dụng không tồn tại"));
-            detail.setApplyToCategory(applyToCategory);
-        }
-
         detail.setProductMinOrderValue(dto.getProductMinOrderValue());
         detail.setProductMinPromotionValue(dto.getProductMinPromotionValue());
         detail.setProductMinPromotionQuantity(dto.getProductMinPromotionQuantity());
@@ -139,14 +125,6 @@ public class PromotionDetailFactory {
             detail.setBuyProduct(buyProduct);
         } else {
             detail.setBuyProduct(null);
-        }
-
-        if (dto.getBuyCategoryId() != null) {
-            Category buyCategory = categoryRepository.findById(dto.getBuyCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục phải mua không tồn tại"));
-            detail.setBuyCategory(buyCategory);
-        } else {
-            detail.setBuyCategory(null);
         }
 
         detail.setBuyMinQuantity(dto.getBuyMinQuantity());
@@ -188,14 +166,6 @@ public class PromotionDetailFactory {
             detail.setApplyToProduct(applyToProduct);
         } else {
             detail.setApplyToProduct(null);
-        }
-
-        if (dto.getApplyToCategoryId() != null) {
-            Category applyToCategory = categoryRepository.findById(dto.getApplyToCategoryId())
-                    .orElseThrow(() -> new PromotionValidationException("Danh mục áp dụng không tồn tại"));
-            detail.setApplyToCategory(applyToCategory);
-        } else {
-            detail.setApplyToCategory(null);
         }
 
         detail.setProductMinOrderValue(dto.getProductMinOrderValue());

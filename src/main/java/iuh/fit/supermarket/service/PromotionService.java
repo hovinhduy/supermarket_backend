@@ -779,14 +779,6 @@ public class PromotionService {
                     throw new PromotionValidationException("Sản phẩm áp dụng không tồn tại");
                 }
                 break;
-            case CATEGORY:
-                if (detailDTO.getApplyToCategoryId() == null) {
-                    throw new PromotionValidationException("ID danh mục áp dụng không được để trống");
-                }
-                if (!categoryRepository.existsById(detailDTO.getApplyToCategoryId())) {
-                    throw new PromotionValidationException("Danh mục áp dụng không tồn tại");
-                }
-                break;
             case ALL:
                 // Không cần validate thêm
                 break;
@@ -993,9 +985,6 @@ public class PromotionService {
             if (buyXGetY.getBuyProduct() != null) {
                 responseDTO.setBuyProduct(convertToProductUnitInfo(buyXGetY.getBuyProduct()));
             }
-            if (buyXGetY.getBuyCategory() != null) {
-                responseDTO.setBuyCategory(convertToCategoryInfo(buyXGetY.getBuyCategory()));
-            }
             responseDTO.setBuyMinQuantity(buyXGetY.getBuyMinQuantity());
             responseDTO.setBuyMinValue(buyXGetY.getBuyMinValue());
 
@@ -1020,9 +1009,6 @@ public class PromotionService {
 
             if (productDiscount.getApplyToProduct() != null) {
                 responseDTO.setApplyToProduct(convertToProductUnitInfo(productDiscount.getApplyToProduct()));
-            }
-            if (productDiscount.getApplyToCategory() != null) {
-                responseDTO.setApplyToCategory(convertToCategoryInfo(productDiscount.getApplyToCategory()));
             }
 
             responseDTO.setProductMinOrderValue(productDiscount.getProductMinOrderValue());
@@ -1051,16 +1037,7 @@ public class PromotionService {
         return info;
     }
 
-    /**
-     * Chuyển đổi Category entity sang CategoryInfo
-     */
-    private PromotionDetailResponseDTO.CategoryInfo convertToCategoryInfo(Category category) {
-        PromotionDetailResponseDTO.CategoryInfo info = new PromotionDetailResponseDTO.CategoryInfo();
-        info.setCategoryId(category.getCategoryId().longValue()); // Convert Integer to Long
-        info.setCategoryName(category.getName()); // Sử dụng getName() thay vì getCategoryName()
-        info.setDescription(category.getDescription());
-        return info;
-    }
+
 
     // =====================================================
     // NEW UPDATE METHODS - SEPARATED BY ENTITY
