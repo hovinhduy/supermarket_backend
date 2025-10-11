@@ -25,6 +25,8 @@ public record CheckPromotionResponseDTO(
     public record OrderPromotionDTO(
             String promotionId,
             String promotionName,
+            Long promotionDetailId,
+            String promotionSummary,
             String discountType,
             BigDecimal discountValue
     ) {

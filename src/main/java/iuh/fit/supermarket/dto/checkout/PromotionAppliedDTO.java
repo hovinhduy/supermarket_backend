@@ -8,6 +8,8 @@ import java.math.BigDecimal;
 public record PromotionAppliedDTO(
         String promotionId,
         String promotionName,
+        Long promotionDetailId,
+        String promotionSummary,
         String discountType,
         BigDecimal discountValue,
         Long sourceLineItemId

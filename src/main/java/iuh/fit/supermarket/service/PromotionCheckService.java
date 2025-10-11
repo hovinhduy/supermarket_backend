@@ -87,6 +87,8 @@ public class PromotionCheckService {
                         applicableDiscount.getPromotionLine().getDescription() != null 
                             ? applicableDiscount.getPromotionLine().getDescription()
                             : "Giảm giá sản phẩm",
+                        applicableDiscount.getDetailId(),
+                        buildProductDiscountSummary(applicableDiscount, productUnit),
                         mapDiscountType(applicableDiscount.getProductDiscountType()),
                         applicableDiscount.getProductDiscountValue(),
                         null
@@ -266,6 +268,8 @@ public class PromotionCheckService {
                 promotion.getPromotionLine().getDescription() != null 
                     ? promotion.getPromotionLine().getDescription() 
                     : "Mua " + promotion.getBuyMinQuantity() + " tặng " + giftQuantity,
+                promotion.getDetailId(),
+                buildBuyXGetYSummary(promotion, giftQuantity),
                 discountTypeStr,
                 displayDiscountValue,
                 sourceLineItemId
@@ -401,6 +405,8 @@ public class PromotionCheckService {
                             applicableOrderDiscount.getPromotionLine().getDescription() != null
                                 ? applicableOrderDiscount.getPromotionLine().getDescription()
                                 : "Giảm giá đơn hàng",
+                            applicableOrderDiscount.getDetailId(),
+                            buildOrderDiscountSummary(applicableOrderDiscount),
                             mapDiscountType(applicableOrderDiscount.getOrderDiscountType()),
                             applicableOrderDiscount.getOrderDiscountValue()
                     );
@@ -660,5 +666,123 @@ public class PromotionCheckService {
 
         // Giảm tối đa bằng tổng đơn hàng (không âm)
         return discountAmount.min(totalAfterLineDiscount);
+    }
+
+    // ============= SUMMARY BUILDER METHODS =============
+
+    /**
+     * Tạo thông tin tóm tắt cho PRODUCT_DISCOUNT
+     * 
+     * @param discount chi tiết khuyến mãi giảm giá sản phẩm
+     * @param productUnit sản phẩm được áp dụng
+     * @return thông tin tóm tắt chi tiết
+     */
+    private String buildProductDiscountSummary(ProductDiscountDetail discount, ProductUnit productUnit) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Loại giảm giá
+        if (discount.getProductDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append("Giảm ").append(discount.getProductDiscountValue()).append("%");
+        } else {
+            summary.append("Giảm ").append(String.format("%,.0f", discount.getProductDiscountValue())).append("đ");
+        }
+        
+        // Áp dụng cho
+        switch (discount.getApplyToType()) {
+            case ALL:
+                summary.append(" cho tất cả sản phẩm");
+                break;
+            case PRODUCT:
+                if (discount.getApplyToProduct() != null) {
+                    summary.append(" cho ").append(discount.getApplyToProduct().getProduct().getName());
+                }
+                break;
+            default:
+                summary.append(" cho sản phẩm");
+                break;
+        }
+        
+        // Điều kiện tối thiểu
+        if (discount.getProductMinPromotionQuantity() != null) {
+            summary.append(" (tối thiểu ").append(discount.getProductMinPromotionQuantity()).append(" sản phẩm)");
+        } else if (discount.getProductMinPromotionValue() != null) {
+            summary.append(" (tối thiểu ").append(String.format("%,.0f", discount.getProductMinPromotionValue())).append("đ)");
+        }
+        
+        return summary.toString();
+    }
+
+    /**
+     * Tạo thông tin tóm tắt cho BUY_X_GET_Y
+     * 
+     * @param promotion chi tiết khuyến mãi mua X tặng Y
+     * @param giftQuantity số lượng quà tặng
+     * @return thông tin tóm tắt chi tiết
+     */
+    private String buildBuyXGetYSummary(BuyXGetYDetail promotion, int giftQuantity) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Điều kiện mua
+        summary.append("Mua ");
+        if (promotion.getBuyMinQuantity() != null) {
+            summary.append(promotion.getBuyMinQuantity()).append(" ");
+        }
+        if (promotion.getBuyProduct() != null) {
+            summary.append(promotion.getBuyProduct().getProduct().getName());
+        }
+        
+        // Quà tặng
+        summary.append(" tặng ").append(giftQuantity).append(" ");
+        if (promotion.getGiftProduct() != null) {
+            summary.append(promotion.getGiftProduct().getProduct().getName());
+        }
+        
+        // Loại giảm giá quà tặng
+        if (promotion.getGiftDiscountType() == DiscountType.FREE) {
+            summary.append(" (miễn phí)");
+        } else if (promotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append(" (giảm ").append(promotion.getGiftDiscountValue()).append("%)");
+        } else if (promotion.getGiftDiscountType() == DiscountType.FIXED_AMOUNT) {
+            summary.append(" (giảm ").append(String.format("%,.0f", promotion.getGiftDiscountValue())).append("đ)");
+        }
+        
+        return summary.toString();
+    }
+
+    /**
+     * Tạo thông tin tóm tắt cho ORDER_DISCOUNT
+     * 
+     * @param discount chi tiết khuyến mãi giảm giá đơn hàng
+     * @return thông tin tóm tắt chi tiết
+     */
+    private String buildOrderDiscountSummary(OrderDiscountDetail discount) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Loại giảm giá
+        if (discount.getOrderDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append("Giảm ").append(discount.getOrderDiscountValue()).append("%");
+            if (discount.getOrderDiscountMaxValue() != null) {
+                summary.append(" (tối đa ").append(String.format("%,.0f", discount.getOrderDiscountMaxValue())).append("đ)");
+            }
+        } else {
+            summary.append("Giảm ").append(String.format("%,.0f", discount.getOrderDiscountValue())).append("đ");
+        }
+        
+        summary.append(" cho đơn hàng");
+        
+        // Điều kiện tối thiểu
+        List<String> conditions = new ArrayList<>();
+        if (discount.getOrderMinTotalValue() != null) {
+            conditions.add("từ " + String.format("%,.0f", discount.getOrderMinTotalValue()) + "đ");
+        }
+        if (discount.getOrderMinTotalQuantity() != null) {
+            conditions.add("từ " + discount.getOrderMinTotalQuantity() + " sản phẩm");
+        }
+        
+        if (!conditions.isEmpty()) {
+            summary.append(" (").append(String.join(" và ", conditions)).append(")");
+        }
+        
+        return summary.toString();
     }
 }
