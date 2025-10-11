@@ -235,6 +235,19 @@ public class GlobalExceptionHandler {
         }
 
         /**
+         * Xử lý InvalidSaleDataException
+         */
+        @ExceptionHandler(InvalidSaleDataException.class)
+        public ResponseEntity<ApiResponse<String>> handleInvalidSaleDataException(
+                        InvalidSaleDataException ex) {
+
+                log.warn("Invalid sale data: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
          * Xử lý DuplicateImportCodeException
          */
         @ExceptionHandler(DuplicateImportCodeException.class)

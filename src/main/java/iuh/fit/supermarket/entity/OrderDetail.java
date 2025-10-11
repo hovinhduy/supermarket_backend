@@ -25,7 +25,7 @@ public class OrderDetail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "order_detail_id")
-    private Integer orderDetailId;
+    private Long orderDetailId;
 
     /**
      * Số lượng sản phẩm
