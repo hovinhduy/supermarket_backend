@@ -69,6 +69,7 @@ public class SecurityConfig {
 
                         // Demo public endpoint
                         .requestMatchers("/demo/public").permitAll()
+                        .requestMatchers("/api/payment/payos_transfer_handler").permitAll()
 
                         // Admin only endpoints
                         .requestMatchers("/admin/**").hasRole("ADMIN")

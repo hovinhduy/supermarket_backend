@@ -4,6 +4,7 @@ import iuh.fit.supermarket.entity.SaleInvoiceHeader;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,4 +22,9 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
      * Kiểm tra số hóa đơn đã tồn tại chưa
      */
     boolean existsByInvoiceNumber(String invoiceNumber);
+
+    /**
+     * Tìm danh sách hóa đơn theo order ID
+     */
+    List<SaleInvoiceHeader> findByOrder_OrderId(Long orderId);
 }

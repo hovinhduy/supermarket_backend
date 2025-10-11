@@ -17,6 +17,10 @@ public record CreateSaleResponseDTO(
         BigDecimal changeAmount,
         String customerName,
         String employeeName,
-        List<SaleItemResponseDTO> items
+        List<SaleItemResponseDTO> items,
+        Long orderCode,
+        String paymentUrl,
+        String qrCode,
+        String status
 ) {
 }

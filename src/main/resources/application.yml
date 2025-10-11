@@ -99,3 +99,11 @@ aws:
   secretAccessKey: ${SECRET_ACCESS_KEY}
   region: ap-southeast-1
   bucketName: ${BUCKET_NAME}
+
+# Cấu hình PayOS
+payos:
+  client-id: ${PAYOS_CLIENT_ID}
+  api-key: ${PAYOS_API_KEY}
+  checksum-key: ${PAYOS_CHECKSUM_KEY}
+  return-url: ${PAYOS_RETURN_URL:http://localhost:8081/api/payment/success}
+  cancel-url: ${PAYOS_CANCEL_URL:http://localhost:8081/api/payment/cancel}
