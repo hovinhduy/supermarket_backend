@@ -4,9 +4,16 @@ import iuh.fit.supermarket.entity.SaleInvoiceDetail;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 /**
  * Repository cho quản lý chi tiết hóa đơn bán hàng
  */
 @Repository
 public interface SaleInvoiceDetailRepository extends JpaRepository<SaleInvoiceDetail, Integer> {
+    
+    /**
+     * Tìm tất cả chi tiết hóa đơn theo invoice ID
+     */
+    List<SaleInvoiceDetail> findByInvoice_InvoiceId(Integer invoiceId);
 }

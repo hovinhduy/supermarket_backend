@@ -259,9 +259,11 @@ public class PromotionCheckService {
         BigDecimal lineTotal = finalGiftPrice.multiply(BigDecimal.valueOf(giftQuantity));
 
         String discountTypeStr = mapDiscountType(promotion.getGiftDiscountType());
+        // Với PERCENTAGE: hiển thị phần trăm
+        // Với FIXED_AMOUNT/FREE: hiển thị tổng giá trị giảm (discountValue × số lượng)
         BigDecimal displayDiscountValue = promotion.getGiftDiscountType() == DiscountType.PERCENTAGE
                 ? promotion.getGiftDiscountValue()
-                : discountValue;
+                : discountValue.multiply(BigDecimal.valueOf(giftQuantity));
 
         PromotionAppliedDTO promotionApplied = new PromotionAppliedDTO(
                 promotion.getPromotionLine().getPromotionCode(),

@@ -1,5 +1,7 @@
 package iuh.fit.supermarket.service.impl;
 
+import iuh.fit.supermarket.dto.checkout.PromotionAppliedDTO;
+import iuh.fit.supermarket.dto.sale.OrderPromotionRequestDTO;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.InvoiceStatus;
 import iuh.fit.supermarket.enums.OrderStatus;
@@ -16,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
@@ -29,6 +32,8 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final OrderRepository orderRepository;
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final SaleInvoiceDetailRepository saleInvoiceDetailRepository;
+    private final AppliedPromotionRepository appliedPromotionRepository;
+    private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
     private final WarehouseService warehouseService;
 
     @Override
@@ -103,6 +108,59 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
 
         return invoiceNumber;
+    }
+
+    @Override
+    @Transactional
+    public void saveAppliedPromotions(
+            String invoiceNumber,
+            List<OrderPromotionRequestDTO> orderPromotions,
+            Map<Integer, PromotionAppliedDTO> itemPromotionsByIndex
+    ) {
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByInvoiceNumber(invoiceNumber)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy invoice: " + invoiceNumber));
+
+        // Lưu khuyến mãi order level
+        if (orderPromotions != null && !orderPromotions.isEmpty()) {
+            for (OrderPromotionRequestDTO orderPromotion : orderPromotions) {
+                AppliedOrderPromotion appliedOrderPromotion = new AppliedOrderPromotion();
+                appliedOrderPromotion.setPromotionId(orderPromotion.promotionId());
+                appliedOrderPromotion.setPromotionName(orderPromotion.promotionName());
+                appliedOrderPromotion.setPromotionDetailId(orderPromotion.promotionDetailId());
+                appliedOrderPromotion.setPromotionSummary(orderPromotion.promotionSummary());
+                appliedOrderPromotion.setDiscountType(orderPromotion.discountType());
+                appliedOrderPromotion.setDiscountValue(orderPromotion.discountValue());
+                appliedOrderPromotion.setInvoice(invoice);
+
+                appliedOrderPromotionRepository.save(appliedOrderPromotion);
+            }
+            log.info("Đã lưu {} khuyến mãi order level cho invoice {}", orderPromotions.size(), invoiceNumber);
+        }
+
+        // Lưu khuyến mãi item level (match theo index)
+        if (itemPromotionsByIndex != null && !itemPromotionsByIndex.isEmpty()) {
+            List<SaleInvoiceDetail> invoiceDetails = saleInvoiceDetailRepository.findByInvoice_InvoiceId(invoice.getInvoiceId());
+            
+            for (int i = 0; i < invoiceDetails.size(); i++) {
+                SaleInvoiceDetail invoiceDetail = invoiceDetails.get(i);
+                PromotionAppliedDTO promotion = itemPromotionsByIndex.get(i);
+                
+                if (promotion != null) {
+                    AppliedPromotion appliedPromotion = new AppliedPromotion();
+                    appliedPromotion.setPromotionId(promotion.promotionId());
+                    appliedPromotion.setPromotionName(promotion.promotionName());
+                    appliedPromotion.setPromotionDetailId(promotion.promotionDetailId());
+                    appliedPromotion.setPromotionSummary(promotion.promotionSummary());
+                    appliedPromotion.setDiscountType(promotion.discountType());
+                    appliedPromotion.setDiscountValue(promotion.discountValue());
+                    appliedPromotion.setSourceLineItemId(promotion.sourceLineItemId());
+                    appliedPromotion.setInvoiceDetail(invoiceDetail);
+
+                    appliedPromotionRepository.save(appliedPromotion);
+                }
+            }
+            log.info("Đã lưu {} khuyến mãi item level cho invoice {}", itemPromotionsByIndex.size(), invoiceNumber);
+        }
     }
 
     private String generateInvoiceNumber() {

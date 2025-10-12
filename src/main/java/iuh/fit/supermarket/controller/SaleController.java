@@ -25,9 +25,10 @@ public class SaleController {
     /**
      * API tạo bán hàng mới
      * - Kiểm tra tồn kho
-     * - Trừ kho và ghi transaction
      * - Tạo order và invoice
-     * - Lưu thông tin khuyến mãi
+     * - Lưu thông tin khuyến mãi đã áp dụng
+     * - CASH/CARD: trừ kho ngay và invoice PAID
+     * - ONLINE: invoice ISSUED, trừ kho khi webhook confirm
      * 
      * @param request thông tin bán hàng
      * @return thông tin hóa đơn đã tạo

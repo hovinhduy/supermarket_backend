@@ -37,7 +37,7 @@ public class ProductDiscountDetail extends PromotionDetail {
     private BigDecimal productDiscountValue;
 
     /**
-     * Áp dụng cho loại nào (ALL, PRODUCT, CATEGORY)
+     * Áp dụng cho loại nào (ALL, PRODUCT)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "apply_to_type", length = 20)
