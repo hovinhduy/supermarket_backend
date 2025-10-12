@@ -49,6 +49,13 @@ public class BuyXGetYDetail extends PromotionDetail {
     private ProductUnit giftProduct;
 
     /**
+     * Số lượng sản phẩm tặng cho mỗi lần đủ điều kiện
+     * Ví dụ: Mua 2 tặng 3 (buyMinQuantity=2, giftQuantity=3)
+     */
+    @Column(name = "gift_quantity")
+    private Integer giftQuantity;
+
+    /**
      * Loại giảm giá cho quà tặng (PERCENTAGE, FIXED_AMOUNT, FREE)
      */
     @Enumerated(EnumType.STRING)
@@ -62,7 +69,9 @@ public class BuyXGetYDetail extends PromotionDetail {
     private BigDecimal giftDiscountValue;
 
     /**
-     * Giới hạn số lượng tặng mỗi đơn hàng
+     * Số lần áp dụng tối đa trong một đơn hàng
+     * Ví dụ: Mua 5 tặng 2, giới hạn 3 lần
+     * Khách mua 20 sản phẩm = 4 lần đủ điều kiện nhưng chỉ áp dụng 3 lần → tặng 6 sản phẩm
      */
     @Column(name = "gift_max_quantity")
     private Integer giftMaxQuantity;
@@ -85,6 +94,12 @@ public class BuyXGetYDetail extends PromotionDetail {
         }
         if (buyMinQuantity == null && buyMinValue == null) {
             throw new IllegalArgumentException("Phải chỉ định số lượng hoặc giá trị tối thiểu phải mua");
+        }
+        if (giftQuantity != null && giftQuantity <= 0) {
+            throw new IllegalArgumentException("Số lượng sản phẩm tặng mỗi lần phải lớn hơn 0");
+        }
+        if (giftMaxQuantity != null && giftMaxQuantity <= 0) {
+            throw new IllegalArgumentException("Số lần áp dụng tối đa phải lớn hơn 0");
         }
         if (giftDiscountType != DiscountType.FREE && giftDiscountValue == null) {
             throw new IllegalArgumentException("Giá trị giảm giá quà tặng không được để trống");

@@ -265,11 +265,15 @@ public class PromotionCheckService {
                 ? promotion.getGiftDiscountValue()
                 : discountValue.multiply(BigDecimal.valueOf(giftQuantity));
 
+        // Tạo mô tả ngắn gọn cho promotion
+        String defaultDescription = "Mua " + promotion.getBuyMinQuantity() + " tặng " 
+                + (promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1);
+
         PromotionAppliedDTO promotionApplied = new PromotionAppliedDTO(
                 promotion.getPromotionLine().getPromotionCode(),
                 promotion.getPromotionLine().getDescription() != null 
                     ? promotion.getPromotionLine().getDescription() 
-                    : "Mua " + promotion.getBuyMinQuantity() + " tặng " + giftQuantity,
+                    : defaultDescription,
                 promotion.getDetailId(),
                 buildBuyXGetYSummary(promotion, giftQuantity),
                 discountTypeStr,
@@ -292,19 +296,31 @@ public class PromotionCheckService {
 
     /**
      * Tính số lượng quà tặng
+     * Công thức: MIN(số lần đủ điều kiện, số lần áp dụng tối đa) × số lượng tặng mỗi lần
+     * 
+     * @param promotion chi tiết khuyến mãi
+     * @param buyQuantity số lượng sản phẩm khách mua
+     * @return tổng số lượng sản phẩm tặng
      */
     private int calculateGiftQuantity(BuyXGetYDetail promotion, Integer buyQuantity) {
         if (promotion.getBuyMinQuantity() == null) {
-            return 1;
+            // Nếu không có điều kiện số lượng tối thiểu, trả về số lượng tặng mặc định
+            return promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1;
         }
 
+        // Tính số lần mua đủ điều kiện
         int eligibleSets = buyQuantity / promotion.getBuyMinQuantity();
 
+        // Giới hạn số lần áp dụng (nếu có cấu hình)
         if (promotion.getGiftMaxQuantity() != null) {
-            return Math.min(eligibleSets, promotion.getGiftMaxQuantity());
+            eligibleSets = Math.min(eligibleSets, promotion.getGiftMaxQuantity());
         }
 
-        return eligibleSets;
+        // Số lượng tặng cho mỗi lần đủ điều kiện (mặc định là 1)
+        int giftQuantityPerSet = promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1;
+
+        // Tổng số lượng tặng = số lần áp dụng × số lượng tặng mỗi lần
+        return eligibleSets * giftQuantityPerSet;
     }
 
     /**
@@ -718,10 +734,10 @@ public class PromotionCheckService {
      * Tạo thông tin tóm tắt cho BUY_X_GET_Y
      * 
      * @param promotion chi tiết khuyến mãi mua X tặng Y
-     * @param giftQuantity số lượng quà tặng
+     * @param actualGiftQuantity số lượng quà tặng thực tế được áp dụng
      * @return thông tin tóm tắt chi tiết
      */
-    private String buildBuyXGetYSummary(BuyXGetYDetail promotion, int giftQuantity) {
+    private String buildBuyXGetYSummary(BuyXGetYDetail promotion, int actualGiftQuantity) {
         StringBuilder summary = new StringBuilder();
         
         // Điều kiện mua
@@ -733,10 +749,19 @@ public class PromotionCheckService {
             summary.append(promotion.getBuyProduct().getProduct().getName());
         }
         
-        // Quà tặng
-        summary.append(" tặng ").append(giftQuantity).append(" ");
+        // Quà tặng - hiển thị số lượng theo cấu hình
+        summary.append(" tặng ");
+        if (promotion.getGiftQuantity() != null && promotion.getGiftQuantity() > 1) {
+            // Hiển thị số lượng tặng theo cấu hình nếu > 1
+            summary.append(promotion.getGiftQuantity()).append(" ");
+        }
         if (promotion.getGiftProduct() != null) {
             summary.append(promotion.getGiftProduct().getProduct().getName());
+        }
+        
+        // Hiển thị số lượng thực tế nếu khác với cấu hình cơ bản
+        if (actualGiftQuantity != promotion.getGiftQuantity()) {
+            summary.append(" (").append(actualGiftQuantity).append(" sản phẩm)");
         }
         
         // Loại giảm giá quà tặng
