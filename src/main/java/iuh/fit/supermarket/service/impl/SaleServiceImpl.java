@@ -15,6 +15,9 @@ import iuh.fit.supermarket.service.SaleService;
 import iuh.fit.supermarket.service.WarehouseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
@@ -26,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -335,5 +339,159 @@ public class SaleServiceImpl implements SaleService {
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaleInvoicesListResponseDTO getSalesInvoicesWithPromotions(int pageNumber, int pageSize) {
+        log.info("Lấy danh sách hoá đơn bán với trang {}, kích thước {}", pageNumber, pageSize);
+
+        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+        Page<SaleInvoiceHeader> invoicesPage = saleInvoiceHeaderRepository.findAllWithDetails(pageable);
+
+        List<SaleInvoiceFullDTO> invoiceDTOs = invoicesPage.getContent().stream()
+                .map(this::convertToSaleInvoiceFullDTO)
+                .collect(Collectors.toList());
+
+        return new SaleInvoicesListResponseDTO(
+                invoiceDTOs,
+                (int) invoicesPage.getTotalElements(),
+                pageNumber,
+                pageSize
+        );
+    }
+
+    /**
+     * Chuyển đổi entity SaleInvoiceHeader thành DTO SaleInvoiceFullDTO kèm đầy đủ thông tin khuyến mãi
+     */
+    private SaleInvoiceFullDTO convertToSaleInvoiceFullDTO(SaleInvoiceHeader invoice) {
+        // Lấy danh sách items của hóa đơn
+        List<SaleInvoiceItemDetailDTO> items = invoice.getInvoiceDetails().stream()
+                .map(detail -> convertToSaleInvoiceItemDetailDTO(detail))
+                .collect(Collectors.toList());
+
+        // Lấy danh sách khuyến mãi áp dụng cho toàn order
+        List<AppliedOrderPromotionDetailDTO> orderPromotions = appliedOrderPromotionRepository
+                .findByInvoice_InvoiceId(invoice.getInvoiceId()).stream()
+                .map(this::convertToAppliedOrderPromotionDetailDTO)
+                .collect(Collectors.toList());
+
+        return new SaleInvoiceFullDTO(
+                invoice.getInvoiceId(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+                invoice.getOrder() != null ? invoice.getOrder().getOrderId() : null,
+                invoice.getCustomer() != null ? invoice.getCustomer().getName() : "Khách vãng lai",
+                invoice.getEmployee() != null ? invoice.getEmployee().getName() : "",
+                invoice.getOrder() != null ? invoice.getOrder().getPaymentMethod() : null,
+                invoice.getStatus(),
+                invoice.getSubtotal(),
+                invoice.getTotalDiscount(),
+                invoice.getTotalTax(),
+                invoice.getTotalAmount(),
+                invoice.getPaidAmount(),
+                items,
+                orderPromotions,
+                invoice.getCreatedAt()
+        );
+    }
+
+    /**
+     * Chuyển đổi entity SaleInvoiceDetail thành DTO SaleInvoiceItemDetailDTO kèm danh sách khuyến mãi áp dụng
+     */
+    private SaleInvoiceItemDetailDTO convertToSaleInvoiceItemDetailDTO(SaleInvoiceDetail detail) {
+        // Lấy danh sách khuyến mãi áp dụng cho item này
+        List<AppliedPromotionDetailDTO> promotions = appliedPromotionRepository
+                .findByInvoiceDetail_InvoiceDetailId(detail.getInvoiceDetailId()).stream()
+                .map(this::convertToAppliedPromotionDetailDTO)
+                .collect(Collectors.toList());
+
+        return new SaleInvoiceItemDetailDTO(
+                detail.getInvoiceDetailId(),
+                detail.getProductUnit().getId(),
+                detail.getProductUnit().getProduct().getName(),
+                detail.getProductUnit().getUnit().getName(),
+                detail.getQuantity(),
+                detail.getUnitPrice(),
+                detail.getDiscountAmount(),
+                detail.getLineTotal(),
+                promotions
+        );
+    }
+
+    /**
+     * Chuyển đổi entity AppliedPromotion thành DTO AppliedPromotionDetailDTO
+     */
+    private AppliedPromotionDetailDTO convertToAppliedPromotionDetailDTO(AppliedPromotion promotion) {
+        return new AppliedPromotionDetailDTO(
+                promotion.getPromotionId(),
+                promotion.getPromotionName(),
+                promotion.getPromotionDetailId(),
+                promotion.getPromotionSummary(),
+                promotion.getDiscountType(),
+                promotion.getDiscountValue(),
+                promotion.getSourceLineItemId()
+        );
+    }
+
+    /**
+     * Chuyển đổi entity AppliedOrderPromotion thành DTO AppliedOrderPromotionDetailDTO
+     */
+    private AppliedOrderPromotionDetailDTO convertToAppliedOrderPromotionDetailDTO(AppliedOrderPromotion promotion) {
+        return new AppliedOrderPromotionDetailDTO(
+                promotion.getPromotionId(),
+                promotion.getPromotionName(),
+                promotion.getPromotionDetailId(),
+                promotion.getPromotionSummary(),
+                promotion.getDiscountType(),
+                promotion.getDiscountValue()
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaleInvoicesListResponseDTO searchSalesInvoices(SaleInvoiceSearchRequestDTO searchRequest) {
+        log.info("Tìm kiếm hoá đơn với tiêu chí - Invoice: {}, Customer: {}, From: {}, To: {}, Status: {}",
+                searchRequest.invoiceNumber(),
+                searchRequest.customerName(),
+                searchRequest.fromDate(),
+                searchRequest.toDate(),
+                searchRequest.status());
+
+        Pageable pageable = PageRequest.of(
+                searchRequest.pageNumber() != null ? searchRequest.pageNumber() : 0,
+                searchRequest.pageSize() != null ? searchRequest.pageSize() : 10
+        );
+
+        Page<SaleInvoiceHeader> invoicesPage = saleInvoiceHeaderRepository.searchAndFilterInvoices(
+                searchRequest.invoiceNumber(),
+                searchRequest.customerName(),
+                searchRequest.fromDate(),
+                searchRequest.toDate(),
+                searchRequest.status(),
+                pageable
+        );
+
+        List<SaleInvoiceFullDTO> invoiceDTOs = invoicesPage.getContent().stream()
+                .map(this::convertToSaleInvoiceFullDTO)
+                .collect(Collectors.toList());
+
+        return new SaleInvoicesListResponseDTO(
+                invoiceDTOs,
+                (int) invoicesPage.getTotalElements(),
+                searchRequest.pageNumber() != null ? searchRequest.pageNumber() : 0,
+                searchRequest.pageSize() != null ? searchRequest.pageSize() : 10
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaleInvoiceFullDTO getInvoiceDetail(Integer invoiceId) {
+        log.info("Lấy thông tin chi tiết hoá đơn ID: {}", invoiceId);
+
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByIdWithDetails(invoiceId)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy hoá đơn với ID: " + invoiceId));
+
+        return convertToSaleInvoiceFullDTO(invoice);
     }
 }
