@@ -10,13 +10,17 @@ import iuh.fit.supermarket.service.ReturnInvoiceService;
 import iuh.fit.supermarket.service.WarehouseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Implementation của ReturnInvoiceService
@@ -149,7 +153,6 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
         returnHeader.setReclaimedDiscountAmount(reclaimedDiscount);
         returnHeader.setFinalRefundAmount(finalRefundAmount);
         returnHeader.setReasonNote(request.reasonNote());
-        returnHeader.setStatus(ReturnStatus.COMPLETED);
         returnHeader.setOriginalInvoice(invoice);
         returnHeader.setCustomer(invoice.getCustomer());
         returnHeader.setEmployee(invoice.getEmployee());
@@ -177,8 +180,7 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
                 returnHeader.getReturnId(),
                 returnCode,
                 finalRefundAmount,
-                reclaimedDiscount,
-                ReturnStatus.COMPLETED.name());
+                reclaimedDiscount);
     }
 
     @Override
@@ -191,8 +193,97 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
                 returnHeader.getReturnId(),
                 returnHeader.getReturnCode(),
                 returnHeader.getFinalRefundAmount(),
+                returnHeader.getReclaimedDiscountAmount());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReturnInvoiceDetailResponse getReturnInvoiceDetail(Integer returnId) {
+        log.info("Lấy chi tiết phiếu trả: {}", returnId);
+
+        ReturnInvoiceHeader returnHeader = returnInvoiceHeaderRepository.findByIdWithDetails(returnId)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy phiếu trả với ID: " + returnId));
+
+        ReturnInvoiceDetailResponse.CustomerInfo customerInfo = null;
+        if (returnHeader.getCustomer() != null) {
+            customerInfo = new ReturnInvoiceDetailResponse.CustomerInfo(
+                    returnHeader.getCustomer().getCustomerId(),
+                    returnHeader.getCustomer().getName(),
+                    returnHeader.getCustomer().getPhone(),
+                    returnHeader.getCustomer().getEmail());
+        }
+
+        ReturnInvoiceDetailResponse.EmployeeInfo employeeInfo = new ReturnInvoiceDetailResponse.EmployeeInfo(
+                returnHeader.getEmployee().getEmployeeId(),
+                returnHeader.getEmployee().getName(),
+                returnHeader.getEmployee().getEmail());
+
+        List<ReturnInvoiceDetailResponse.ReturnItemDetail> returnItemDetails = returnHeader.getReturnDetails()
+                .stream()
+                .map(detail -> new ReturnInvoiceDetailResponse.ReturnItemDetail(
+                        detail.getReturnDetailId(),
+                        detail.getQuantity(),
+                        detail.getProductUnit().getProduct().getName(),
+                        detail.getProductUnit().getUnit().getName(),
+                        detail.getPriceAtReturn(),
+                        detail.getRefundAmount()))
+                .collect(Collectors.toList());
+
+        return new ReturnInvoiceDetailResponse(
+                returnHeader.getReturnId(),
+                returnHeader.getReturnCode(),
+                returnHeader.getReturnDate(),
+                returnHeader.getOriginalInvoice().getInvoiceNumber(),
+                returnHeader.getOriginalInvoice().getInvoiceId(),
+                customerInfo,
+                employeeInfo,
+                returnHeader.getTotalRefundAmount(),
                 returnHeader.getReclaimedDiscountAmount(),
-                returnHeader.getStatus().name());
+                returnHeader.getFinalRefundAmount(),
+                returnHeader.getReasonNote(),
+                returnItemDetails,
+                returnHeader.getCreatedAt(),
+                returnHeader.getUpdatedAt());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReturnInvoiceListResponse> searchAndFilterReturns(
+            String returnCode,
+            String invoiceNumber,
+            String customerName,
+            String customerPhone,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Integer employeeId,
+            Integer customerId,
+            Pageable pageable) {
+        log.info("Tìm kiếm phiếu trả: returnCode={}, invoiceNumber={}, customerName={}, customerPhone={}",
+                returnCode, invoiceNumber, customerName, customerPhone);
+
+        Page<ReturnInvoiceHeader> returnHeaders = returnInvoiceHeaderRepository.searchAndFilterReturns(
+                returnCode,
+                invoiceNumber,
+                customerName,
+                customerPhone,
+                fromDate,
+                toDate,
+                employeeId,
+                customerId,
+                pageable);
+
+        return returnHeaders.map(header -> new ReturnInvoiceListResponse(
+                header.getReturnId(),
+                header.getReturnCode(),
+                header.getReturnDate(),
+                header.getOriginalInvoice().getInvoiceNumber(),
+                header.getCustomer() != null ? header.getCustomer().getName() : null,
+                header.getCustomer() != null ? header.getCustomer().getPhone() : null,
+                header.getEmployee().getName(),
+                header.getTotalRefundAmount(),
+                header.getReclaimedDiscountAmount(),
+                header.getFinalRefundAmount(),
+                header.getReasonNote()));
     }
 
     private SaleInvoiceHeader validateInvoice(Integer invoiceId) {

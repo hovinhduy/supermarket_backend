@@ -67,13 +67,6 @@ public class ReturnInvoiceHeader {
     private String reasonNote;
 
     /**
-     * Trạng thái phiếu trả hàng
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status")
-    private ReturnStatus status = ReturnStatus.PENDING;
-
-    /**
      * Thời gian tạo
      */
     @CreationTimestamp

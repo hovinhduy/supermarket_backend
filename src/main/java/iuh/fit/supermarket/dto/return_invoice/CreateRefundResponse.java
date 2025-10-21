@@ -9,7 +9,6 @@ public record CreateRefundResponse(
         Integer returnId,
         String returnCode,
         BigDecimal finalRefundAmount,
-        BigDecimal reclaimedDiscountAmount,
-        String status
+        BigDecimal reclaimedDiscountAmount
 ) {
 }

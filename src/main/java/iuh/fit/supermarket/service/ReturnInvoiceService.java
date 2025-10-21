@@ -1,10 +1,10 @@
 package iuh.fit.supermarket.service;
 
-import iuh.fit.supermarket.dto.return_invoice.CreateRefundRequest;
-import iuh.fit.supermarket.dto.return_invoice.CreateRefundResponse;
-import iuh.fit.supermarket.dto.return_invoice.RefundCalculationResponse;
-import iuh.fit.supermarket.dto.return_invoice.RefundLineItemRequest;
+import iuh.fit.supermarket.dto.return_invoice.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -36,4 +36,38 @@ public interface ReturnInvoiceService {
      * @return Thông tin phiếu trả
      */
     CreateRefundResponse getReturnInvoice(Integer returnId);
+
+    /**
+     * Lấy thông tin chi tiết đầy đủ của phiếu trả
+     *
+     * @param returnId ID phiếu trả
+     * @return Thông tin chi tiết phiếu trả
+     */
+    ReturnInvoiceDetailResponse getReturnInvoiceDetail(Integer returnId);
+
+    /**
+     * Tìm kiếm và lọc danh sách hóa đơn trả hàng
+     *
+     * @param returnCode Mã trả hàng
+     * @param invoiceNumber Mã hóa đơn gốc
+     * @param customerName Tên khách hàng
+     * @param customerPhone Số điện thoại khách hàng
+     * @param fromDate Từ ngày
+     * @param toDate Đến ngày
+     * @param employeeId ID nhân viên
+     * @param customerId ID khách hàng
+     * @param pageable Thông tin phân trang
+     * @return Danh sách hóa đơn trả hàng
+     */
+    Page<ReturnInvoiceListResponse> searchAndFilterReturns(
+            String returnCode,
+            String invoiceNumber,
+            String customerName,
+            String customerPhone,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Integer employeeId,
+            Integer customerId,
+            Pageable pageable
+    );
 }
