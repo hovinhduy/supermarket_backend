@@ -39,6 +39,12 @@ public class RegisterCustomerRequest {
     private String phone;
 
     /**
+     * Mã khách hàng (tùy chọn, nếu không nhập sẽ tự động sinh theo format KH000001-KH999999)
+     */
+    @Size(max = 50, message = "Mã khách hàng không được vượt quá 50 ký tự")
+    private String customerCode;
+
+    /**
      * Mật khẩu (bắt buộc cho registration)
      */
     @NotBlank(message = "Mật khẩu không được để trống")

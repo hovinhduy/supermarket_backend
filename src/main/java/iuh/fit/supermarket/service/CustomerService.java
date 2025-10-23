@@ -120,6 +120,34 @@ public class CustomerService {
     }
 
     /**
+     * Tự động sinh mã khách hàng mới theo định dạng KH000001 đến KH999999
+     * 
+     * @return mã khách hàng mới
+     */
+    @Transactional(readOnly = true)
+    public String generateCustomerCode() {
+        Optional<Customer> lastCustomer = customerRepository.findTopByOrderByCustomerCodeDesc();
+
+        if (lastCustomer.isPresent() && lastCustomer.get().getCustomerCode() != null) {
+            String lastCode = lastCustomer.get().getCustomerCode();
+            // Trích xuất số từ mã (KH000001 -> 1)
+            int lastNumber = Integer.parseInt(lastCode.substring(2));
+            
+            // Kiểm tra giới hạn
+            if (lastNumber >= 999999) {
+                throw new CustomerValidationException("customerCode", "Đã hết mã khách hàng có thể tạo (KH999999)");
+            }
+            
+            // Tạo mã mới
+            int newNumber = lastNumber + 1;
+            return String.format("KH%06d", newNumber);
+        }
+
+        // Nếu chưa có mã nào, bắt đầu từ KH000001
+        return "KH000001";
+    }
+
+    /**
      * Đăng ký khách hàng mới (self-registration)
      * 
      * @param request thông tin đăng ký khách hàng
@@ -135,6 +163,19 @@ public class CustomerService {
         // Normalize dữ liệu
         String normalizedEmail = customerValidator.normalizeEmail(request.getEmail());
         String normalizedPhone = customerValidator.normalizePhone(request.getPhone());
+
+        // Xử lý mã khách hàng
+        String customerCode = request.getCustomerCode();
+        if (customerCode == null || customerCode.trim().isEmpty()) {
+            customerCode = generateCustomerCode();
+            log.info("Tự động sinh mã khách hàng: {}", customerCode);
+        } else {
+            customerCode = customerCode.trim();
+            // Kiểm tra mã đã tồn tại chưa
+            if (customerRepository.existsByCustomerCode(customerCode)) {
+                throw new DuplicateCustomerException("customerCode", customerCode);
+            }
+        }
 
         // Kiểm tra email đã tồn tại chưa
         if (customerRepository.existsByEmail(normalizedEmail)) {
@@ -157,6 +198,7 @@ public class CustomerService {
 
             existingCustomer.setName(request.getName().trim());
             existingCustomer.setEmail(normalizedEmail);
+            existingCustomer.setCustomerCode(customerCode);
             existingCustomer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
             existingCustomer.setGender(request.getGender());
             existingCustomer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
@@ -174,6 +216,7 @@ public class CustomerService {
         customer.setName(request.getName().trim());
         customer.setEmail(normalizedEmail);
         customer.setPhone(normalizedPhone);
+        customer.setCustomerCode(customerCode);
         customer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         customer.setGender(request.getGender());
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
@@ -204,6 +247,19 @@ public class CustomerService {
         String normalizedEmail = customerValidator.normalizeEmail(request.getEmail());
         String normalizedPhone = customerValidator.normalizePhone(request.getPhone());
 
+        // Xử lý mã khách hàng
+        String customerCode = request.getCustomerCode();
+        if (customerCode == null || customerCode.trim().isEmpty()) {
+            customerCode = generateCustomerCode();
+            log.info("Tự động sinh mã khách hàng: {}", customerCode);
+        } else {
+            customerCode = customerCode.trim();
+            // Kiểm tra mã đã tồn tại chưa
+            if (customerRepository.existsByCustomerCode(customerCode)) {
+                throw new DuplicateCustomerException("customerCode", customerCode);
+            }
+        }
+
         // Kiểm tra email đã tồn tại chưa
         if (customerRepository.existsByEmail(normalizedEmail)) {
             throw new DuplicateCustomerException("email", normalizedEmail);
@@ -220,6 +276,7 @@ public class CustomerService {
         customer.setName(request.getName().trim());
         customer.setEmail(normalizedEmail);
         customer.setPhone(normalizedPhone);
+        customer.setCustomerCode(customerCode);
         customer.setPasswordHash(null); // Không có mật khẩu khi admin tạo
         customer.setGender(request.getGender());
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);

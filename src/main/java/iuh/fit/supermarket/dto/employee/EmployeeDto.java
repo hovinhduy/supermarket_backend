@@ -31,6 +31,11 @@ public class EmployeeDto {
     private String email;
 
     /**
+     * Mã nhân viên
+     */
+    private String employeeCode;
+
+    /**
      * Vai trò của nhân viên
      */
     private EmployeeRole role;
@@ -62,6 +67,7 @@ public class EmployeeDto {
             employee.getEmployeeId(),
             employee.getName(),
             employee.getEmail(),
+            employee.getEmployeeCode(),
             employee.getRole(),
             employee.getIsDeleted(),
             employee.getCreatedAt(),

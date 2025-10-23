@@ -46,6 +46,20 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     boolean existsByEmailAndEmployeeIdNot(String email, Integer employeeId);
 
     /**
+     * Kiểm tra mã nhân viên đã tồn tại chưa
+     * @param employeeCode mã nhân viên cần kiểm tra
+     * @return true nếu mã nhân viên đã tồn tại
+     */
+    boolean existsByEmployeeCode(String employeeCode);
+
+    /**
+     * Tìm nhân viên có mã lớn nhất để sinh mã mới
+     * @return Optional<Employee>
+     */
+    @Query("SELECT e FROM Employee e WHERE e.employeeCode IS NOT NULL ORDER BY e.employeeCode DESC")
+    Optional<Employee> findTopByOrderByEmployeeCodeDesc();
+
+    /**
      * Tìm tất cả nhân viên chưa bị xóa
      * @return List<Employee>
      */

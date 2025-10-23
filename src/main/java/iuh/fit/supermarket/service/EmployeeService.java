@@ -67,6 +67,33 @@ public class EmployeeService {
     }
 
     /**
+     * Tự động sinh mã nhân viên mới theo định dạng NV000001 đến NV999999
+     * @return mã nhân viên mới
+     */
+    @Transactional(readOnly = true)
+    public String generateEmployeeCode() {
+        Optional<Employee> lastEmployee = employeeRepository.findTopByOrderByEmployeeCodeDesc();
+
+        if (lastEmployee.isPresent() && lastEmployee.get().getEmployeeCode() != null) {
+            String lastCode = lastEmployee.get().getEmployeeCode();
+            // Trích xuất số từ mã (NV000001 -> 1)
+            int lastNumber = Integer.parseInt(lastCode.substring(2));
+            
+            // Kiểm tra giới hạn
+            if (lastNumber >= 999999) {
+                throw new IllegalArgumentException("Đã hết mã nhân viên có thể tạo (NV999999)");
+            }
+            
+            // Tạo mã mới
+            int newNumber = lastNumber + 1;
+            return String.format("NV%06d", newNumber);
+        }
+
+        // Nếu chưa có mã nào, bắt đầu từ NV000001
+        return "NV000001";
+    }
+
+    /**
      * Tạo nhân viên mới
      * @param employee thông tin nhân viên
      * @return Employee đã được tạo
@@ -74,6 +101,21 @@ public class EmployeeService {
     @Transactional
     public Employee createEmployee(Employee employee) {
         log.info("Tạo nhân viên mới với email: {}", employee.getEmail());
+        
+        // Xử lý mã nhân viên
+        String employeeCode = employee.getEmployeeCode();
+        if (employeeCode == null || employeeCode.trim().isEmpty()) {
+            employeeCode = generateEmployeeCode();
+            employee.setEmployeeCode(employeeCode);
+            log.info("Tự động sinh mã nhân viên: {}", employeeCode);
+        } else {
+            employeeCode = employeeCode.trim();
+            employee.setEmployeeCode(employeeCode);
+            // Kiểm tra mã đã tồn tại chưa
+            if (employeeRepository.existsByEmployeeCode(employeeCode)) {
+                throw new IllegalArgumentException("Mã nhân viên đã tồn tại: " + employeeCode);
+            }
+        }
         
         // Kiểm tra email đã tồn tại chưa
         if (employeeRepository.existsByEmail(employee.getEmail())) {

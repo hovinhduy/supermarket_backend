@@ -38,6 +38,11 @@ public class CustomerDto {
     private String phone;
 
     /**
+     * Mã khách hàng
+     */
+    private String customerCode;
+
+    /**
      * Giới tính
      */
     private Gender gender;
@@ -85,6 +90,7 @@ public class CustomerDto {
             customer.getName(),
             customer.getEmail(),
             customer.getPhone(),
+            customer.getCustomerCode(),
             customer.getGender(),
             customer.getAddress(),
             customer.getDateOfBirth(),

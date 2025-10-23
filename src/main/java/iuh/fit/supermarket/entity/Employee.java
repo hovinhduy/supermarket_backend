@@ -43,6 +43,12 @@ public class Employee {
     private String email;
 
     /**
+     * Mã nhân viên (tự động sinh: NV000001 - NV999999, hoặc tùy chỉnh)
+     */
+    @Column(name = "employee_code", length = 50, unique = true)
+    private String employeeCode;
+
+    /**
      * Mật khẩu đã được hash
      */
     @Column(name = "password_hash", nullable = false)

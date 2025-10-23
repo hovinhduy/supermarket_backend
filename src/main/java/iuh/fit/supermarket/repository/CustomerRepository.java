@@ -87,6 +87,22 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
     boolean existsByPhoneAndCustomerIdNot(String phone, Integer customerId);
 
     /**
+     * Kiểm tra mã khách hàng đã tồn tại chưa
+     * 
+     * @param customerCode mã khách hàng cần kiểm tra
+     * @return true nếu mã khách hàng đã tồn tại
+     */
+    boolean existsByCustomerCode(String customerCode);
+
+    /**
+     * Tìm khách hàng có mã lớn nhất để sinh mã mới
+     * 
+     * @return Optional<Customer>
+     */
+    @Query("SELECT c FROM Customer c WHERE c.customerCode IS NOT NULL ORDER BY c.customerCode DESC")
+    Optional<Customer> findTopByOrderByCustomerCodeDesc();
+
+    /**
      * Tìm tất cả khách hàng chưa bị xóa
      * 
      * @return List<Customer>

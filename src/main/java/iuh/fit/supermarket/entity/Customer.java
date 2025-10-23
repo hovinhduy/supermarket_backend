@@ -50,6 +50,12 @@ public class Customer {
     private String phone;
 
     /**
+     * Mã khách hàng (tự động sinh: KH000001 - KH999999, hoặc tùy chỉnh)
+     */
+    @Column(name = "customer_code", length = 50, unique = true)
+    private String customerCode;
+
+    /**
      * Mật khẩu đã được hash
      */
     @Column(name = "password_hash")
