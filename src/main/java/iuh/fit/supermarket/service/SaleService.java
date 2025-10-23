@@ -62,4 +62,20 @@ public interface SaleService {
      */
     SaleInvoiceFullDTO getInvoiceDetail(Integer invoiceId);
 
+    /**
+     * Tạo file PDF cho hóa đơn bán hàng
+     * 
+     * @param invoiceId ID của hoá đơn
+     * @return byte array của file PDF
+     */
+    byte[] generateInvoicePdf(Integer invoiceId);
+
+    /**
+     * Tạo HTML để in hóa đơn bán hàng
+     * 
+     * @param invoiceId ID của hoá đơn
+     * @return HTML content có thể in trực tiếp
+     */
+    String generateInvoiceHtml(Integer invoiceId);
+
 }

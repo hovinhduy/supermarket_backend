@@ -140,4 +140,43 @@ public class SaleController {
         
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin hoá đơn thành công", response));
     }
+
+    /**
+     * API tạo và tải xuống file PDF hóa đơn bán hàng
+     * 
+     * @param invoiceId ID của hoá đơn
+     * @return file PDF
+     */
+    @GetMapping("/{invoiceId}/pdf")
+    public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable Integer invoiceId) {
+        log.info("Tạo PDF cho hóa đơn ID: {}", invoiceId);
+
+        byte[] pdfContent = saleService.generateInvoicePdf(invoiceId);
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "invoice_" + invoiceId + ".pdf");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+
+        return new ResponseEntity<>(pdfContent, headers, org.springframework.http.HttpStatus.OK);
+    }
+
+    /**
+     * API tạo HTML hóa đơn để in trực tiếp từ trình duyệt
+     * 
+     * @param invoiceId ID của hoá đơn
+     * @return HTML content có thể in trực tiếp (Ctrl+P hoặc nút In)
+     */
+    @GetMapping("/{invoiceId}/print")
+    public ResponseEntity<String> printInvoiceHtml(@PathVariable Integer invoiceId) {
+        log.info("Tạo HTML để in cho hóa đơn ID: {}", invoiceId);
+
+        String htmlContent = saleService.generateInvoiceHtml(invoiceId);
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.TEXT_HTML);
+        headers.add("Content-Type", "text/html; charset=UTF-8");
+
+        return new ResponseEntity<>(htmlContent, headers, org.springframework.http.HttpStatus.OK);
+    }
 }

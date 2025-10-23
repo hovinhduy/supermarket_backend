@@ -10,6 +10,7 @@ import iuh.fit.supermarket.exception.InsufficientStockException;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.InvoiceService;
+import iuh.fit.supermarket.service.InvoicePdfService;
 import iuh.fit.supermarket.service.PaymentService;
 import iuh.fit.supermarket.service.SaleService;
 import iuh.fit.supermarket.service.WarehouseService;
@@ -22,12 +23,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -48,6 +53,7 @@ public class SaleServiceImpl implements SaleService {
     private final WarehouseService warehouseService;
     private final PaymentService paymentService;
     private final InvoiceService invoiceService;
+    private final InvoicePdfService invoicePdfService;
 
     @Override
     @Transactional
@@ -478,5 +484,128 @@ public class SaleServiceImpl implements SaleService {
                 .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy hoá đơn với ID: " + invoiceId));
 
         return convertToSaleInvoiceFullDTO(invoice);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] generateInvoicePdf(Integer invoiceId) {
+        log.info("Tạo PDF cho hóa đơn ID: {}", invoiceId);
+
+        SaleInvoiceFullDTO invoice = getInvoiceDetail(invoiceId);
+        
+        return invoicePdfService.generateInvoicePdf(invoice);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String generateInvoiceHtml(Integer invoiceId) {
+        log.info("Tạo HTML để in cho hóa đơn ID: {}", invoiceId);
+
+        SaleInvoiceFullDTO invoice = getInvoiceDetail(invoiceId);
+        
+        try {
+            // Load template
+            InputStream templateStream = getClass().getResourceAsStream("/templates/invoice-print-template.html");
+            if (templateStream == null) {
+                throw new RuntimeException("Không tìm thấy template hóa đơn");
+            }
+            
+            String template = new String(templateStream.readAllBytes(), StandardCharsets.UTF_8);
+            
+            // Format currency
+            NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            
+            // Build items rows HTML
+            StringBuilder itemsRows = new StringBuilder();
+            int index = 1;
+            for (var item : invoice.items()) {
+                itemsRows.append("<tr>")
+                        .append("<td class=\"center\">").append(index++).append("</td>")
+                        .append("<td>").append(item.productName()).append("</td>")
+                        .append("<td class=\"center\">").append(item.unit()).append("</td>")
+                        .append("<td class=\"center\">").append(item.quantity()).append("</td>")
+                        .append("<td class=\"right\">").append(currencyFormatter.format(item.unitPrice())).append("</td>")
+                        .append("<td class=\"right\">").append(currencyFormatter.format(item.lineTotal())).append("</td>")
+                        .append("</tr>");
+                
+                // Add promotions if any
+                if (item.appliedPromotions() != null && !item.appliedPromotions().isEmpty()) {
+                    itemsRows.append("<tr class=\"promotion-row\">")
+                            .append("<td colspan=\"6\" style=\"padding-left: 30px;\">");
+                    
+                    for (var promo : item.appliedPromotions()) {
+                        itemsRows.append("→ ").append(promo.promotionSummary())
+                                .append(" (-").append(currencyFormatter.format(promo.discountValue())).append(") ");
+                    }
+                    
+                    itemsRows.append("</td></tr>");
+                }
+            }
+            
+            // Build order promotions HTML
+            String orderPromotionsHtml = "";
+            if (invoice.appliedOrderPromotions() != null && !invoice.appliedOrderPromotions().isEmpty()) {
+                StringBuilder promotions = new StringBuilder();
+                promotions.append("<div class=\"order-promotions\">")
+                        .append("<h4>KHUYẾN MÃI ĐƠN HÀNG</h4>")
+                        .append("<ul>");
+                
+                for (var promo : invoice.appliedOrderPromotions()) {
+                    promotions.append("<li>• ").append(promo.promotionSummary())
+                            .append(": -").append(currencyFormatter.format(promo.discountValue()))
+                            .append("</li>");
+                }
+                
+                promotions.append("</ul></div>");
+                orderPromotionsHtml = promotions.toString();
+            }
+            
+            // Calculate remaining
+            BigDecimal remaining = invoice.totalAmount().subtract(invoice.paidAmount());
+            
+            // Replace placeholders
+            String html = template
+                    .replace("{{invoiceNumber}}", invoice.invoiceNumber())
+                    .replace("{{invoiceDate}}", invoice.invoiceDate().format(dateFormatter))
+                    .replace("{{status}}", getStatusText(invoice.status()))
+                    .replace("{{paymentMethod}}", getPaymentMethodText(invoice.paymentMethod()))
+                    .replace("{{customerName}}", invoice.customerName() != null ? invoice.customerName() : "Khách lẻ")
+                    .replace("{{employeeName}}", invoice.employeeName())
+                    .replace("{{itemsRows}}", itemsRows.toString())
+                    .replace("{{orderPromotions}}", orderPromotionsHtml)
+                    .replace("{{subtotal}}", currencyFormatter.format(invoice.subtotal()))
+                    .replace("{{totalDiscount}}", currencyFormatter.format(invoice.totalDiscount()))
+                    .replace("{{totalTax}}", currencyFormatter.format(invoice.totalTax()))
+                    .replace("{{totalAmount}}", currencyFormatter.format(invoice.totalAmount()))
+                    .replace("{{paidAmount}}", currencyFormatter.format(invoice.paidAmount()))
+                    .replace("{{remaining}}", currencyFormatter.format(remaining))
+                    .replace("{{printTime}}", LocalDateTime.now().format(dateFormatter));
+            
+            return html;
+            
+        } catch (Exception e) {
+            log.error("Lỗi khi tạo HTML hóa đơn: {}", e.getMessage(), e);
+            throw new RuntimeException("Không thể tạo HTML hóa đơn", e);
+        }
+    }
+
+    private String getStatusText(InvoiceStatus status) {
+        return switch (status) {
+            case DRAFT -> "Nháp";
+            case ISSUED -> "Đã phát hành";
+            case PAID -> "Đã thanh toán";
+            case CANCELLED -> "Đã hủy";
+            default -> status.name();
+        };
+    }
+
+    private String getPaymentMethodText(PaymentMethod method) {
+        return switch (method) {
+            case CASH -> "Tiền mặt";
+            case CARD -> "Thẻ";
+            case ONLINE -> "Chuyển khoản";
+            default -> method.name();
+        };
     }
 }
