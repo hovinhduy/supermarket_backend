@@ -48,26 +48,30 @@ public interface ReturnInvoiceService {
     /**
      * Tìm kiếm và lọc danh sách hóa đơn trả hàng
      *
-     * @param returnCode Mã trả hàng
-     * @param invoiceNumber Mã hóa đơn gốc
-     * @param customerName Tên khách hàng
-     * @param customerPhone Số điện thoại khách hàng
+     * @param searchKeyword Từ khóa tìm kiếm (tìm trong mã trả hàng, mã hóa đơn gốc, tên khách hàng, số điện thoại)
      * @param fromDate Từ ngày
      * @param toDate Đến ngày
      * @param employeeId ID nhân viên
      * @param customerId ID khách hàng
+     * @param productUnitId ID sản phẩm đơn vị
      * @param pageable Thông tin phân trang
      * @return Danh sách hóa đơn trả hàng
      */
     Page<ReturnInvoiceListResponse> searchAndFilterReturns(
-            String returnCode,
-            String invoiceNumber,
-            String customerName,
-            String customerPhone,
+            String searchKeyword,
             LocalDate fromDate,
             LocalDate toDate,
             Integer employeeId,
             Integer customerId,
+            Integer productUnitId,
             Pageable pageable
     );
+
+    /**
+     * Kiểm tra số lượng còn lại có thể trả của mỗi hóa đơn bán
+     *
+     * @param invoiceId ID hóa đơn
+     * @return Thông tin chi tiết số lượng có thể trả
+     */
+    AvailableReturnQuantityResponse getAvailableReturnQuantity(Integer invoiceId);
 }

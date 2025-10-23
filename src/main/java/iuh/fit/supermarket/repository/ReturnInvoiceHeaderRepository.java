@@ -31,14 +31,12 @@ public interface ReturnInvoiceHeaderRepository extends JpaRepository<ReturnInvoi
 
     /**
      * Tìm kiếm và lọc hóa đơn trả hàng theo các tiêu chí:
-     * - returnCode: tìm kiếm mã trả hàng (LIKE)
-     * - invoiceNumber: tìm kiếm mã hóa đơn gốc (LIKE)
-     * - customerName: tìm kiếm tên khách hàng (LIKE)
-     * - customerPhone: tìm kiếm số điện thoại khách hàng (LIKE)
+     * - searchKeyword: tìm kiếm trong mã trả hàng, mã hóa đơn gốc, tên khách hàng, số điện thoại khách hàng (LIKE)
      * - fromDate: lọc từ ngày (>=)
      * - toDate: lọc đến ngày (<=)
      * - employeeId: lọc theo nhân viên xử lý
      * - customerId: lọc theo khách hàng
+     * - productUnitId: lọc theo sản phẩm đơn vị trong chi tiết phiếu trả
      */
     @EntityGraph(attributePaths = {"originalInvoice", "customer", "employee"})
     @Query("""
@@ -46,25 +44,26 @@ public interface ReturnInvoiceHeaderRepository extends JpaRepository<ReturnInvoi
             LEFT JOIN r.originalInvoice inv
             LEFT JOIN r.customer c
             LEFT JOIN r.employee e
-            WHERE (:returnCode IS NULL OR LOWER(r.returnCode) LIKE LOWER(CONCAT('%', :returnCode, '%')))
-            AND (:invoiceNumber IS NULL OR LOWER(inv.invoiceNumber) LIKE LOWER(CONCAT('%', :invoiceNumber, '%')))
-            AND (:customerName IS NULL OR (c IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :customerName, '%'))))
-            AND (:customerPhone IS NULL OR (c IS NOT NULL AND LOWER(c.phone) LIKE LOWER(CONCAT('%', :customerPhone, '%'))))
+            LEFT JOIN r.returnDetails rd
+            WHERE (:searchKeyword IS NULL OR 
+                   LOWER(r.returnCode) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
+                   LOWER(inv.invoiceNumber) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
+                   (c IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))) OR
+                   (c IS NOT NULL AND LOWER(c.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
             AND (:fromDate IS NULL OR CAST(r.returnDate AS DATE) >= :fromDate)
             AND (:toDate IS NULL OR CAST(r.returnDate AS DATE) <= :toDate)
             AND (:employeeId IS NULL OR e.employeeId = :employeeId)
             AND (:customerId IS NULL OR (c IS NOT NULL AND c.customerId = :customerId))
+            AND (:productUnitId IS NULL OR rd.productUnit.id = :productUnitId)
             ORDER BY r.returnDate DESC
             """)
     Page<ReturnInvoiceHeader> searchAndFilterReturns(
-            @Param("returnCode") String returnCode,
-            @Param("invoiceNumber") String invoiceNumber,
-            @Param("customerName") String customerName,
-            @Param("customerPhone") String customerPhone,
+            @Param("searchKeyword") String searchKeyword,
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate,
             @Param("employeeId") Integer employeeId,
             @Param("customerId") Integer customerId,
+            @Param("productUnitId") Integer productUnitId,
             Pageable pageable
     );
 

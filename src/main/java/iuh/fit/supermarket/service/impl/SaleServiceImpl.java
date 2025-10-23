@@ -343,11 +343,30 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     @Transactional(readOnly = true)
-    public SaleInvoicesListResponseDTO getSalesInvoicesWithPromotions(int pageNumber, int pageSize) {
-        log.info("Lấy danh sách hoá đơn bán với trang {}, kích thước {}", pageNumber, pageSize);
+    public SaleInvoicesListResponseDTO searchAndFilterSalesInvoices(
+            String searchKeyword,
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            iuh.fit.supermarket.enums.InvoiceStatus status,
+            Integer employeeId,
+            Integer customerId,
+            Integer productUnitId,
+            int pageNumber,
+            int pageSize) {
+        log.info("Tìm kiếm hoá đơn - Keyword: {}, From: {}, To: {}, Status: {}, EmployeeId: {}, CustomerId: {}, ProductUnitId: {}, Page: {}, Size: {}",
+                searchKeyword, fromDate, toDate, status, employeeId, customerId, productUnitId, pageNumber, pageSize);
 
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
-        Page<SaleInvoiceHeader> invoicesPage = saleInvoiceHeaderRepository.findAllWithDetails(pageable);
+        Page<SaleInvoiceHeader> invoicesPage = saleInvoiceHeaderRepository.searchAndFilterInvoices(
+                searchKeyword,
+                fromDate,
+                toDate,
+                status,
+                employeeId,
+                customerId,
+                productUnitId,
+                pageable
+        );
 
         List<SaleInvoiceFullDTO> invoiceDTOs = invoicesPage.getContent().stream()
                 .map(this::convertToSaleInvoiceFullDTO)
@@ -448,41 +467,7 @@ public class SaleServiceImpl implements SaleService {
         );
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public SaleInvoicesListResponseDTO searchSalesInvoices(SaleInvoiceSearchRequestDTO searchRequest) {
-        log.info("Tìm kiếm hoá đơn với tiêu chí - Invoice: {}, Customer: {}, From: {}, To: {}, Status: {}",
-                searchRequest.invoiceNumber(),
-                searchRequest.customerName(),
-                searchRequest.fromDate(),
-                searchRequest.toDate(),
-                searchRequest.status());
 
-        Pageable pageable = PageRequest.of(
-                searchRequest.pageNumber() != null ? searchRequest.pageNumber() : 0,
-                searchRequest.pageSize() != null ? searchRequest.pageSize() : 10
-        );
-
-        Page<SaleInvoiceHeader> invoicesPage = saleInvoiceHeaderRepository.searchAndFilterInvoices(
-                searchRequest.invoiceNumber(),
-                searchRequest.customerName(),
-                searchRequest.fromDate(),
-                searchRequest.toDate(),
-                searchRequest.status(),
-                pageable
-        );
-
-        List<SaleInvoiceFullDTO> invoiceDTOs = invoicesPage.getContent().stream()
-                .map(this::convertToSaleInvoiceFullDTO)
-                .collect(Collectors.toList());
-
-        return new SaleInvoicesListResponseDTO(
-                invoiceDTOs,
-                (int) invoicesPage.getTotalElements(),
-                searchRequest.pageNumber() != null ? searchRequest.pageNumber() : 0,
-                searchRequest.pageSize() != null ? searchRequest.pageSize() : 10
-        );
-    }
 
     @Override
     @Transactional(readOnly = true)

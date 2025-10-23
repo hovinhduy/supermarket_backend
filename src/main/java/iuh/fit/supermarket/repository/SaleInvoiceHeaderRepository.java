@@ -33,36 +33,39 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
     List<SaleInvoiceHeader> findByOrder_OrderId(Long orderId);
 
     /**
-     * Lấy danh sách hóa đơn với eager load các entity liên quan để tránh N+1
-     * Eager load: order, invoiceDetails, invoiceDetails.productUnit, invoiceDetails.productUnit.product, invoiceDetails.productUnit.unit
-     */
-    @EntityGraph(attributePaths = {"order", "customer", "employee", "invoiceDetails", "invoiceDetails.productUnit", "invoiceDetails.productUnit.product", "invoiceDetails.productUnit.unit"})
-    @Query("SELECT i FROM SaleInvoiceHeader i")
-    Page<SaleInvoiceHeader> findAllWithDetails(Pageable pageable);
-
-    /**
      * Tìm kiếm và lọc hoá đơn theo các tiêu chí:
-     * - invoiceNumber: tìm kiếm mã hoá đơn (LIKE)
-     * - customerName: tìm kiếm tên khách hàng (LIKE)
+     * - searchKeyword: tìm kiếm trong mã hoá đơn và số điện thoại khách hàng (LIKE)
      * - fromDate: lọc từ ngày (>=)
      * - toDate: lọc đến ngày (<=)
      * - status: lọc theo trạng thái hoá đơn
+     * - employeeId: lọc theo nhân viên
+     * - customerId: lọc theo khách hàng
+     * - productUnitId: lọc theo sản phẩm đơn vị trong chi tiết hoá đơn
      */
     @EntityGraph(attributePaths = {"order", "customer", "employee", "invoiceDetails", "invoiceDetails.productUnit", "invoiceDetails.productUnit.product", "invoiceDetails.productUnit.unit"})
     @Query("""
-            SELECT i FROM SaleInvoiceHeader i
-            WHERE (:invoiceNumber IS NULL OR LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', :invoiceNumber, '%')))
-            AND (:customerName IS NULL OR LOWER(i.customer.name) LIKE LOWER(CONCAT('%', :customerName, '%')))
+            SELECT DISTINCT i FROM SaleInvoiceHeader i
+            LEFT JOIN i.customer c
+            LEFT JOIN i.employee e
+            LEFT JOIN i.invoiceDetails d
+            WHERE (:searchKeyword IS NULL OR 
+                   LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
+                   (c IS NOT NULL AND LOWER(c.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
             AND (:fromDate IS NULL OR CAST(i.invoiceDate AS DATE) >= :fromDate)
             AND (:toDate IS NULL OR CAST(i.invoiceDate AS DATE) <= :toDate)
             AND (:status IS NULL OR i.status = :status)
+            AND (:employeeId IS NULL OR e.employeeId = :employeeId)
+            AND (:customerId IS NULL OR (c IS NOT NULL AND c.customerId = :customerId))
+            AND (:productUnitId IS NULL OR d.productUnit.id = :productUnitId)
             """)
     Page<SaleInvoiceHeader> searchAndFilterInvoices(
-            String invoiceNumber,
-            String customerName,
+            String searchKeyword,
             java.time.LocalDate fromDate,
             java.time.LocalDate toDate,
             iuh.fit.supermarket.enums.InvoiceStatus status,
+            Integer employeeId,
+            Integer customerId,
+            Integer productUnitId,
             Pageable pageable
     );
 

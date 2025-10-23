@@ -29,21 +29,30 @@ public interface SaleService {
     OrderStatusResponseDTO getOrderStatus(Long orderId);
 
     /**
-     * Lấy danh sách hoá đơn bán có đầy đủ thông tin khuyến mãi
+     * Tìm kiếm và lọc danh sách hoá đơn bán có đầy đủ thông tin khuyến mãi
      * 
+     * @param searchKeyword từ khóa tìm kiếm (tìm trong mã hoá đơn và số điện thoại khách hàng)
+     * @param fromDate từ ngày
+     * @param toDate đến ngày
+     * @param status trạng thái hoá đơn
+     * @param employeeId ID nhân viên
+     * @param customerId ID khách hàng
+     * @param productUnitId ID sản phẩm đơn vị
      * @param pageNumber số trang (từ 0)
      * @param pageSize kích thước trang
      * @return danh sách hoá đơn với chi tiết khuyến mãi
      */
-    SaleInvoicesListResponseDTO getSalesInvoicesWithPromotions(int pageNumber, int pageSize);
-
-    /**
-     * Tìm kiếm và lọc danh sách hoá đơn bán theo các tiêu chí
-     * 
-     * @param searchRequest các tiêu chí tìm kiếm (invoiceNumber, customerName, fromDate, toDate, status)
-     * @return danh sách hoá đơn với chi tiết khuyến mãi
-     */
-    SaleInvoicesListResponseDTO searchSalesInvoices(SaleInvoiceSearchRequestDTO searchRequest);
+    SaleInvoicesListResponseDTO searchAndFilterSalesInvoices(
+            String searchKeyword,
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            iuh.fit.supermarket.enums.InvoiceStatus status,
+            Integer employeeId,
+            Integer customerId,
+            Integer productUnitId,
+            int pageNumber,
+            int pageSize
+    );
 
     /**
      * Lấy thông tin chi tiết hoá đơn bán theo ID

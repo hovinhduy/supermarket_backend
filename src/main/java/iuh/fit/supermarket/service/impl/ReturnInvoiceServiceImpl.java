@@ -249,27 +249,23 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReturnInvoiceListResponse> searchAndFilterReturns(
-            String returnCode,
-            String invoiceNumber,
-            String customerName,
-            String customerPhone,
+            String searchKeyword,
             LocalDate fromDate,
             LocalDate toDate,
             Integer employeeId,
             Integer customerId,
+            Integer productUnitId,
             Pageable pageable) {
-        log.info("Tìm kiếm phiếu trả: returnCode={}, invoiceNumber={}, customerName={}, customerPhone={}",
-                returnCode, invoiceNumber, customerName, customerPhone);
+        log.info("Tìm kiếm phiếu trả: searchKeyword={}, fromDate={}, toDate={}, employeeId={}, customerId={}, productUnitId={}",
+                searchKeyword, fromDate, toDate, employeeId, customerId, productUnitId);
 
         Page<ReturnInvoiceHeader> returnHeaders = returnInvoiceHeaderRepository.searchAndFilterReturns(
-                returnCode,
-                invoiceNumber,
-                customerName,
-                customerPhone,
+                searchKeyword,
                 fromDate,
                 toDate,
                 employeeId,
                 customerId,
+                productUnitId,
                 pageable);
 
         return returnHeaders.map(header -> new ReturnInvoiceListResponse(
@@ -384,6 +380,83 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
         }
 
         return BigDecimal.ZERO;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AvailableReturnQuantityResponse getAvailableReturnQuantity(Integer invoiceId) {
+        log.info("Kiểm tra số lượng có thể trả cho hóa đơn ID: {}", invoiceId);
+
+        SaleInvoiceHeader invoice = validateInvoice(invoiceId);
+        List<SaleInvoiceDetail> invoiceDetails = invoiceDetailRepository.findByInvoice_InvoiceId(invoiceId);
+        Map<Integer, Integer> alreadyReturnedQuantities = getAlreadyReturnedQuantities(invoiceId);
+
+        int totalOriginalQuantity = 0;
+        int totalReturnedQuantity = 0;
+        int totalAvailableQuantity = 0;
+
+        List<AvailableReturnQuantityResponse.LineItemQuantity> lineItems = new ArrayList<>();
+
+        for (SaleInvoiceDetail detail : invoiceDetails) {
+            int returnedQuantity = alreadyReturnedQuantities.getOrDefault(detail.getInvoiceDetailId(), 0);
+            int availableQuantity = detail.getQuantity() - returnedQuantity;
+            boolean isFullyReturned = availableQuantity == 0;
+
+            List<AppliedPromotion> appliedPromotions = appliedPromotionRepository
+                    .findByInvoiceDetail_InvoiceDetailId(detail.getInvoiceDetailId());
+
+            BigDecimal priceAfterDiscount = detail.getUnitPrice();
+            if (!appliedPromotions.isEmpty()) {
+                for (AppliedPromotion promotion : appliedPromotions) {
+                    if (!"FREE".equalsIgnoreCase(promotion.getDiscountType()) && promotion.getDiscountValue() != null) {
+                        BigDecimal discountPerItem = promotion.getDiscountValue()
+                                .divide(BigDecimal.valueOf(detail.getQuantity()), 2, java.math.RoundingMode.HALF_UP);
+                        priceAfterDiscount = priceAfterDiscount.subtract(discountPerItem);
+                    }
+                }
+            } else {
+                BigDecimal discountPerItem = detail.getDiscountAmount()
+                        .divide(BigDecimal.valueOf(detail.getQuantity()), 2, java.math.RoundingMode.HALF_UP);
+                priceAfterDiscount = priceAfterDiscount.subtract(discountPerItem);
+            }
+
+            AvailableReturnQuantityResponse.LineItemQuantity lineItem = 
+                    new AvailableReturnQuantityResponse.LineItemQuantity(
+                            detail.getInvoiceDetailId(),
+                            detail.getProductUnit().getProduct().getName(),
+                            detail.getProductUnit().getUnit().getName(),
+                            detail.getQuantity(),
+                            returnedQuantity,
+                            availableQuantity,
+                            detail.getUnitPrice(),
+                            priceAfterDiscount,
+                            isFullyReturned
+                    );
+
+            lineItems.add(lineItem);
+
+            totalOriginalQuantity += detail.getQuantity();
+            totalReturnedQuantity += returnedQuantity;
+            totalAvailableQuantity += availableQuantity;
+        }
+
+        String customerName = invoice.getCustomer() != null ? invoice.getCustomer().getName() : null;
+        String customerPhone = invoice.getCustomer() != null ? invoice.getCustomer().getPhone() : null;
+
+        log.info("Hoàn tất kiểm tra. Tổng ban đầu: {}, Đã trả: {}, Còn lại: {}",
+                totalOriginalQuantity, totalReturnedQuantity, totalAvailableQuantity);
+
+        return new AvailableReturnQuantityResponse(
+                invoice.getInvoiceId(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+                customerName,
+                customerPhone,
+                lineItems,
+                totalOriginalQuantity,
+                totalReturnedQuantity,
+                totalAvailableQuantity
+        );
     }
 
     private String generateReturnCode() {

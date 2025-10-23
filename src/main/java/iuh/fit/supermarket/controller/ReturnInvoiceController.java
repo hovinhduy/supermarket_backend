@@ -66,14 +66,12 @@ public class ReturnInvoiceController {
     /**
      * Lấy danh sách hóa đơn trả hàng với tìm kiếm và lọc
      *
-     * @param returnCode Mã trả hàng
-     * @param invoiceNumber Mã hóa đơn gốc
-     * @param customerName Tên khách hàng
-     * @param customerPhone Số điện thoại khách hàng
+     * @param searchKeyword Từ khóa tìm kiếm (tìm trong mã trả hàng, mã hóa đơn gốc, tên khách hàng, số điện thoại)
      * @param fromDate Từ ngày
      * @param toDate Đến ngày
      * @param employeeId ID nhân viên
      * @param customerId ID khách hàng
+     * @param productUnitId ID sản phẩm đơn vị
      * @param page Số trang (mặc định 0)
      * @param size Kích thước trang (mặc định 10)
      * @param sortBy Sắp xếp theo (mặc định returnDate)
@@ -82,33 +80,29 @@ public class ReturnInvoiceController {
      */
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ReturnInvoiceListResponse>>> searchAndFilterReturns(
-            @RequestParam(required = false) String returnCode,
-            @RequestParam(required = false) String invoiceNumber,
-            @RequestParam(required = false) String customerName,
-            @RequestParam(required = false) String customerPhone,
+            @RequestParam(required = false) String searchKeyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam(required = false) Integer employeeId,
             @RequestParam(required = false) Integer customerId,
+            @RequestParam(required = false) Integer productUnitId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "returnDate") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDirection) {
-        log.info("Tìm kiếm phiếu trả: returnCode={}, invoiceNumber={}, customerName={}, customerPhone={}",
-                returnCode, invoiceNumber, customerName, customerPhone);
+        log.info("Tìm kiếm phiếu trả: searchKeyword={}, fromDate={}, toDate={}, employeeId={}, customerId={}, productUnitId={}",
+                searchKeyword, fromDate, toDate, employeeId, customerId, productUnitId);
 
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<ReturnInvoiceListResponse> response = returnInvoiceService.searchAndFilterReturns(
-                returnCode,
-                invoiceNumber,
-                customerName,
-                customerPhone,
+                searchKeyword,
                 fromDate,
                 toDate,
                 employeeId,
                 customerId,
+                productUnitId,
                 pageable);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách phiếu trả thành công", response));
@@ -143,5 +137,21 @@ public class ReturnInvoiceController {
         ReturnInvoiceDetailResponse response = returnInvoiceService.getReturnInvoiceDetail(returnId);
 
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết phiếu trả thành công", response));
+    }
+
+    /**
+     * Kiểm tra số lượng còn lại có thể trả của mỗi hóa đơn bán
+     *
+     * @param invoiceId ID hóa đơn bán
+     * @return Response với thông tin số lượng có thể trả
+     */
+    @GetMapping("/invoice/{invoiceId}/available-quantity")
+    public ResponseEntity<ApiResponse<AvailableReturnQuantityResponse>> getAvailableReturnQuantity(
+            @PathVariable Integer invoiceId) {
+        log.info("Nhận request kiểm tra số lượng có thể trả cho hóa đơn: {}", invoiceId);
+
+        AvailableReturnQuantityResponse response = returnInvoiceService.getAvailableReturnQuantity(invoiceId);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin số lượng có thể trả thành công", response));
     }
 }

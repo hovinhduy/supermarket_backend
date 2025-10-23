@@ -64,69 +64,63 @@ public class SaleController {
     }
 
     /**
-     * API lấy danh sách hoá đơn bán có đầy đủ thông tin khuyến mãi được áp dụng
-     * - Trả về danh sách hoá đơn với các khuyến mãi item-level và order-level
+     * API tìm kiếm và lọc danh sách hoá đơn bán có đầy đủ thông tin khuyến mãi
+     * - Tìm kiếm theo từ khóa (tìm trong mã hoá đơn và số điện thoại khách hàng)
+     * - Lọc theo khoảng ngày (từ ngày - đến ngày)
+     * - Lọc theo trạng thái hoá đơn
+     * - Lọc theo nhân viên
+     * - Lọc theo khách hàng
+     * - Lọc theo sản phẩm đơn vị
      * - Hỗ trợ phân trang
      * 
+     * @param searchKeyword từ khóa tìm kiếm (optional)
+     * @param fromDate từ ngày (optional, format: yyyy-MM-dd)
+     * @param toDate đến ngày (optional, format: yyyy-MM-dd)
+     * @param status trạng thái hoá đơn (optional)
+     * @param employeeId ID nhân viên (optional)
+     * @param customerId ID khách hàng (optional)
+     * @param productUnitId ID sản phẩm đơn vị (optional)
      * @param pageNumber số trang (mặc định 0)
      * @param pageSize kích thước trang (mặc định 10)
      * @return danh sách hoá đơn với thông tin khuyến mãi đầy đủ
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<SaleInvoicesListResponseDTO>> getSalesInvoicesWithPromotions(
-            @RequestParam(defaultValue = "0") int pageNumber,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        
-        log.info("Lấy danh sách hoá đơn bán với trang: {}, kích thước: {}", pageNumber, pageSize);
-
-        SaleInvoicesListResponseDTO response = saleService.getSalesInvoicesWithPromotions(pageNumber, pageSize);
-        
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách hoá đơn thành công", response));
-    }
-
-    /**
-     * API tìm kiếm và lọc danh sách hoá đơn bán
-     * - Tìm kiếm theo mã hoá đơn
-     * - Tìm kiếm theo tên khách hàng
-     * - Lọc theo khoảng ngày (từ ngày - đến ngày)
-     * - Lọc theo trạng thái hoá đơn
-     * - Hỗ trợ phân trang
-     * 
-     * @param invoiceNumber mã hoá đơn (optional)
-     * @param customerName tên khách hàng (optional)
-     * @param fromDate từ ngày (optional, format: yyyy-MM-dd)
-     * @param toDate đến ngày (optional, format: yyyy-MM-dd)
-     * @param status trạng thái hoá đơn (optional)
-     * @param pageNumber số trang (mặc định 0)
-     * @param pageSize kích thước trang (mặc định 10)
-     * @return danh sách hoá đơn phù hợp với tiêu chí tìm kiếm
-     */
-    @GetMapping("/search")
-    public ResponseEntity<ApiResponse<SaleInvoicesListResponseDTO>> searchSalesInvoices(
-            @RequestParam(required = false) String invoiceNumber,
-            @RequestParam(required = false) String customerName,
-            @RequestParam(required = false) String fromDate,
-            @RequestParam(required = false) String toDate,
+    public ResponseEntity<ApiResponse<SaleInvoicesListResponseDTO>> searchAndFilterSalesInvoices(
+            @RequestParam(required = false) String searchKeyword,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate fromDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate toDate,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer employeeId,
+            @RequestParam(required = false) Integer customerId,
+            @RequestParam(required = false) Integer productUnitId,
             @RequestParam(defaultValue = "0") int pageNumber,
             @RequestParam(defaultValue = "10") int pageSize) {
         
-        log.info("Tìm kiếm hoá đơn - Invoice: {}, Customer: {}, From: {}, To: {}, Status: {}", 
-                invoiceNumber, customerName, fromDate, toDate, status);
+        log.info("Tìm kiếm hoá đơn - Keyword: {}, From: {}, To: {}, Status: {}, EmployeeId: {}, CustomerId: {}, ProductUnitId: {}", 
+                searchKeyword, fromDate, toDate, status, employeeId, customerId, productUnitId);
 
-        SaleInvoiceSearchRequestDTO searchRequest = new SaleInvoiceSearchRequestDTO(
-                invoiceNumber,
-                customerName,
-                fromDate != null ? java.time.LocalDate.parse(fromDate) : null,
-                toDate != null ? java.time.LocalDate.parse(toDate) : null,
-                status != null ? iuh.fit.supermarket.enums.InvoiceStatus.valueOf(status) : null,
+        iuh.fit.supermarket.enums.InvoiceStatus invoiceStatus = null;
+        if (status != null && !status.isEmpty()) {
+            try {
+                invoiceStatus = iuh.fit.supermarket.enums.InvoiceStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                log.warn("Trạng thái hoá đơn không hợp lệ: {}", status);
+            }
+        }
+
+        SaleInvoicesListResponseDTO response = saleService.searchAndFilterSalesInvoices(
+                searchKeyword,
+                fromDate,
+                toDate,
+                invoiceStatus,
+                employeeId,
+                customerId,
+                productUnitId,
                 pageNumber,
                 pageSize
         );
-
-        SaleInvoicesListResponseDTO response = saleService.searchSalesInvoices(searchRequest);
         
-        return ResponseEntity.ok(ApiResponse.success("Tìm kiếm hoá đơn thành công", response));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách hoá đơn thành công", response));
     }
 
     /**
