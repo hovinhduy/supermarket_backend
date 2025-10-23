@@ -76,4 +76,28 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
     @EntityGraph(attributePaths = {"order", "customer", "employee", "invoiceDetails", "invoiceDetails.productUnit", "invoiceDetails.productUnit.product", "invoiceDetails.productUnit.unit"})
     @Query("SELECT i FROM SaleInvoiceHeader i WHERE i.invoiceId = :invoiceId")
     java.util.Optional<SaleInvoiceHeader> findByIdWithDetails(Integer invoiceId);
+
+    /**
+     * Lấy dữ liệu báo cáo doanh số bán hàng theo ngày
+     * Nhóm theo nhân viên và ngày, chỉ lấy hóa đơn PAID
+     */
+    @Query("""
+            SELECT e.employeeCode, e.name, MIN(i.invoiceDate),
+                   COALESCE(SUM(i.totalDiscount), 0.0),
+                   COALESCE(SUM(i.subtotal), 0.0),
+                   COALESCE(SUM(i.totalAmount), 0.0)
+            FROM SaleInvoiceHeader i
+            JOIN i.employee e
+            WHERE i.status = 'PAID'
+            AND FUNCTION('DATE', i.invoiceDate) >= :fromDate
+            AND FUNCTION('DATE', i.invoiceDate) <= :toDate
+            AND (:employeeId IS NULL OR e.employeeId = :employeeId)
+            GROUP BY e.employeeCode, e.name, FUNCTION('DATE', i.invoiceDate)
+            ORDER BY e.employeeCode, FUNCTION('DATE', i.invoiceDate)
+            """)
+    List<Object[]> getSalesDailyReportRaw(
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            Integer employeeId
+    );
 }
