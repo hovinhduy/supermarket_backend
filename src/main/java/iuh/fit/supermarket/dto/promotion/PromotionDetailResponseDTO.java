@@ -47,6 +47,11 @@ public class PromotionDetailResponseDTO {
     private ProductUnitInfo giftProduct;
 
     /**
+     * Số lượng sản phẩm tặng cho mỗi lần đủ điều kiện
+     */
+    private Integer giftQuantity;
+
+    /**
      * Loại giảm giá cho quà tặng
      */
     private DiscountType giftDiscountType;

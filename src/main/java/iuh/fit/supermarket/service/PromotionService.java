@@ -991,6 +991,7 @@ public class PromotionService {
             if (buyXGetY.getGiftProduct() != null) {
                 responseDTO.setGiftProduct(convertToProductUnitInfo(buyXGetY.getGiftProduct()));
             }
+            responseDTO.setGiftQuantity(buyXGetY.getGiftQuantity());
             responseDTO.setGiftDiscountType(buyXGetY.getGiftDiscountType());
             responseDTO.setGiftDiscountValue(buyXGetY.getGiftDiscountValue());
             responseDTO.setGiftMaxQuantity(buyXGetY.getGiftMaxQuantity());

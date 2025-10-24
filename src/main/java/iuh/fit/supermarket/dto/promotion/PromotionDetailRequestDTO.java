@@ -50,6 +50,13 @@ public class PromotionDetailRequestDTO {
     private Long giftProductId;
 
     /**
+     * Số lượng sản phẩm tặng cho mỗi lần đủ điều kiện
+     * Ví dụ: Mua 2 tặng 3 (buyMinQuantity=2, giftQuantity=3)
+     */
+    @Min(value = 1, message = "Số lượng sản phẩm tặng phải là số dương")
+    private Integer giftQuantity;
+
+    /**
      * Loại giảm giá cho quà tặng
      */
     private DiscountType giftDiscountType;

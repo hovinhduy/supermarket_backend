@@ -53,6 +53,7 @@ public class PromotionDetailFactory {
             detail.setGiftProduct(giftProduct);
         }
 
+        detail.setGiftQuantity(dto.getGiftQuantity());
         detail.setGiftDiscountType(dto.getGiftDiscountType());
         detail.setGiftDiscountValue(dto.getGiftDiscountValue());
         detail.setGiftMaxQuantity(dto.getGiftMaxQuantity());
@@ -136,6 +137,7 @@ public class PromotionDetailFactory {
             detail.setGiftProduct(giftProduct);
         }
 
+        detail.setGiftQuantity(dto.getGiftQuantity());
         detail.setGiftDiscountType(dto.getGiftDiscountType());
         detail.setGiftDiscountValue(dto.getGiftDiscountValue());
         detail.setGiftMaxQuantity(dto.getGiftMaxQuantity());
