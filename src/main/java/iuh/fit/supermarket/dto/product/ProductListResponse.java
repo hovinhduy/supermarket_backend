@@ -133,12 +133,6 @@ public class ProductListResponse {
         private Long id;
 
         /**
-         * Mã đơn vị sản phẩm
-         */
-        @Schema(description = "Mã đơn vị sản phẩm", example = "PU1U1T12345")
-        private String code;
-
-        /**
          * Mã vạch
          */
         @Schema(description = "Mã vạch", example = "1234567890123")

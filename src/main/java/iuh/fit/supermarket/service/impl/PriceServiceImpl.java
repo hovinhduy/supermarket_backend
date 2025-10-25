@@ -594,8 +594,7 @@ public class PriceServiceImpl implements PriceService {
                 if (!currentPricesWithProductUnit.isEmpty()) {
                     ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
                             .orElse(null);
-                    String productUnitName = productUnit != null ? productUnit.getCode()
-                            : detail.getProductUnitId().toString();
+                    String productUnitName = detail.getProductUnitId().toString();
                     Price conflictPrice = currentPricesWithProductUnit.get(0);
                     throw PriceConflictException.variantAlreadyInCurrentPrice(
                             productUnitName, conflictPrice.getPriceCode());
@@ -604,10 +603,7 @@ public class PriceServiceImpl implements PriceService {
                 List<Price> currentPrices = priceRepository.findCurrentPricesByProductUnitId(
                         PriceType.CURRENT, detail.getProductUnitId());
                 if (!currentPrices.isEmpty()) {
-                    ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
-                            .orElse(null);
-                    String productUnitName = productUnit != null ? productUnit.getCode()
-                            : detail.getProductUnitId().toString();
+                    String productUnitName = detail.getProductUnitId().toString();
                     throw PriceConflictException.variantAlreadyInCurrentPrice(
                             productUnitName, currentPrices.get(0).getPriceCode());
                 }
@@ -676,7 +672,7 @@ public class PriceServiceImpl implements PriceService {
             if (!currentPricesWithProductUnit.isEmpty()) {
                 Price conflictPrice = currentPricesWithProductUnit.get(0);
                 throw PriceConflictException.variantAlreadyInCurrentPrice(
-                        detail.getProductUnit().getCode(), conflictPrice.getPriceCode());
+                        detail.getProductUnit().getId().toString(), conflictPrice.getPriceCode());
             }
         }
     }
@@ -703,7 +699,7 @@ public class PriceServiceImpl implements PriceService {
             if (priceDetailRepository.existsByPricePriceIdAndProductUnitId(price.getPriceId(),
                     request.getProductUnitId())) {
                 throw new PriceConflictException(
-                        "Đơn vị sản phẩm " + productUnit.getCode() + " đã tồn tại trong bảng giá");
+                        "Đơn vị sản phẩm " + productUnit.getId() + " đã tồn tại trong bảng giá");
             }
 
             // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
@@ -718,7 +714,7 @@ public class PriceServiceImpl implements PriceService {
             if (!currentPricesWithProductUnit.isEmpty()) {
                 Price conflictPrice = currentPricesWithProductUnit.get(0);
                 throw PriceConflictException.variantAlreadyInCurrentPrice(
-                        productUnit.getCode(), conflictPrice.getPriceCode());
+                        productUnit.getId().toString(), conflictPrice.getPriceCode());
             }
 
             // Tạo chi tiết giá
@@ -839,7 +835,6 @@ public class PriceServiceImpl implements PriceService {
         // Map thông tin đơn vị sản phẩm
         if (priceDetail.getProductUnit() != null) {
             dto.setProductUnitId(priceDetail.getProductUnit().getId());
-            dto.setProductUnitCode(priceDetail.getProductUnit().getCode());
             dto.setBarcode(priceDetail.getProductUnit().getBarcode());
 
             // Lấy tên đơn vị từ Unit entity

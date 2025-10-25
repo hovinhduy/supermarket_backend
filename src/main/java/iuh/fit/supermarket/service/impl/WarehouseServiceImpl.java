@@ -79,7 +79,7 @@ public class WarehouseServiceImpl implements WarehouseService {
             warehouseTransactionRepository.save(transaction);
 
             log.info("Đã cập nhật tồn kho cho đơn vị sản phẩm {}: {} -> {}",
-                    productUnit.getCode(), currentQuantity, newQuantity);
+                    productUnit.getId(), currentQuantity, newQuantity);
 
             return convertWarehouseToDto(warehouse);
 
@@ -288,7 +288,6 @@ public class WarehouseServiceImpl implements WarehouseService {
         if (warehouse.getProductUnit() != null) {
             WarehouseDto.ProductUnitInfo productUnitInfo = new WarehouseDto.ProductUnitInfo();
             productUnitInfo.setProductUnitId(warehouse.getProductUnit().getId());
-            productUnitInfo.setCode(warehouse.getProductUnit().getCode());
             productUnitInfo.setBarcode(warehouse.getProductUnit().getBarcode());
             productUnitInfo.setConversionValue(warehouse.getProductUnit().getConversionValue());
             productUnitInfo.setIsBaseUnit(warehouse.getProductUnit().getIsBaseUnit());
@@ -392,7 +391,6 @@ public class WarehouseServiceImpl implements WarehouseService {
         if (transaction.getProductUnit() != null) {
             WarehouseTransactionDto.ProductUnitInfo productUnitInfo = new WarehouseTransactionDto.ProductUnitInfo();
             productUnitInfo.setProductUnitId(transaction.getProductUnit().getId());
-            productUnitInfo.setCode(transaction.getProductUnit().getCode());
             productUnitInfo.setBarcode(transaction.getProductUnit().getBarcode());
             productUnitInfo.setConversionValue(transaction.getProductUnit().getConversionValue());
             productUnitInfo.setIsBaseUnit(transaction.getProductUnit().getIsBaseUnit());

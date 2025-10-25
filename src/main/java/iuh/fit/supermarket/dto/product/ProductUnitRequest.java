@@ -27,11 +27,6 @@ public record ProductUnitRequest(
         @NotNull(message = "Cờ đơn vị cơ bản không được để trống") @Schema(description = "Có phải là đơn vị cơ bản không", example = "true", required = true) Boolean isBaseUnit,
 
         /**
-         * Mã đơn vị sản phẩm tùy chỉnh (tùy chọn, sẽ tự động tạo nếu null hoặc rỗng)
-         */
-        @Schema(description = "Mã đơn vị sản phẩm tùy chỉnh", example = "COCA_CHAI_001") String code,
-
-        /**
          * Mã vạch (tùy chọn)
          */
         @Schema(description = "Mã vạch của đơn vị sản phẩm", example = "1234567890123") String barcode) {
@@ -56,13 +51,6 @@ public record ProductUnitRequest(
         // Tự động điều chỉnh conversion value = 1 cho đơn vị cơ bản
         if (isBaseUnit && conversionValue != 1) {
             conversionValue = 1;
-        }
-        // Trim code nếu có
-        if (code != null) {
-            code = code.trim();
-            if (code.isEmpty()) {
-                code = null;
-            }
         }
 
         // Trim barcode nếu có

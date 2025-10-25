@@ -432,7 +432,7 @@ public class ProductUnitImageServiceImpl implements ProductUnitImageService {
 
         ProductUnitImageResponse response = new ProductUnitImageResponse();
         response.setProductUnitId(productUnitId);
-        response.setProductUnitName(productUnit.getCode()); // Hoặc tên khác nếu có
+        response.setProductUnitName(String.valueOf(productUnit.getId())); // Sử dụng ID làm tên
         response.setImages(imageDtos);
         response.setPrimaryImage(primaryImage);
         response.setTotalImages(imageDtos.size());

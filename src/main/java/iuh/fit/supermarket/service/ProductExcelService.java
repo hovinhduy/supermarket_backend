@@ -187,7 +187,6 @@ public class ProductExcelService {
                 unitName.trim(),
                 conversionValue,
                 isBaseUnit,
-                null, // code sẽ được tự động tạo
                 barcode
             );
 

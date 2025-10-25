@@ -776,7 +776,6 @@ public class StocktakeServiceImpl implements StocktakeService {
             ProductUnit productUnit = detail.getProductUnit();
             dto.setProductUnit(new StocktakeDetailDto.ProductUnitInfo(
                     productUnit.getId(),
-                    productUnit.getCode(),
                     productUnit.getBarcode(),
                     productUnit.getConversionValue(),
                     productUnit.getProduct() != null ? productUnit.getProduct().getName() : null,

@@ -33,4 +33,14 @@ public class DuplicateProductException extends RuntimeException {
     public static DuplicateProductException forProductName(String productName) {
         return new DuplicateProductException("Sản phẩm với tên '" + productName + "' đã tồn tại trong hệ thống");
     }
+
+    /**
+     * Tạo ngoại lệ với mã sản phẩm bị trùng
+     * 
+     * @param productCode mã sản phẩm bị trùng
+     * @return instance của DuplicateProductException
+     */
+    public static DuplicateProductException forProductCode(String productCode) {
+        return new DuplicateProductException("Sản phẩm với mã '" + productCode + "' đã tồn tại trong hệ thống");
+    }
 }

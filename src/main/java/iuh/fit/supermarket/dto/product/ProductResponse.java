@@ -24,6 +24,12 @@ public class ProductResponse {
     private Long id;
 
     /**
+     * Mã sản phẩm
+     */
+    @Schema(description = "Mã sản phẩm", example = "SP001")
+    private String code;
+
+    /**
      * Tên sản phẩm
      */
     @Schema(description = "Tên sản phẩm", example = "Smartphone Samsung Galaxy S24")
@@ -171,12 +177,6 @@ public class ProductResponse {
          */
         @Schema(description = "ID đơn vị sản phẩm", example = "1")
         private Long id;
-
-        /**
-         * Mã đơn vị sản phẩm
-         */
-        @Schema(description = "Mã đơn vị sản phẩm", example = "PU1U1T12345")
-        private String code;
 
         /**
          * Mã vạch

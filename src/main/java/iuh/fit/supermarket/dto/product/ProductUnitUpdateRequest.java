@@ -25,11 +25,6 @@ public record ProductUnitUpdateRequest(
         @Schema(description = "Có phải là đơn vị cơ bản không", example = "true") Boolean isBaseUnit,
 
         /**
-         * Mã đơn vị sản phẩm tùy chỉnh
-         */
-        @Schema(description = "Mã đơn vị sản phẩm tùy chỉnh", example = "COCA_CHAI_001") String code,
-
-        /**
          * Mã vạch (tùy chọn)
          */
         @Schema(description = "Mã vạch của đơn vị sản phẩm", example = "1234567890123") String barcode,
@@ -61,14 +56,6 @@ public record ProductUnitUpdateRequest(
             conversionValue = 1;
         }
 
-        // Trim code nếu có
-        if (code != null) {
-            code = code.trim();
-            if (code.isEmpty()) {
-                code = null;
-            }
-        }
-
         // Trim barcode nếu có
         if (barcode != null) {
             barcode = barcode.trim();
@@ -85,7 +72,6 @@ public record ProductUnitUpdateRequest(
      */
     public boolean hasUpdates() {
         return unitName != null || conversionValue != null ||
-                isBaseUnit != null || code != null ||
-                barcode != null || isActive != null;
+                isBaseUnit != null || barcode != null || isActive != null;
     }
 }

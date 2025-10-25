@@ -77,7 +77,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
      * @param productId ID sản phẩm
      * @return List<Warehouse>
      */
-    @Query("SELECT w FROM Warehouse w WHERE w.productUnit.product.id = :productId ORDER BY w.productUnit.code")
+    @Query("SELECT w FROM Warehouse w WHERE w.productUnit.product.id = :productId ORDER BY w.productUnit.product.code")
     List<Warehouse> findByProductId(@Param("productId") Long productId);
 
     /**
@@ -109,7 +109,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
      * @return List<Warehouse>
      */
     @Query("SELECT w FROM Warehouse w WHERE " +
-            "LOWER(w.productUnit.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(w.productUnit.product.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(w.productUnit.barcode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(w.productUnit.product.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     List<Warehouse> findByKeyword(@Param("keyword") String keyword);
@@ -122,7 +122,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
      * @return Page<Warehouse>
      */
     @Query("SELECT w FROM Warehouse w WHERE " +
-            "LOWER(w.productUnit.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(w.productUnit.product.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(w.productUnit.barcode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(w.productUnit.product.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
     Page<Warehouse> findByKeyword(@Param("keyword") String keyword, Pageable pageable);

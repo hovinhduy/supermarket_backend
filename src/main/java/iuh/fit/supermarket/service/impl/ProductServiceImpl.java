@@ -53,6 +53,20 @@ public class ProductServiceImpl implements ProductService {
     public ProductResponse createProduct(ProductCreateRequest request) {
         log.info("Bắt đầu tạo sản phẩm mới: {}", request.getName());
 
+        // Sinh mã sản phẩm nếu không được cung cấp
+        String productCode = request.getCode();
+        if (productCode == null || productCode.trim().isEmpty()) {
+            productCode = generateProductCode();
+            log.debug("Tự động sinh mã sản phẩm: {}", productCode);
+        } else {
+            productCode = productCode.trim();
+        }
+
+        // Kiểm tra trùng lặp mã sản phẩm
+        if (productRepository.existsByCode(productCode)) {
+            throw DuplicateProductException.forProductCode(productCode);
+        }
+
         // Kiểm tra trùng lặp tên sản phẩm
         if (existsByName(request.getName())) {
             throw DuplicateProductException.forProductName(request.getName());
@@ -89,6 +103,7 @@ public class ProductServiceImpl implements ProductService {
 
         // Tạo entity Product
         Product product = new Product();
+        product.setCode(productCode);
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setCategory(category);
@@ -397,6 +412,7 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponse mapToProductResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
+        response.setCode(product.getCode());
         response.setName(product.getName());
         response.setDescription(product.getDescription());
         response.setIsActive(product.getIsActive());
@@ -554,16 +570,6 @@ public class ProductServiceImpl implements ProductService {
             throw new ProductException("Không được có đơn vị tính trùng lặp");
         }
 
-        // Kiểm tra code không trùng lặp nếu có
-        for (ProductUnitRequest unitRequest : units) {
-            if (unitRequest.code() != null && !unitRequest.code().trim().isEmpty()) {
-                if (productUnitRepository.existsByCode(unitRequest.code().trim())) {
-                    throw new ProductException(
-                            "Mã đơn vị sản phẩm '" + unitRequest.code() + "' đã tồn tại trong hệ thống");
-                }
-            }
-        }
-
         // Kiểm tra barcode không trùng lặp nếu có
         for (ProductUnitRequest unitRequest : units) {
             if (unitRequest.barcode() != null && !unitRequest.barcode().trim().isEmpty()) {
@@ -571,19 +577,6 @@ public class ProductServiceImpl implements ProductService {
                     throw new ProductException("Mã vạch '" + unitRequest.barcode() + "' đã tồn tại trong hệ thống");
                 }
             }
-        }
-
-        // Kiểm tra không có code trùng lặp trong cùng request
-        Set<String> codesInRequest = units.stream()
-                .map(ProductUnitRequest::code)
-                .filter(code -> code != null && !code.trim().isEmpty())
-                .collect(Collectors.toSet());
-
-        if (codesInRequest.size() != units.stream()
-                .map(ProductUnitRequest::code)
-                .filter(code -> code != null && !code.trim().isEmpty())
-                .count()) {
-            throw new ProductException("Không được có mã đơn vị sản phẩm trùng lặp trong cùng yêu cầu");
         }
     }
 
@@ -599,17 +592,6 @@ public class ProductServiceImpl implements ProductService {
             productUnit.setProduct(product);
             productUnit.setUnit(unit);
 
-            // Sử dụng code tùy chỉnh nếu có, ngược lại tự động tạo
-            String finalCode;
-            if (unitRequest.code() != null && !unitRequest.code().trim().isEmpty()) {
-                finalCode = unitRequest.code().trim();
-                log.debug("Sử dụng mã tùy chỉnh: {} cho sản phẩm ID: {}", finalCode, product.getId());
-            } else {
-                finalCode = generateProductUnitCode(product.getId(), unit.getId());
-                log.debug("Tự động tạo mã: {} cho sản phẩm ID: {}", finalCode, product.getId());
-            }
-            productUnit.setCode(finalCode);
-
             productUnit.setConversionValue(unitRequest.conversionValue());
             productUnit.setIsBaseUnit(unitRequest.isBaseUnit());
             productUnit.setBarcode(unitRequest.barcode());
@@ -617,29 +599,44 @@ public class ProductServiceImpl implements ProductService {
             productUnit.setIsDeleted(false);
 
             productUnitRepository.save(productUnit);
-            log.debug("Đã tạo đơn vị sản phẩm với mã: {} cho sản phẩm ID: {}",
-                    productUnit.getCode(), product.getId());
+            log.debug("Đã tạo đơn vị sản phẩm cho sản phẩm ID: {}", product.getId());
         }
     }
 
     /**
-     * Tạo mã đơn vị sản phẩm duy nhất
+     * Sinh mã sản phẩm tự động duy nhất theo format SPxxxxx
+     * Ví dụ: SP00001, SP00002, ..., SP99999
      */
-    private String generateProductUnitCode(Long productId, Long unitId) {
-        // Format: PU{productId}U{unitId}T{timestamp}
-        long timestamp = System.currentTimeMillis() % 100000; // Lấy 5 chữ số cuối
-        String code = String.format("PU%dU%dT%d", productId, unitId, timestamp);
-
-        // Kiểm tra trùng lặp và tạo lại nếu cần
-        int attempts = 0;
-        while (productUnitRepository.existsByCode(code) && attempts < 10) {
-            timestamp = System.currentTimeMillis() % 100000;
-            code = String.format("PU%dU%dT%d", productId, unitId, timestamp);
-            attempts++;
+    private String generateProductCode() {
+        // Lấy tất cả mã sản phẩm hiện tại bắt đầu với "SP" và extract số
+        long nextNumber = 1;
+        
+        // Tìm mã sản phẩm có số lớn nhất
+        List<Product> products = productRepository.findAll();
+        for (Product product : products) {
+            if (product.getCode() != null && product.getCode().startsWith("SP")) {
+                try {
+                    String numberPart = product.getCode().substring(2);
+                    long number = Long.parseLong(numberPart);
+                    if (number >= nextNumber) {
+                        nextNumber = number + 1;
+                    }
+                } catch (NumberFormatException e) {
+                    log.debug("Không thể parse mã sản phẩm: {}", product.getCode());
+                }
+            }
         }
 
-        if (attempts >= 10) {
-            throw new ProductException("Không thể tạo mã đơn vị sản phẩm duy nhất sau 10 lần thử");
+        // Kiểm tra không vượt quá giới hạn (SP99999)
+        if (nextNumber > 99999) {
+            throw new ProductException("Số lượng mã sản phẩm đã vượt quá giới hạn (99999)");
+        }
+
+        String code = String.format("SP%05d", nextNumber);
+        
+        // Double-check để chắc chắn mã không trùng
+        if (productRepository.existsByCode(code)) {
+            throw new ProductException("Mã sản phẩm " + code + " đã tồn tại");
         }
 
         return code;
@@ -651,7 +648,6 @@ public class ProductServiceImpl implements ProductService {
     private ProductResponse.ProductUnitInfo mapToProductUnitInfo(ProductUnit productUnit) {
         ProductResponse.ProductUnitInfo info = new ProductResponse.ProductUnitInfo();
         info.setId(productUnit.getId());
-        info.setCode(productUnit.getCode());
         info.setBarcode(productUnit.getBarcode());
         info.setConversionValue(productUnit.getConversionValue());
         info.setIsBaseUnit(productUnit.getIsBaseUnit());
@@ -725,13 +721,6 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // Kiểm tra mã code nếu có
-        if (request.code() != null && !request.code().trim().isEmpty()) {
-            if (productUnitRepository.existsByCode(request.code().trim())) {
-                throw new ProductException("Mã đơn vị sản phẩm '" + request.code() + "' đã tồn tại");
-            }
-        }
-
         // Kiểm tra barcode nếu có
         if (request.barcode() != null && !request.barcode().trim().isEmpty()) {
             if (productUnitRepository.existsByBarcode(request.barcode().trim())) {
@@ -744,15 +733,6 @@ public class ProductServiceImpl implements ProductService {
         productUnit.setProduct(product);
         productUnit.setUnit(unit);
 
-        // Sử dụng code tùy chỉnh nếu có, ngược lại tự động tạo
-        String finalCode;
-        if (request.code() != null && !request.code().trim().isEmpty()) {
-            finalCode = request.code().trim();
-        } else {
-            finalCode = generateProductUnitCode(product.getId(), unit.getId());
-        }
-        productUnit.setCode(finalCode);
-
         productUnit.setConversionValue(request.conversionValue());
         productUnit.setIsBaseUnit(request.isBaseUnit());
         productUnit.setBarcode(request.barcode());
@@ -760,7 +740,7 @@ public class ProductServiceImpl implements ProductService {
         productUnit.setIsDeleted(false);
 
         ProductUnit savedProductUnit = productUnitRepository.save(productUnit);
-        log.info("Đã thêm đơn vị sản phẩm với mã: {} cho sản phẩm ID: {}", savedProductUnit.getCode(), productId);
+        log.info("Đã thêm đơn vị sản phẩm cho sản phẩm ID: {}", productId);
 
         return mapToProductUnitResponse(savedProductUnit);
     }
@@ -825,14 +805,6 @@ public class ProductServiceImpl implements ProductService {
                 }
             }
             productUnit.setIsBaseUnit(request.isBaseUnit());
-        }
-
-        // Cập nhật mã code
-        if (request.code() != null) {
-            if (productUnitRepository.existsByCodeAndIdNot(request.code(), unitId)) {
-                throw new ProductException("Mã đơn vị sản phẩm '" + request.code() + "' đã tồn tại");
-            }
-            productUnit.setCode(request.code());
         }
 
         // Cập nhật barcode
@@ -993,7 +965,6 @@ public class ProductServiceImpl implements ProductService {
 
         return new ProductUnitResponse(
                 productUnit.getId(),
-                productUnit.getCode(),
                 productUnit.getBarcode(),
                 productUnit.getConversionValue(),
                 productUnit.getIsBaseUnit(),
@@ -1039,7 +1010,6 @@ public class ProductServiceImpl implements ProductService {
     private ProductListResponse.ProductUnitSummary mapToProductUnitSummary(ProductUnit productUnit) {
         ProductListResponse.ProductUnitSummary summary = new ProductListResponse.ProductUnitSummary();
         summary.setId(productUnit.getId());
-        summary.setCode(productUnit.getCode());
         summary.setBarcode(productUnit.getBarcode());
         summary.setConversionValue(productUnit.getConversionValue());
         summary.setIsBaseUnit(productUnit.getIsBaseUnit());
@@ -1083,14 +1053,13 @@ public class ProductServiceImpl implements ProductService {
         // Build response cơ bản
         ProductUnitDetailResponse.ProductUnitDetailResponseBuilder builder = ProductUnitDetailResponse.builder()
                 .productUnitId(productUnit.getId())
-                .productUnitCode(productUnit.getCode())
                 .barcode(productUnit.getBarcode())
                 .conversionValue(productUnit.getConversionValue())
                 .isBaseUnit(productUnit.getIsBaseUnit())
                 .isActive(productUnit.getIsActive())
                 .productId(product.getId())
                 .productName(product.getName())
-                .productCode(null) // Product entity không có trường productCode
+                .productCode(product.getCode())
                 .unitId(unit.getId())
                 .unitName(unit.getName());
 

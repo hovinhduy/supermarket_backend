@@ -44,4 +44,24 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         Page<Product> findProductsAdvanced(@Param("searchTerm") String searchTerm,
                         @Param("isActive") Boolean isActive,
                         Pageable pageable);
+
+        /**
+         * Kiểm tra tồn tại mã sản phẩm
+         */
+        boolean existsByCode(String code);
+
+        /**
+         * Kiểm tra tồn tại mã sản phẩm (trừ bản thân)
+         */
+        boolean existsByCodeAndIdNot(String code, Long id);
+
+        /**
+         * Kiểm tra tồn tại tên sản phẩm
+         */
+        boolean existsByName(String name);
+
+        /**
+         * Kiểm tra tồn tại tên sản phẩm (trừ bản thân)
+         */
+        boolean existsByNameAndIdNot(String name, Long id);
 }

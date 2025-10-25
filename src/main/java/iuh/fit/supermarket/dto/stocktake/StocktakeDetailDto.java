@@ -86,12 +86,6 @@ public class StocktakeDetailDto {
         private Long productUnitId;
 
         /**
-         * Mã đơn vị sản phẩm (SKU)
-         */
-        @Schema(description = "Mã đơn vị sản phẩm (SKU)", example = "SKU001")
-        private String code;
-
-        /**
          * Mã vạch
          */
         @Schema(description = "Mã vạch", example = "1234567890123")

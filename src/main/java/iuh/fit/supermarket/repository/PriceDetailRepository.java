@@ -34,12 +34,6 @@ public interface PriceDetailRepository extends JpaRepository<PriceDetail, Long> 
         boolean existsByPricePriceIdAndProductUnitId(Long priceId, Long productUnitId);
 
         /**
-         * Tìm chi tiết giá theo mã đơn vị sản phẩm
-         */
-        @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.code = :unitCode")
-        List<PriceDetail> findByProductUnitCode(@Param("unitCode") String unitCode);
-
-        /**
          * Tìm giá hiện tại của đơn vị sản phẩm (từ bảng giá CURRENT) với thông tin unit
          */
         @Query("SELECT pd FROM PriceDetail pd " +

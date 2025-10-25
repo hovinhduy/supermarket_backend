@@ -25,28 +25,12 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
     List<ProductUnit> findByProductId(Long productId);
 
     /**
-     * Tìm đơn vị sản phẩm theo mã code
-     *
-     * @param code mã đơn vị sản phẩm
-     * @return đơn vị sản phẩm nếu tìm thấy
-     */
-    Optional<ProductUnit> findByCode(String code);
-
-    /**
      * Tìm đơn vị sản phẩm theo barcode
      *
      * @param barcode mã vạch
      * @return đơn vị sản phẩm nếu tìm thấy
      */
     Optional<ProductUnit> findByBarcode(String barcode);
-
-    /**
-     * Kiểm tra sự tồn tại của mã đơn vị sản phẩm
-     *
-     * @param code mã đơn vị sản phẩm
-     * @return true nếu tồn tại, false nếu không
-     */
-    boolean existsByCode(String code);
 
     /**
      * Kiểm tra sự tồn tại của barcode
@@ -138,15 +122,6 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
     List<ProductUnit> findActiveByProductId(@Param("productId") Long productId);
 
     /**
-     * Kiểm tra tồn tại code trùng (trừ bản thân)
-     *
-     * @param code      mã code cần kiểm tra
-     * @param excludeId ID cần loại trừ
-     * @return true nếu tồn tại, false nếu không
-     */
-    boolean existsByCodeAndIdNot(String code, Long excludeId);
-
-    /**
      * Kiểm tra tồn tại barcode trùng (trừ bản thân)
      *
      * @param barcode   mã barcode cần kiểm tra
@@ -156,7 +131,7 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
     boolean existsByBarcodeAndIdNot(String barcode, Long excludeId);
 
     /**
-     * Tìm kiếm ProductUnit theo tên sản phẩm, mã code hoặc barcode
+     * Tìm kiếm ProductUnit theo tên sản phẩm, mã sản phẩm hoặc barcode
      *
      * @param searchTerm từ khóa tìm kiếm
      * @return danh sách ProductUnit tìm được
@@ -171,7 +146,7 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
             "AND p.isDeleted = false " +
             "AND p.isActive = true " +
             "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
-            "OR LOWER(pu.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(p.code) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
             "OR LOWER(pu.barcode) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     List<ProductUnit> searchProductUnits(@Param("searchTerm") String searchTerm);
 

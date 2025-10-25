@@ -1028,7 +1028,7 @@ public class PromotionService {
         info.setProductUnitId(productUnit.getId());
         info.setProductName(productUnit.getProduct().getName());
         info.setUnitName(productUnit.getUnit().getName());
-        info.setVariantCode(productUnit.getCode()); // Sử dụng code thay vì variantCode
+        info.setVariantCode(String.valueOf(productUnit.getId())); // Sử dụng ID làm variant code
 
         // Lấy giá hiện tại (có thể cần implement logic lấy giá từ PriceDetail)
         // Tạm thời để null, sẽ implement sau

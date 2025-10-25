@@ -16,7 +16,6 @@ import java.util.List;
  */
 @Entity
 @Table(name = "product_units", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_product_unit_code", columnNames = {"code"}),
         @UniqueConstraint(name = "uk_product_unit_product_unit", columnNames = {"product_id", "unit_id"})
 })
 @Data
@@ -31,12 +30,6 @@ public class ProductUnit {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
-
-    /**
-     * Mã đơn vị sản phẩm (duy nhất) - SKU cho đơn vị này
-     */
-    @Column(name = "code", length = 50, unique = true)
-    private String code;
 
     /**
      * Mã vạch của đơn vị sản phẩm

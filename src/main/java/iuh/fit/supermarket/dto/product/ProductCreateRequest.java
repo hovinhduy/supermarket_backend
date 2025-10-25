@@ -23,6 +23,13 @@ import java.util.List;
 public class ProductCreateRequest {
 
     /**
+     * Mã sản phẩm (tùy chọn - tự động sinh nếu không nhập)
+     */
+    @Size(max = 50, message = "Mã sản phẩm không được vượt quá 50 ký tự")
+    @Schema(description = "Mã sản phẩm (tùy chọn - tự động sinh nếu không nhập)", example = "SP001")
+    private String code;
+
+    /**
      * Tên sản phẩm
      */
     @NotBlank(message = "Tên sản phẩm không được để trống")

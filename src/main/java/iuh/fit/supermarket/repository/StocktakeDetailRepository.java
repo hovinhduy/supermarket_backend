@@ -172,7 +172,7 @@ public interface StocktakeDetailRepository extends JpaRepository<StocktakeDetail
      * @return List<StocktakeDetail>
      */
     @Query("SELECT sd FROM StocktakeDetail sd WHERE sd.stocktake.stocktakeId = :stocktakeId AND (" +
-            "LOWER(sd.productUnit.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(sd.productUnit.product.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(sd.productUnit.barcode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(sd.productUnit.product.name) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<StocktakeDetail> findByStocktakeIdAndKeyword(@Param("stocktakeId") Integer stocktakeId,

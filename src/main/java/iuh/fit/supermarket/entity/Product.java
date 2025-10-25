@@ -30,6 +30,12 @@ public class Product {
     private Long id;
 
     /**
+     * Mã sản phẩm (duy nhất)
+     */
+    @Column(name = "code", length = 50, unique = true, nullable = false)
+    private String code;
+
+    /**
      * Tên sản phẩm
      */
     @Column(name = "name", length = 255, nullable = false)

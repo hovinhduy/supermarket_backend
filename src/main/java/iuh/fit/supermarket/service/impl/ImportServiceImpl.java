@@ -326,7 +326,6 @@ public class ImportServiceImpl implements ImportService {
         if (detail.getProductUnit() != null) {
             ImportResponse.ImportDetailResponse.ProductUnitInfo productUnitInfo = new ImportResponse.ImportDetailResponse.ProductUnitInfo();
             productUnitInfo.setProductUnitId(detail.getProductUnit().getId());
-            productUnitInfo.setCode(detail.getProductUnit().getCode());
             productUnitInfo.setBarcode(detail.getProductUnit().getBarcode());
             productUnitInfo.setConversionValue(detail.getProductUnit().getConversionValue());
 

@@ -18,11 +18,6 @@ public record ProductUnitResponse(
                 @Schema(description = "ID đơn vị sản phẩm", example = "1") Long id,
 
                 /**
-                 * Mã đơn vị sản phẩm
-                 */
-                @Schema(description = "Mã đơn vị sản phẩm", example = "COCA_CHAI_001") String code,
-
-                /**
                  * Mã vạch
                  */
                 @Schema(description = "Mã vạch của đơn vị sản phẩm", example = "1234567890123") String barcode,
