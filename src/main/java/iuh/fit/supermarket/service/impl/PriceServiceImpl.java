@@ -75,7 +75,8 @@ public class PriceServiceImpl implements PriceService {
         price.setStartDate(request.getStartDate());
         price.setEndDate(request.getEndDate());
         price.setDescription(request.getDescription());
-        price.setStatus(PriceType.UPCOMING);
+        // Sử dụng trạng thái được truyền, mặc định là PAUSED nếu không cung cấp
+        price.setStatus(request.getStatus() != null ? request.getStatus() : PriceType.PAUSED);
         price.setCreatedBy(currentEmployee);
         price.setUpdatedBy(currentEmployee);
 
@@ -88,10 +89,22 @@ public class PriceServiceImpl implements PriceService {
                 !request.getPriceDetails().isEmpty()) {
             priceDetails = createPriceDetails(price, request.getPriceDetails());
             price.setPriceDetails(priceDetails);
+            
+            // Chỉ tự động kích hoạt khi người dùng không chỉ định trạng thái hoặc chỉ định PAUSED
+            if (request.getStatus() == null || request.getStatus() == PriceType.PAUSED) {
+                try {
+                    validateNoConflictWithCurrentPrices(price);
+                    price.setStatus(PriceType.ACTIVE);
+                    log.info("Tự động kích hoạt bảng giá: {}", price.getPriceCode());
+                } catch (PriceConflictException e) {
+                    log.warn("Không thể kích hoạt bảng giá do có xung đột: {}", e.getMessage());
+                    // Giữ trạng thái PAUSED nếu có xung đột
+                }
+            }
         }
 
-        log.info("Đã tạo bảng giá thành công: {} với {} chi tiết giá",
-                price.getPriceCode(), priceDetails.size());
+        log.info("Đã tạo bảng giá thành công: {} với {} chi tiết giá, trạng thái: {}",
+                price.getPriceCode(), priceDetails.size(), price.getStatus());
 
         return mapToPriceResponse(price, true);
     }
@@ -107,8 +120,10 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Kiểm tra quyền chỉnh sửa
-        validatePriceEditable(price);
+        // Chỉ kiểm tra quyền chỉnh sửa khi có chỉnh sửa chi tiết giá
+        if (request.getPriceDetails() != null && !request.getPriceDetails().isEmpty()) {
+            validatePriceEditable(price);
+        }
 
         // Lấy thông tin nhân viên hiện tại
         Employee currentEmployee = getCurrentEmployee();
@@ -125,7 +140,7 @@ public class PriceServiceImpl implements PriceService {
         }
 
         // Cập nhật ngày bắt đầu (chỉ cho phép nếu chưa active)
-        if (request.getStartDate() != null && price.getStatus() == PriceType.UPCOMING) {
+        if (request.getStartDate() != null && price.getStatus() == PriceType.ACTIVE) {
             validateStartDate(request.getStartDate());
             price.setStartDate(request.getStartDate());
         }
@@ -133,6 +148,8 @@ public class PriceServiceImpl implements PriceService {
         // Cập nhật trạng thái (chỉ cho phép một số trạng thái)
         if (request.getStatus() != null) {
             validateStatusTransition(price.getStatus(), request.getStatus());
+            // Xử lý logic đặc biệt khi chuyển đổi trạng thái (kiểm tra xung đột)
+            handleStatusTransition(price, request.getStatus());
             price.setStatus(request.getStatus());
         }
 
@@ -235,8 +252,8 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Chỉ cho phép xóa bảng giá UPCOMING hoặc PAUSED
-        if (price.getStatus() != PriceType.UPCOMING && price.getStatus() != PriceType.PAUSED) {
+        // Chỉ cho phép xóa bảng giá ACTIVE hoặc PAUSED
+        if (price.getStatus() != PriceType.ACTIVE && price.getStatus() != PriceType.PAUSED) {
             throw PriceConflictException.cannotEditPrice(price.getStatus().name());
         }
 
@@ -255,6 +272,8 @@ public class PriceServiceImpl implements PriceService {
 
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
+
+        log.info("Trạng thái hiện tại của bảng giá {}: {}", priceId, price.getStatus());
 
         // Validate chuyển đổi trạng thái
         validateStatusTransition(price.getStatus(), request.getStatus());
@@ -283,10 +302,10 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Chỉ cho phép kích hoạt từ UPCOMING hoặc PAUSED
-        if (price.getStatus() != PriceType.UPCOMING && price.getStatus() != PriceType.PAUSED) {
+        // Chỉ cho phép kích hoạt từ ACTIVE hoặc PAUSED
+        if (price.getStatus() != PriceType.ACTIVE && price.getStatus() != PriceType.PAUSED) {
             throw PriceConflictException.invalidStatusTransition(
-                    price.getStatus().name(), PriceType.CURRENT.name());
+                    price.getStatus().name(), PriceType.ACTIVE.name());
         }
 
         // Kiểm tra thời gian bắt đầu
@@ -302,9 +321,9 @@ public class PriceServiceImpl implements PriceService {
         }
 
         // Xử lý logic kích hoạt
-        handleStatusTransition(price, PriceType.CURRENT);
+        handleStatusTransition(price, PriceType.ACTIVE);
 
-        price.setStatus(PriceType.CURRENT);
+        price.setStatus(PriceType.ACTIVE);
         price.setUpdatedBy(getCurrentEmployee());
 
         price = priceRepository.save(price);
@@ -324,8 +343,8 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Chỉ cho phép tạm dừng từ CURRENT
-        if (price.getStatus() != PriceType.CURRENT) {
+        // Chỉ cho phép tạm dừng từ ACTIVE
+        if (price.getStatus() != PriceType.ACTIVE) {
             throw PriceConflictException.invalidStatusTransition(
                     price.getStatus().name(), PriceType.PAUSED.name());
         }
@@ -360,7 +379,7 @@ public class PriceServiceImpl implements PriceService {
     @Override
     @Transactional(readOnly = true)
     public List<PriceResponse> getCurrentPrices() {
-        return getPricesByStatus(PriceType.CURRENT);
+        return getPricesByStatus(PriceType.ACTIVE);
     }
 
     /**
@@ -372,29 +391,8 @@ public class PriceServiceImpl implements PriceService {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // Chuyển UPCOMING sang CURRENT
-        List<Price> pricesToActivate = priceRepository.findPricesToActivate(PriceType.UPCOMING, now);
-        for (Price price : pricesToActivate) {
-            try {
-                log.info("Tự động kích hoạt bảng giá: {}", price.getPriceCode());
-
-                // Kiểm tra bảng giá phải có ít nhất một chi tiết giá
-                long priceDetailCount = priceDetailRepository.countByPricePriceId(price.getPriceId());
-                if (priceDetailCount == 0) {
-                    log.warn("Bỏ qua tự động kích hoạt bảng giá trống: {}", price.getPriceCode());
-                    continue;
-                }
-
-                handleStatusTransition(price, PriceType.CURRENT);
-                price.setStatus(PriceType.CURRENT);
-                priceRepository.save(price);
-            } catch (Exception e) {
-                log.error("Lỗi khi tự động kích hoạt bảng giá {}: {}", price.getPriceCode(), e.getMessage());
-            }
-        }
-
-        // Chuyển CURRENT sang EXPIRED
-        List<Price> pricesToExpire = priceRepository.findPricesToExpire(PriceType.CURRENT, now);
+        // Chuyển ACTIVE sang EXPIRED
+        List<Price> pricesToExpire = priceRepository.findPricesToExpire(PriceType.ACTIVE, now);
         for (Price price : pricesToExpire) {
             try {
                 log.info("Tự động hết hạn bảng giá: {}", price.getPriceCode());
@@ -405,8 +403,8 @@ public class PriceServiceImpl implements PriceService {
             }
         }
 
-        log.info("Hoàn thành tự động cập nhật trạng thái bảng giá: {} kích hoạt, {} hết hạn",
-                pricesToActivate.size(), pricesToExpire.size());
+        log.info("Hoàn thành tự động cập nhật trạng thái bảng giá: {} hết hạn",
+                pricesToExpire.size());
     }
 
     /**
@@ -420,6 +418,11 @@ public class PriceServiceImpl implements PriceService {
         // Validate ngày kết thúc
         if (request.getEndDate() != null) {
             validateEndDate(request.getStartDate(), request.getEndDate());
+        }
+
+        // Validate trạng thái khi tạo mới
+        if (!isUpdate) {
+            validateStatusForCreate(request.getStatus(), request.getPriceDetails());
         }
 
         // Validate chi tiết giá
@@ -452,18 +455,30 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Kiểm tra quyền chỉnh sửa
+        // Kiểm tra quyền chỉnh sửa (luôn kiểm tra vì đây là thao tác trực tiếp trên chi tiết giá)
         validatePriceEditable(price);
 
         // Tạo chi tiết giá mới
         List<PriceDetail> newPriceDetails = createPriceDetails(price, priceDetails);
 
+        // Nếu bảng giá đang PAUSED và thêm chi tiết giá thành công, thử kích hoạt
+        if (price.getStatus() == PriceType.PAUSED) {
+            try {
+                validateNoConflictWithCurrentPrices(price);
+                price.setStatus(PriceType.ACTIVE);
+                log.info("Tự động kích hoạt bảng giá sau khi thêm chi tiết giá: {}", price.getPriceCode());
+            } catch (PriceConflictException e) {
+                log.warn("Không thể kích hoạt bảng giá do có xung đột: {}", e.getMessage());
+                // Giữ trạng thái PAUSED nếu có xung đột
+            }
+        }
+
         // Cập nhật thông tin
         price.setUpdatedBy(getCurrentEmployee());
         priceRepository.save(price);
 
-        log.info("Đã thêm {} chi tiết giá vào bảng giá: {}", newPriceDetails.size(),
-                price.getPriceCode());
+        log.info("Đã thêm {} chi tiết giá vào bảng giá: {}, trạng thái: {}", 
+                newPriceDetails.size(), price.getPriceCode(), price.getStatus());
 
         return mapToPriceResponse(price, true);
     }
@@ -479,7 +494,7 @@ public class PriceServiceImpl implements PriceService {
         Price price = priceRepository.findById(priceId)
                 .orElseThrow(() -> new PriceNotFoundException(priceId));
 
-        // Kiểm tra quyền chỉnh sửa
+        // Kiểm tra quyền chỉnh sửa (luôn kiểm tra vì đây là thao tác trực tiếp trên chi tiết giá)
         validatePriceEditable(price);
 
         // Xóa chi tiết giá
@@ -536,7 +551,7 @@ public class PriceServiceImpl implements PriceService {
      * Kiểm tra bảng giá có thể chỉnh sửa không
      */
     private void validatePriceEditable(Price price) {
-        if (price.getStatus() == PriceType.CURRENT || price.getStatus() == PriceType.EXPIRED) {
+        if (price.getStatus() == PriceType.ACTIVE || price.getStatus() == PriceType.EXPIRED) {
             throw PriceConflictException.cannotEditPrice(price.getStatus().name());
         }
     }
@@ -560,6 +575,31 @@ public class PriceServiceImpl implements PriceService {
     }
 
     /**
+     * Validate trạng thái khi tạo mới bảng giá
+     */
+    private void validateStatusForCreate(PriceType status, 
+            List<PriceCreateRequest.PriceDetailCreateRequest> priceDetails) {
+        // Nếu không có chi tiết giá, chỉ cho phép trạng thái PAUSED
+        if (priceDetails == null || priceDetails.isEmpty()) {
+            if (status == PriceType.ACTIVE) {
+                throw new PriceValidationException(
+                        "Không thể tạo bảng giá ACTIVE khi không có chi tiết giá");
+            }
+            if (status == PriceType.EXPIRED) {
+                throw new PriceValidationException(
+                        "Không thể tạo bảng giá EXPIRED");
+            }
+        }
+        
+        // Nếu có chi tiết giá, cho phép cả ACTIVE và PAUSED
+        // EXPIRED vẫn không được phép khi tạo mới
+        if (status == PriceType.EXPIRED) {
+            throw new PriceValidationException(
+                    "Không thể tạo bảng giá EXPIRED");
+        }
+    }
+
+    /**
      * Validate chi tiết giá
      */
     private void validatePriceDetails(List<PriceCreateRequest.PriceDetailCreateRequest> priceDetails,
@@ -579,31 +619,40 @@ public class PriceServiceImpl implements PriceService {
             throw new PriceValidationException("Không được có đơn vị sản phẩm trùng lặp trong bảng giá");
         }
 
-        // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
+        // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá ACTIVE khác không
         for (PriceCreateRequest.PriceDetailCreateRequest detail : priceDetails) {
             if (isUpdate && currentPriceId != null) {
-                // Tìm bảng giá CURRENT khác chứa đơn vị sản phẩm này
-                List<Price> currentPricesWithProductUnit = priceRepository.findCurrentPricesByProductUnitId(
-                        PriceType.CURRENT, detail.getProductUnitId());
+                // Sử dụng phương thức repository để kiểm tra hiệu quả hơn
+                boolean existsInOtherActivePrice = priceRepository.existsProductUnitInOtherCurrentPrice(
+                        PriceType.ACTIVE, detail.getProductUnitId(), currentPriceId);
 
-                // Loại bỏ bảng giá hiện tại khỏi danh sách kiểm tra
-                currentPricesWithProductUnit = currentPricesWithProductUnit.stream()
-                        .filter(p -> !p.getPriceId().equals(currentPriceId))
-                        .collect(Collectors.toList());
-
-                if (!currentPricesWithProductUnit.isEmpty()) {
+                if (existsInOtherActivePrice) {
                     ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
                             .orElse(null);
-                    String productUnitName = detail.getProductUnitId().toString();
-                    Price conflictPrice = currentPricesWithProductUnit.get(0);
-                    throw PriceConflictException.variantAlreadyInCurrentPrice(
-                            productUnitName, conflictPrice.getPriceCode());
+                    String productUnitName = productUnit != null ? 
+                            productUnit.getBarcode() : "ID: " + detail.getProductUnitId();
+                    
+                    // Lấy thông tin bảng giá xung đột để hiển thị
+                    List<Price> conflictPrices = priceRepository.findCurrentPricesByProductUnitId(
+                            PriceType.ACTIVE, detail.getProductUnitId());
+                    conflictPrices = conflictPrices.stream()
+                            .filter(p -> !p.getPriceId().equals(currentPriceId))
+                            .collect(Collectors.toList());
+                    
+                    if (!conflictPrices.isEmpty()) {
+                        throw PriceConflictException.variantAlreadyInCurrentPrice(
+                                productUnitName, conflictPrices.get(0).getPriceCode());
+                    }
                 }
             } else {
+                // Kiểm tra cho trường hợp tạo mới
                 List<Price> currentPrices = priceRepository.findCurrentPricesByProductUnitId(
-                        PriceType.CURRENT, detail.getProductUnitId());
+                        PriceType.ACTIVE, detail.getProductUnitId());
                 if (!currentPrices.isEmpty()) {
-                    String productUnitName = detail.getProductUnitId().toString();
+                    ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
+                            .orElse(null);
+                    String productUnitName = productUnit != null ? 
+                            productUnit.getBarcode() : "ID: " + detail.getProductUnitId();
                     throw PriceConflictException.variantAlreadyInCurrentPrice(
                             productUnitName, currentPrices.get(0).getPriceCode());
                 }
@@ -622,14 +671,11 @@ public class PriceServiceImpl implements PriceService {
         boolean isValidTransition = false;
 
         switch (currentStatus) {
-            case UPCOMING:
-                isValidTransition = newStatus == PriceType.CURRENT || newStatus == PriceType.PAUSED;
-                break;
-            case CURRENT:
+            case ACTIVE:
                 isValidTransition = newStatus == PriceType.PAUSED || newStatus == PriceType.EXPIRED;
                 break;
             case PAUSED:
-                isValidTransition = newStatus == PriceType.CURRENT || newStatus == PriceType.EXPIRED;
+                isValidTransition = newStatus == PriceType.ACTIVE || newStatus == PriceType.EXPIRED;
                 break;
             case EXPIRED:
                 // Không cho phép chuyển từ EXPIRED sang trạng thái khác
@@ -647,8 +693,11 @@ public class PriceServiceImpl implements PriceService {
      * Xử lý logic đặc biệt khi chuyển đổi trạng thái
      */
     private void handleStatusTransition(Price price, PriceType newStatus) {
-        if (newStatus == PriceType.CURRENT) {
-            // Khi kích hoạt bảng giá, kiểm tra xung đột với bảng giá CURRENT khác
+        log.info("Xử lý chuyển đổi trạng thái: {} -> {}", price.getStatus(), newStatus);
+        
+        if (newStatus == PriceType.ACTIVE) {
+            // Khi kích hoạt bảng giá, kiểm tra xung đột với bảng giá ACTIVE khác
+            log.info("Kiểm tra xung đột khi kích hoạt bảng giá ID: {}", price.getPriceId());
             validateNoConflictWithCurrentPrices(price);
         }
     }
@@ -658,21 +707,32 @@ public class PriceServiceImpl implements PriceService {
      */
     private void validateNoConflictWithCurrentPrices(Price price) {
         List<PriceDetail> priceDetails = priceDetailRepository.findByPricePriceId(price.getPriceId());
+        
+        log.info("Kiểm tra xung đột cho bảng giá ID: {} với {} chi tiết giá", 
+                price.getPriceId(), priceDetails.size());
 
         for (PriceDetail detail : priceDetails) {
-            // Tìm bảng giá CURRENT khác chứa đơn vị sản phẩm này
-            List<Price> currentPricesWithProductUnit = priceRepository.findCurrentPricesByProductUnitId(
-                    PriceType.CURRENT, detail.getProductUnit().getId());
+            // Sử dụng phương thức repository để kiểm tra hiệu quả hơn
+            boolean existsInOtherActivePrice = priceRepository.existsProductUnitInOtherCurrentPrice(
+                    PriceType.ACTIVE, detail.getProductUnit().getId(), price.getPriceId());
+            
+            log.info("Kiểm tra đơn vị sản phẩm ID: {} trong bảng giá khác: {}", 
+                    detail.getProductUnit().getId(), existsInOtherActivePrice);
 
-            // Loại bỏ bảng giá hiện tại khỏi danh sách kiểm tra
-            currentPricesWithProductUnit = currentPricesWithProductUnit.stream()
-                    .filter(p -> !p.getPriceId().equals(price.getPriceId()))
-                    .collect(Collectors.toList());
-
-            if (!currentPricesWithProductUnit.isEmpty()) {
-                Price conflictPrice = currentPricesWithProductUnit.get(0);
-                throw PriceConflictException.variantAlreadyInCurrentPrice(
-                        detail.getProductUnit().getId().toString(), conflictPrice.getPriceCode());
+            if (existsInOtherActivePrice) {
+                // Lấy thông tin bảng giá xung đột để hiển thị
+                List<Price> conflictPrices = priceRepository.findCurrentPricesByProductUnitId(
+                        PriceType.ACTIVE, detail.getProductUnit().getId());
+                conflictPrices = conflictPrices.stream()
+                        .filter(p -> !p.getPriceId().equals(price.getPriceId()))
+                        .collect(Collectors.toList());
+                
+                if (!conflictPrices.isEmpty()) {
+                    String productUnitName = detail.getProductUnit().getBarcode() != null ? 
+                            detail.getProductUnit().getBarcode() : "ID: " + detail.getProductUnit().getId();
+                    throw PriceConflictException.variantAlreadyInCurrentPrice(
+                            productUnitName, conflictPrices.get(0).getPriceCode());
+                }
             }
         }
     }
@@ -692,29 +752,33 @@ public class PriceServiceImpl implements PriceService {
         for (PriceCreateRequest.PriceDetailCreateRequest request : requests) {
             // Kiểm tra đơn vị sản phẩm tồn tại
             ProductUnit productUnit = productUnitRepository.findById(request.getProductUnitId())
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new PriceValidationException(
                             "Không tìm thấy đơn vị sản phẩm ID: " + request.getProductUnitId()));
 
             // Kiểm tra đơn vị sản phẩm đã tồn tại trong bảng giá này chưa
             if (priceDetailRepository.existsByPricePriceIdAndProductUnitId(price.getPriceId(),
                     request.getProductUnitId())) {
                 throw new PriceConflictException(
-                        "Đơn vị sản phẩm " + productUnit.getId() + " đã tồn tại trong bảng giá");
+                        "Đơn vị sản phẩm " + productUnit.getBarcode() + " đã tồn tại trong bảng giá");
             }
 
-            // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
-            List<Price> currentPricesWithProductUnit = priceRepository.findCurrentPricesByProductUnitId(
-                    PriceType.CURRENT, request.getProductUnitId());
+            // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá ACTIVE khác không
+            // Sử dụng phương thức repository để kiểm tra hiệu quả hơn
+            boolean existsInOtherActivePrice = priceRepository.existsProductUnitInOtherCurrentPrice(
+                    PriceType.ACTIVE, request.getProductUnitId(), price.getPriceId());
 
-            // Loại bỏ bảng giá hiện tại khỏi danh sách kiểm tra
-            currentPricesWithProductUnit = currentPricesWithProductUnit.stream()
-                    .filter(p -> !p.getPriceId().equals(price.getPriceId()))
-                    .collect(Collectors.toList());
-
-            if (!currentPricesWithProductUnit.isEmpty()) {
-                Price conflictPrice = currentPricesWithProductUnit.get(0);
-                throw PriceConflictException.variantAlreadyInCurrentPrice(
-                        productUnit.getId().toString(), conflictPrice.getPriceCode());
+            if (existsInOtherActivePrice) {
+                // Lấy thông tin bảng giá xung đột để hiển thị
+                List<Price> conflictPrices = priceRepository.findCurrentPricesByProductUnitId(
+                        PriceType.ACTIVE, request.getProductUnitId());
+                conflictPrices = conflictPrices.stream()
+                        .filter(p -> !p.getPriceId().equals(price.getPriceId()))
+                        .collect(Collectors.toList());
+                
+                if (!conflictPrices.isEmpty()) {
+                    throw PriceConflictException.variantAlreadyInCurrentPrice(
+                            productUnit.getBarcode(), conflictPrices.get(0).getPriceCode());
+                }
             }
 
             // Tạo chi tiết giá
@@ -743,8 +807,33 @@ public class PriceServiceImpl implements PriceService {
             } else if (request.getPriceDetailId() == null) {
                 // Tạo mới chi tiết giá
                 ProductUnit productUnit = productUnitRepository.findById(request.getProductUnitId())
-                        .orElseThrow(() -> new RuntimeException(
+                        .orElseThrow(() -> new PriceValidationException(
                                 "Không tìm thấy đơn vị sản phẩm ID: " + request.getProductUnitId()));
+
+                // Kiểm tra đơn vị sản phẩm đã tồn tại trong bảng giá này chưa
+                if (priceDetailRepository.existsByPricePriceIdAndProductUnitId(price.getPriceId(),
+                        request.getProductUnitId())) {
+                    throw new PriceConflictException(
+                            "Đơn vị sản phẩm " + productUnit.getBarcode() + " đã tồn tại trong bảng giá");
+                }
+
+                // Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá ACTIVE khác không
+                boolean existsInOtherActivePrice = priceRepository.existsProductUnitInOtherCurrentPrice(
+                        PriceType.ACTIVE, request.getProductUnitId(), price.getPriceId());
+
+                if (existsInOtherActivePrice) {
+                    // Lấy thông tin bảng giá xung đột để hiển thị
+                    List<Price> conflictPrices = priceRepository.findCurrentPricesByProductUnitId(
+                            PriceType.ACTIVE, request.getProductUnitId());
+                    conflictPrices = conflictPrices.stream()
+                            .filter(p -> !p.getPriceId().equals(price.getPriceId()))
+                            .collect(Collectors.toList());
+                    
+                    if (!conflictPrices.isEmpty()) {
+                        throw PriceConflictException.variantAlreadyInCurrentPrice(
+                                productUnit.getBarcode(), conflictPrices.get(0).getPriceCode());
+                    }
+                }
 
                 PriceDetail priceDetail = new PriceDetail();
                 priceDetail.setPrice(price);
@@ -755,7 +844,7 @@ public class PriceServiceImpl implements PriceService {
             } else {
                 // Cập nhật chi tiết giá
                 PriceDetail priceDetail = priceDetailRepository.findById(request.getPriceDetailId())
-                        .orElseThrow(() -> new RuntimeException(
+                        .orElseThrow(() -> new PriceValidationException(
                                 "Không tìm thấy chi tiết giá ID: " + request.getPriceDetailId()));
 
                 priceDetail.setSalePrice(request.getSalePrice());
@@ -853,7 +942,7 @@ public class PriceServiceImpl implements PriceService {
     @Transactional(readOnly = true)
     public PriceDetailDto getCurrentPriceByProductUnitId(Long productUnitId) {
         Optional<PriceDetail> priceDetailOpt = priceDetailRepository
-                .findCurrentPriceByProductUnitId(productUnitId, PriceType.CURRENT);
+                .findCurrentPriceByProductUnitId(productUnitId, PriceType.ACTIVE);
 
         if (priceDetailOpt.isEmpty()) {
             return null;

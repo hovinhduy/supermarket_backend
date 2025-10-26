@@ -97,14 +97,14 @@ public class PriceResponse {
      * Kiểm tra bảng giá có đang hoạt động không
      */
     public boolean isActive() {
-        return status == PriceType.CURRENT;
+        return status == PriceType.ACTIVE;
     }
 
     /**
      * Kiểm tra bảng giá có thể chỉnh sửa không
      */
     public boolean isEditable() {
-        return status == PriceType.UPCOMING || status == PriceType.PAUSED;
+        return status == PriceType.ACTIVE || status == PriceType.PAUSED;
     }
 
     /**

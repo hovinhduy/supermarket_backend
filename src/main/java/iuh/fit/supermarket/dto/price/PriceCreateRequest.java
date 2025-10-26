@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import iuh.fit.supermarket.enums.PriceType;
 
 /**
  * DTO cho yêu cầu tạo bảng giá mới
@@ -57,6 +58,13 @@ public class PriceCreateRequest {
      */
     @Valid
     private List<PriceDetailCreateRequest> priceDetails;
+
+    /**
+     * Trạng thái bảng giá (tùy chọn - mặc định là PAUSED)
+     * Nếu không cung cấp, hệ thống sẽ tự động đặt là PAUSED
+     * Nếu có chi tiết giá và không có xung đột, có thể đặt là ACTIVE
+     */
+    private PriceType status;
 
     /**
      * DTO cho yêu cầu tạo chi tiết giá

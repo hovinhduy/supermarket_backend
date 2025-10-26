@@ -177,7 +177,7 @@ public class PromotionCheckService {
         Map<Long, BigDecimal> priceMap = new HashMap<>();
 
         for (Long productUnitId : productUnitIds) {
-            priceDetailRepository.findCurrentPriceByProductUnitId(productUnitId, iuh.fit.supermarket.enums.PriceType.CURRENT)
+            priceDetailRepository.findCurrentPriceByProductUnitId(productUnitId, iuh.fit.supermarket.enums.PriceType.ACTIVE)
                     .ifPresent(priceDetail -> priceMap.put(productUnitId, priceDetail.getSalePrice()));
         }
 

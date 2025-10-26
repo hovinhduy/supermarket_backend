@@ -59,6 +59,10 @@ public class PriceController {
             log.error("Dữ liệu bảng giá không hợp lệ: ", e);
             ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        } catch (PriceConflictException e) {
+            log.error("Xung đột dữ liệu bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         } catch (Exception e) {
             log.error("Lỗi khi tạo bảng giá: ", e);
             ApiResponse<PriceResponse> response = ApiResponse.error("Lỗi hệ thống khi tạo bảng giá");
@@ -79,6 +83,11 @@ public class PriceController {
         log.info("API cập nhật bảng giá ID: {}", priceId);
 
         try {
+            // Chỉ kiểm tra trạng thái active khi có chỉnh sửa chi tiết giá
+            if (request.getPriceDetails() != null && !request.getPriceDetails().isEmpty()) {
+                log.info("Kiểm tra trạng thái active khi chỉnh sửa chi tiết giá");
+            }
+
             PriceResponse priceResponse = priceService.updatePrice(priceId, request);
 
             ApiResponse<PriceResponse> response = ApiResponse.success(
@@ -123,6 +132,10 @@ public class PriceController {
 
             return ResponseEntity.ok(response);
 
+        } catch (PriceConflictException e) {
+            log.error("Xung đột dữ liệu bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
         } catch (Exception e) {
             log.error("Lỗi khi lấy thông tin bảng giá: ", e);
 
@@ -426,6 +439,14 @@ public class PriceController {
 
             return ResponseEntity.ok(response);
 
+        } catch (PriceConflictException e) {
+            log.error("Xung đột dữ liệu bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        } catch (PriceValidationException e) {
+            log.error("Dữ liệu chi tiết giá không hợp lệ: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             log.error("Lỗi khi thêm chi tiết giá: ", e);
 
@@ -454,6 +475,14 @@ public class PriceController {
 
             return ResponseEntity.ok(response);
 
+        } catch (PriceConflictException e) {
+            log.error("Xung đột dữ liệu bảng giá: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        } catch (PriceValidationException e) {
+            log.error("Dữ liệu chi tiết giá không hợp lệ: ", e);
+            ApiResponse<PriceResponse> response = ApiResponse.error(e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
             log.error("Lỗi khi xóa chi tiết giá: ", e);
 

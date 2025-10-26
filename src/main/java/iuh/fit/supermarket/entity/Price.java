@@ -59,7 +59,7 @@ public class Price {
     /**
      * Ngày kết thúc hiệu lực của bảng giá
      */
-    @Column(name = "end_date")
+    @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
     /**
@@ -69,11 +69,11 @@ public class Price {
     private String description;
 
     /**
-     * Trạng thái của bảng giá (CURRENT, PAUSED, UPCOMING, EXPIRED)
+     * Trạng thái của bảng giá (ACTIVE, PAUSED, EXPIRED)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
-    private PriceType status = PriceType.UPCOMING;
+    private PriceType status = PriceType.ACTIVE;
 
     /**
      * Thời gian tạo bảng giá

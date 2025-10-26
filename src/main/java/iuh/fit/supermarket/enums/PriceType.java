@@ -8,17 +8,13 @@ public enum PriceType {
     /**
      * Đang áp dụng
      */
-    CURRENT("current"),
+    ACTIVE("active"),
 
     /**
      * Tạm dừng áp dụng
      */
     PAUSED("paused"),
-
-    /**
-     * Chưa áp dụng
-     */
-    UPCOMING("upcoming"),
+    
     /**
      * Đã hết hiệu lực
      */
