@@ -49,6 +49,7 @@ public class PromotionCheckService {
         log.info("Bắt đầu kiểm tra khuyến mãi cho {} sản phẩm", request.items().size());
 
         Map<Long, ProductUnit> productUnitMap = loadProductUnits(request.items());
+        // Tải giá ban đầu cho các sản phẩm trong request
         Map<Long, BigDecimal> priceMap = loadPrices(productUnitMap.keySet());
 
         // Tải tất cả khuyến mãi giảm giá sản phẩm đang active
@@ -103,19 +104,10 @@ public class PromotionCheckService {
 
             boolean hasBuyXGetYPromotion = !applicableBuyXGetY.isEmpty();
 
-            // Nếu có BUY_X_GET_Y, tính số lượng quà tặng và cập nhật lineTotal, quantity
+            // Nếu có BUY_X_GET_Y, tính số lượng quà tặng
             int actualBuyQuantity = item.quantity();
-            if (hasBuyXGetYPromotion) {
-                int totalGiftQuantity = 0;
-                for (BuyXGetYDetail promotion : applicableBuyXGetY) {
-                    int giftQuantityActual = calculateGiftQuantity(promotion, item.quantity());
-                    BigDecimal giftTotalPrice = unitPrice.multiply(BigDecimal.valueOf(giftQuantityActual));
-                    lineTotal = lineTotal.subtract(giftTotalPrice);
-                    totalGiftQuantity += giftQuantityActual;
-                }
-                // Số lượng mua thực tế = tổng quantity - số lượng tặng
-                actualBuyQuantity = item.quantity() - totalGiftQuantity;
-            }
+            // Không thay đổi lineTotal của sản phẩm mua, giữ nguyên giá trị gốc
+            // lineTotal = unitPrice * quantity (giữ nguyên)
 
             CartItemResponseDTO cartItem = new CartItemResponseDTO(
                     lineItemId++,
@@ -172,13 +164,24 @@ public class PromotionCheckService {
 
     /**
      * Tải giá hiện tại của các sản phẩm
+     * Nếu có nhiều giá ACTIVE, lấy giá từ bảng giá có ngày tạo mới nhất
      */
     private Map<Long, BigDecimal> loadPrices(Set<Long> productUnitIds) {
         Map<Long, BigDecimal> priceMap = new HashMap<>();
 
         for (Long productUnitId : productUnitIds) {
-            priceDetailRepository.findCurrentPriceByProductUnitId(productUnitId, iuh.fit.supermarket.enums.PriceType.ACTIVE)
-                    .ifPresent(priceDetail -> priceMap.put(productUnitId, priceDetail.getSalePrice()));
+            // Sử dụng phương thức trả về List để xử lý trường hợp có nhiều giá
+            List<PriceDetail> priceDetails = priceDetailRepository.findByProductUnitIdAndPriceStatus(
+                    productUnitId, iuh.fit.supermarket.enums.PriceType.ACTIVE);
+            
+            if (!priceDetails.isEmpty()) {
+                // Lấy giá từ bảng giá có ngày tạo mới nhất
+                PriceDetail latestPriceDetail = priceDetails.stream()
+                        .max((pd1, pd2) -> pd1.getPrice().getCreatedAt().compareTo(pd2.getPrice().getCreatedAt()))
+                        .orElse(priceDetails.get(0));
+                
+                priceMap.put(productUnitId, latestPriceDetail.getSalePrice());
+            }
         }
 
         return priceMap;
@@ -231,8 +234,8 @@ public class PromotionCheckService {
 
     /**
      * Kiểm tra xem khuyến mãi Mua X Tặng Y có áp dụng được không
-     * Lưu ý: quantity phải bao gồm cả số lượng quà tặng
-     * Ví dụ: Mua 2 tặng 1 thì quantity phải >= 3
+     * Lưu ý: quantity là số lượng mua thực tế, không bao gồm quà tặng
+     * Ví dụ: Mua 5 tặng 1 thì quantity chỉ cần >= 5
      */
     private boolean isBuyXGetYApplicable(BuyXGetYDetail detail, Long productUnitId, Integer quantity) {
         if (detail.getBuyProduct() == null || !detail.getBuyProduct().getId().equals(productUnitId)) {
@@ -240,9 +243,8 @@ public class PromotionCheckService {
         }
 
         if (detail.getBuyMinQuantity() != null) {
-            int giftQty = detail.getGiftQuantity() != null ? detail.getGiftQuantity() : 1;
-            int requiredQuantity = detail.getBuyMinQuantity() + giftQty;
-            if (quantity < requiredQuantity) {
+            // Chỉ cần kiểm tra số lượng mua tối thiểu, không cần cộng thêm số lượng tặng
+            if (quantity < detail.getBuyMinQuantity()) {
                 return false;
             }
         }
@@ -261,7 +263,26 @@ public class PromotionCheckService {
             Map<Long, BigDecimal> priceMap
     ) {
         ProductUnit giftProduct = promotion.getGiftProduct();
-        BigDecimal giftPrice = priceMap.getOrDefault(giftProduct.getId(), BigDecimal.ZERO);
+        // Đảm bảo có giá cho quà tặng, nếu chưa có thì tải từ database
+        BigDecimal giftPrice = priceMap.get(giftProduct.getId());
+        if (giftPrice == null) {
+            // Tải giá cho quà tặng nếu chưa có trong priceMap
+            List<PriceDetail> giftPriceDetails = priceDetailRepository.findByProductUnitIdAndPriceStatus(
+                    giftProduct.getId(), iuh.fit.supermarket.enums.PriceType.ACTIVE);
+            
+            if (!giftPriceDetails.isEmpty()) {
+                // Lấy giá từ bảng giá có ngày tạo mới nhất
+                giftPrice = giftPriceDetails.stream()
+                        .max((pd1, pd2) -> pd1.getPrice().getCreatedAt().compareTo(pd2.getPrice().getCreatedAt()))
+                        .orElse(giftPriceDetails.get(0))
+                        .getSalePrice();
+                
+                // Thêm vào priceMap để dùng lại sau
+                priceMap.put(giftProduct.getId(), giftPrice);
+            } else {
+                giftPrice = BigDecimal.ZERO;
+            }
+        }
 
         int giftQuantity = calculateGiftQuantity(promotion, buyQuantity);
 
@@ -280,10 +301,16 @@ public class PromotionCheckService {
 
         String discountTypeStr = mapDiscountType(promotion.getGiftDiscountType());
         // Với PERCENTAGE: hiển thị phần trăm
-        // Với FIXED_AMOUNT/FREE: hiển thị tổng giá trị giảm (discountValue × số lượng)
-        BigDecimal displayDiscountValue = promotion.getGiftDiscountType() == DiscountType.PERCENTAGE
-                ? promotion.getGiftDiscountValue()
-                : discountValue.multiply(BigDecimal.valueOf(giftQuantity));
+        // Với FIXED_AMOUNT: hiển thị tổng giá trị giảm (discountValue × số lượng)
+        // Với FREE: hiển thị 100 (miễn phí 100%)
+        BigDecimal displayDiscountValue;
+        if (promotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+            displayDiscountValue = promotion.getGiftDiscountValue();
+        } else if (promotion.getGiftDiscountType() == DiscountType.FREE) {
+            displayDiscountValue = BigDecimal.valueOf(100); // Miễn phí 100%
+        } else {
+            displayDiscountValue = discountValue.multiply(BigDecimal.valueOf(giftQuantity));
+        }
 
         // Tạo mô tả ngắn gọn cho promotion
         String defaultDescription = "Mua " + promotion.getBuyMinQuantity() + " tặng " 
@@ -316,16 +343,16 @@ public class PromotionCheckService {
 
     /**
      * Tính số lượng quà tặng
-     * Logic mới: quantity truyền vào đã bao gồm cả quà tặng
-     * Công thức: MIN((quantity / (buyMin + giftQty)) × giftQty, giới hạn tối đa)
+     * Logic mới: quantity truyền vào là số lượng mua thực tế, không bao gồm quà tặng
+     * Công thức: MIN((buyQuantity / buyMinQuantity) × giftQuantity, giới hạn tối đa)
      * 
-     * Ví dụ: Mua 2 tặng 1, user truyền quantity=3
-     * - requiredPerSet = 2 + 1 = 3
-     * - eligibleSets = 3 / 3 = 1
+     * Ví dụ: Mua 5 tặng 1, user truyền quantity=5
+     * - buyMinQuantity = 5
+     * - eligibleSets = 5 / 5 = 1
      * - giftQuantity = 1 × 1 = 1
      * 
      * @param promotion chi tiết khuyến mãi
-     * @param buyQuantity số lượng sản phẩm khách truyền vào (bao gồm quà tặng)
+     * @param buyQuantity số lượng sản phẩm khách mua (không bao gồm quà tặng)
      * @return tổng số lượng sản phẩm tặng
      */
     private int calculateGiftQuantity(BuyXGetYDetail promotion, Integer buyQuantity) {
@@ -337,11 +364,8 @@ public class PromotionCheckService {
         // Số lượng tặng cho mỗi lần đủ điều kiện (mặc định là 1)
         int giftQuantityPerSet = promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1;
 
-        // Tổng số lượng cần thiết = mua tối thiểu + tặng
-        int requiredPerSet = promotion.getBuyMinQuantity() + giftQuantityPerSet;
-
-        // Tính số lần mua đủ điều kiện dựa trên tổng quantity (bao gồm cả tặng)
-        int eligibleSets = buyQuantity / requiredPerSet;
+        // Tính số lần mua đủ điều kiện dựa trên số lượng mua thực tế
+        int eligibleSets = buyQuantity / promotion.getBuyMinQuantity();
 
         // Giới hạn số lần áp dụng (nếu có cấu hình)
         if (promotion.getGiftMaxQuantity() != null) {
@@ -398,7 +422,7 @@ public class PromotionCheckService {
         int totalQuantity = 0;
 
         for (CartItemResponseDTO item : items) {
-            // Tính tổng số lượng
+            // Tính tổng số lượng (chỉ tính sản phẩm mua, không tính quà tặng)
             if (item.promotionApplied() == null || item.promotionApplied().sourceLineItemId() == null) {
                 totalQuantity += item.quantity();
             }
@@ -412,11 +436,11 @@ public class PromotionCheckService {
                 lineItemDiscount = lineItemDiscount.add(discountAmount);
                 subTotal = subTotal.add(originalPrice);
             } else if (item.promotionApplied() != null && item.promotionApplied().sourceLineItemId() != null) {
-                // BUY_X_GET_Y: dòng quà tặng
+                // BUY_X_GET_Y: dòng quà tặng - chỉ tính vào giảm giá, không tính vào subTotal
                 BigDecimal originalPrice = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
                 BigDecimal discountAmount = originalPrice.subtract(item.lineTotal());
                 lineItemDiscount = lineItemDiscount.add(discountAmount);
-                subTotal = subTotal.add(originalPrice);
+                // Không cộng vào subTotal vì quà tặng không phải là sản phẩm mua
             } else {
                 // Không có KM
                 subTotal = subTotal.add(item.lineTotal());
