@@ -17,6 +17,13 @@ import lombok.NoArgsConstructor;
 public class ProductUpdateRequest {
 
     /**
+     * Mã sản phẩm
+     */
+    @Size(max = 50, message = "Mã sản phẩm không được vượt quá 50 ký tự")
+    @Schema(description = "Mã sản phẩm", example = "SP001")
+    private String code;
+
+    /**
      * Tên sản phẩm
      */
     @Size(max = 255, message = "Tên sản phẩm không được vượt quá 255 ký tự")

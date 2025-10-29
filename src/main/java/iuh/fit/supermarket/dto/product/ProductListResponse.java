@@ -81,10 +81,22 @@ public class ProductListResponse {
         private LocalDateTime updatedAt;
 
         /**
+         * ID thương hiệu
+         */
+        @Schema(description = "ID thương hiệu", example = "1")
+        private Integer brandId;
+
+        /**
          * Tên thương hiệu
          */
         @Schema(description = "Tên thương hiệu", example = "Samsung")
         private String brandName;
+
+        /**
+         * ID danh mục
+         */
+        @Schema(description = "ID danh mục", example = "1")
+        private Integer categoryId;
 
         /**
          * Tên danh mục

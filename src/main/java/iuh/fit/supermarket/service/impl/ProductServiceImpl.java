@@ -155,6 +155,17 @@ public class ProductServiceImpl implements ProductService {
             throw new ProductNotFoundException(id);
         }
 
+        // Kiểm tra trùng lặp mã sản phẩm (nếu có thay đổi code)
+        if (request.getCode() != null && !request.getCode().trim().isEmpty()) {
+            String newCode = request.getCode().trim();
+            if (!newCode.equals(product.getCode())) {
+                if (productRepository.existsByCodeAndIdNot(newCode, id)) {
+                    throw new ProductException("Mã sản phẩm đã tồn tại: " + newCode);
+                }
+                product.setCode(newCode);
+            }
+        }
+
         // Kiểm tra trùng lặp tên sản phẩm (nếu có thay đổi tên)
         if (request.getName() != null && !request.getName().equals(product.getName())) {
             if (existsByNameAndIdNot(request.getName(), id)) {
@@ -511,8 +522,10 @@ public class ProductServiceImpl implements ProductService {
         summary.setCreatedDate(product.getCreatedAt());
         summary.setUpdatedAt(product.getUpdatedAt());
 
-        // Set tên thương hiệu và danh mục
+        // Set thông tin thương hiệu và danh mục
+        summary.setBrandId(product.getBrand() != null ? product.getBrand().getBrandId() : null);
         summary.setBrandName(product.getBrand() != null ? product.getBrand().getName() : null);
+        summary.setCategoryId(product.getCategory() != null ? product.getCategory().getCategoryId() : null);
         summary.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
 
         // Load và map thông tin units
