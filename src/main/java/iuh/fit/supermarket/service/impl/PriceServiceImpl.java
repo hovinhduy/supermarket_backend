@@ -90,8 +90,8 @@ public class PriceServiceImpl implements PriceService {
             priceDetails = createPriceDetails(price, request.getPriceDetails());
             price.setPriceDetails(priceDetails);
             
-            // Chỉ tự động kích hoạt khi người dùng không chỉ định trạng thái hoặc chỉ định PAUSED
-            if (request.getStatus() == null || request.getStatus() == PriceType.PAUSED) {
+            // Chỉ tự động kích hoạt khi người dùng KHÔNG chỉ định trạng thái
+            if (request.getStatus() == null) {
                 try {
                     validateNoConflictWithCurrentPrices(price);
                     price.setStatus(PriceType.ACTIVE);
@@ -101,6 +101,7 @@ public class PriceServiceImpl implements PriceService {
                     // Giữ trạng thái PAUSED nếu có xung đột
                 }
             }
+            // Nếu người dùng đã chỉ định trạng thái rõ ràng (PAUSED hoặc ACTIVE), giữ nguyên trạng thái đó
         }
 
         log.info("Đã tạo bảng giá thành công: {} với {} chi tiết giá, trạng thái: {}",
@@ -627,10 +628,9 @@ public class PriceServiceImpl implements PriceService {
                         PriceType.ACTIVE, detail.getProductUnitId(), currentPriceId);
 
                 if (existsInOtherActivePrice) {
-                    ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
+                    ProductUnit productUnit = productUnitRepository.findByIdWithProductAndUnit(detail.getProductUnitId())
                             .orElse(null);
-                    String productUnitName = productUnit != null ? 
-                            productUnit.getBarcode() : "ID: " + detail.getProductUnitId();
+                    String productUnitName = formatProductUnitName(productUnit);
                     
                     // Lấy thông tin bảng giá xung đột để hiển thị
                     List<Price> conflictPrices = priceRepository.findCurrentPricesByProductUnitId(
@@ -649,10 +649,9 @@ public class PriceServiceImpl implements PriceService {
                 List<Price> currentPrices = priceRepository.findCurrentPricesByProductUnitId(
                         PriceType.ACTIVE, detail.getProductUnitId());
                 if (!currentPrices.isEmpty()) {
-                    ProductUnit productUnit = productUnitRepository.findById(detail.getProductUnitId())
+                    ProductUnit productUnit = productUnitRepository.findByIdWithProductAndUnit(detail.getProductUnitId())
                             .orElse(null);
-                    String productUnitName = productUnit != null ? 
-                            productUnit.getBarcode() : "ID: " + detail.getProductUnitId();
+                    String productUnitName = formatProductUnitName(productUnit);
                     throw PriceConflictException.variantAlreadyInCurrentPrice(
                             productUnitName, currentPrices.get(0).getPriceCode());
                 }
@@ -751,7 +750,7 @@ public class PriceServiceImpl implements PriceService {
 
         for (PriceCreateRequest.PriceDetailCreateRequest request : requests) {
             // Kiểm tra đơn vị sản phẩm tồn tại
-            ProductUnit productUnit = productUnitRepository.findById(request.getProductUnitId())
+            ProductUnit productUnit = productUnitRepository.findByIdWithProductAndUnit(request.getProductUnitId())
                     .orElseThrow(() -> new PriceValidationException(
                             "Không tìm thấy đơn vị sản phẩm ID: " + request.getProductUnitId()));
 
@@ -777,7 +776,7 @@ public class PriceServiceImpl implements PriceService {
                 
                 if (!conflictPrices.isEmpty()) {
                     throw PriceConflictException.variantAlreadyInCurrentPrice(
-                            productUnit.getBarcode(), conflictPrices.get(0).getPriceCode());
+                            formatProductUnitName(productUnit), conflictPrices.get(0).getPriceCode());
                 }
             }
 
@@ -806,7 +805,7 @@ public class PriceServiceImpl implements PriceService {
                 }
             } else if (request.getPriceDetailId() == null) {
                 // Tạo mới chi tiết giá
-                ProductUnit productUnit = productUnitRepository.findById(request.getProductUnitId())
+                ProductUnit productUnit = productUnitRepository.findByIdWithProductAndUnit(request.getProductUnitId())
                         .orElseThrow(() -> new PriceValidationException(
                                 "Không tìm thấy đơn vị sản phẩm ID: " + request.getProductUnitId()));
 
@@ -831,7 +830,7 @@ public class PriceServiceImpl implements PriceService {
                     
                     if (!conflictPrices.isEmpty()) {
                         throw PriceConflictException.variantAlreadyInCurrentPrice(
-                                productUnit.getBarcode(), conflictPrices.get(0).getPriceCode());
+                                formatProductUnitName(productUnit), conflictPrices.get(0).getPriceCode());
                     }
                 }
 
@@ -909,6 +908,36 @@ public class PriceServiceImpl implements PriceService {
         }
 
         return response;
+    }
+
+    /**
+     * Format tên ProductUnit theo dạng "tenSanPham(donVi)"
+     * Ví dụ: "coca(lốc)"
+     */
+    private String formatProductUnitName(ProductUnit productUnit) {
+        if (productUnit == null) {
+            return "Không xác định";
+        }
+        
+        String productName = "Không xác định";
+        String unitName = "";
+        
+        // Lấy tên sản phẩm
+        if (productUnit.getProduct() != null && productUnit.getProduct().getName() != null) {
+            productName = productUnit.getProduct().getName();
+        }
+        
+        // Lấy tên đơn vị
+        if (productUnit.getUnit() != null && productUnit.getUnit().getName() != null) {
+            unitName = productUnit.getUnit().getName();
+        }
+        
+        // Format: tenSanPham(donVi)
+        if (!unitName.isEmpty()) {
+            return String.format("%s(%s)", productName, unitName);
+        }
+        
+        return productName;
     }
 
     /**

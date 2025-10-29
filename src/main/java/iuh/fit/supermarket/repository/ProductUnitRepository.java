@@ -150,4 +150,17 @@ public interface ProductUnitRepository extends JpaRepository<ProductUnit, Long> 
             "OR LOWER(pu.barcode) LIKE LOWER(CONCAT('%', :searchTerm, '%')))")
     List<ProductUnit> searchProductUnits(@Param("searchTerm") String searchTerm);
 
+    /**
+     * Tìm ProductUnit theo ID với eager loading Product và Unit
+     * Sử dụng để hiển thị tên sản phẩm và đơn vị trong thông báo lỗi
+     *
+     * @param id ID của ProductUnit
+     * @return ProductUnit với Product và Unit được load
+     */
+    @Query("SELECT pu FROM ProductUnit pu " +
+            "LEFT JOIN FETCH pu.product p " +
+            "LEFT JOIN FETCH pu.unit u " +
+            "WHERE pu.id = :id")
+    Optional<ProductUnit> findByIdWithProductAndUnit(@Param("id") Long id);
+
 }
