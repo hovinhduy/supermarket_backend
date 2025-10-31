@@ -1,9 +1,9 @@
 spring:
   # Cấu hình datasource cho MySQL
   datasource:
-    url: jdbc:mysql://localhost:3306/test?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    url: ${DBMS_CONNECTION:jdbc:mysql://localhost:3306/test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DBMS_USERNAME:root}
+    password: ${DBMS_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   # Cấu hình JPA/Hibernate
@@ -34,6 +34,14 @@ spring:
       enabled: true
       max-file-size: 5MB
       max-request-size: 5MB
+  ai:
+    openai:
+      api-key: ${GEMINI_KEY}
+      chat:
+        base-url: https://generativelanguage.googleapis.com
+        completions-path: /v1beta/openai/chat/completions
+        options:
+          model: gemini-2.0-flash
 
 # Cấu hình logging
 logging:

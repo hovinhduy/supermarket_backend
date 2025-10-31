@@ -200,7 +200,6 @@ public class PromotionCheckService {
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
                                !now.isAfter(line.getHeader().getEndDate()))
-                .filter(line -> isUsageLimitValid(line))
                 .toList();
 
         List<BuyXGetYDetail> applicablePromotions = new ArrayList<>();
@@ -221,16 +220,7 @@ public class PromotionCheckService {
         return applicablePromotions;
     }
 
-    /**
-     * Kiểm tra giới hạn sử dụng của promotion line
-     */
-    private boolean isUsageLimitValid(PromotionLine line) {
-        if (line.getMaxUsageTotal() != null && 
-            line.getCurrentUsageCount() >= line.getMaxUsageTotal()) {
-            return false;
-        }
-        return true;
-    }
+
 
     /**
      * Kiểm tra xem khuyến mãi Mua X Tặng Y có áp dụng được không
@@ -520,7 +510,6 @@ public class PromotionCheckService {
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
                                !now.isAfter(line.getHeader().getEndDate()))
-                .filter(line -> isUsageLimitValid(line))
                 .toList();
 
         List<ProductDiscountDetail> productDiscounts = new ArrayList<>();
@@ -656,7 +645,6 @@ public class PromotionCheckService {
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
                                !now.isAfter(line.getHeader().getEndDate()))
-                .filter(line -> isUsageLimitValid(line))
                 .toList();
 
         OrderDiscountDetail bestDiscount = null;

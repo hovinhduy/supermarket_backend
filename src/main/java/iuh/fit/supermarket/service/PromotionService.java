@@ -109,9 +109,6 @@ public class PromotionService {
         line.setStartDate(requestDTO.getStartDate());
         line.setEndDate(requestDTO.getEndDate());
         line.setStatus(requestDTO.getStatus());
-        line.setMaxUsageTotal(requestDTO.getMaxUsageTotal());
-        line.setMaxUsagePerCustomer(requestDTO.getMaxUsagePerCustomer());
-        line.setCurrentUsageCount(0);
         line.setHeader(header);
 
         line = promotionLineRepository.save(line);
@@ -167,9 +164,6 @@ public class PromotionService {
         line.setStartDate(requestDTO.getStartDate());
         line.setEndDate(requestDTO.getEndDate());
         line.setStatus(requestDTO.getStatus());
-        line.setMaxUsageTotal(requestDTO.getMaxUsageTotal());
-        line.setMaxUsagePerCustomer(requestDTO.getMaxUsagePerCustomer());
-        line.setCurrentUsageCount(0);
         line.setHeader(header);
 
         line = promotionLineRepository.save(line);
@@ -487,12 +481,6 @@ public class PromotionService {
                 now.isAfter(line.getStartDate()) &&
                 now.isBefore(line.getEndDate())) {
             throw new PromotionValidationException("Không thể xóa promotion line đang hoạt động");
-        }
-
-        // Không cho phép xóa nếu đã có người sử dụng
-        if (line.getCurrentUsageCount() != null && line.getCurrentUsageCount() > 0) {
-            throw new PromotionValidationException(
-                    "Không thể xóa promotion line đã được sử dụng " + line.getCurrentUsageCount() + " lần");
         }
 
         // Kiểm tra header có thể cập nhật không (tương tự như khi cập nhật)
@@ -875,9 +863,6 @@ public class PromotionService {
         line.setStartDate(lineDTO.getStartDate());
         line.setEndDate(lineDTO.getEndDate());
         line.setStatus(lineDTO.getStatus());
-        line.setMaxUsageTotal(lineDTO.getMaxUsageTotal());
-        line.setMaxUsagePerCustomer(lineDTO.getMaxUsagePerCustomer());
-        line.setCurrentUsageCount(0);
         line.setHeader(header);
         return line;
     }
@@ -953,9 +938,6 @@ public class PromotionService {
         responseDTO.setStartDate(line.getStartDate());
         responseDTO.setEndDate(line.getEndDate());
         responseDTO.setStatus(line.getStatus());
-        responseDTO.setMaxUsageTotal(line.getMaxUsageTotal());
-        responseDTO.setMaxUsagePerCustomer(line.getMaxUsagePerCustomer());
-        responseDTO.setCurrentUsageCount(line.getCurrentUsageCount());
         responseDTO.setCreatedAt(line.getCreatedAt());
         responseDTO.setUpdatedAt(line.getUpdatedAt());
 
@@ -967,8 +949,8 @@ public class PromotionService {
             responseDTO.setDetails(detailResponseDTOs);
         }
 
-        // Tính toán các trường computed
-        responseDTO.calculateComputedFields();
+        // Tính toán trạng thái hoạt động
+        responseDTO.calculateActiveStatus();
 
         return responseDTO;
     }
@@ -1127,8 +1109,6 @@ public class PromotionService {
         existingLine.setStartDate(requestDTO.getStartDate());
         existingLine.setEndDate(requestDTO.getEndDate());
         existingLine.setStatus(requestDTO.getStatus());
-        existingLine.setMaxUsageTotal(requestDTO.getMaxUsageTotal());
-        existingLine.setMaxUsagePerCustomer(requestDTO.getMaxUsagePerCustomer());
 
         existingLine = promotionLineRepository.save(existingLine);
 

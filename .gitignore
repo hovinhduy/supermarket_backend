@@ -46,4 +46,7 @@ AGENTS.md
 
 GEMINI.md
 
-.github/
+.github/instructions
+
+.dockerignore
+docker-compose.yml

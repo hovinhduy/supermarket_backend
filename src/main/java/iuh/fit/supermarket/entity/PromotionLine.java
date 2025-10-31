@@ -66,24 +66,6 @@ public class PromotionLine {
     private PromotionStatus status;
 
     /**
-     * Giới hạn tổng số lần sử dụng
-     */
-    @Column(name = "max_usage_total")
-    private Integer maxUsageTotal;
-
-    /**
-     * Giới hạn số lần sử dụng mỗi khách hàng
-     */
-    @Column(name = "max_usage_per_customer")
-    private Integer maxUsagePerCustomer;
-
-    /**
-     * Số lần đã sử dụng hiện tại
-     */
-    @Column(name = "current_usage_count", nullable = false)
-    private Integer currentUsageCount = 0;
-
-    /**
      * Header cha mà line này thuộc về
      */
     @ManyToOne(fetch = FetchType.LAZY)

@@ -71,20 +71,6 @@ public class PromotionLineRequestDTO {
     private PromotionStatus status;
 
     /**
-     * Giới hạn tổng số lần sử dụng
-     * Phải là số dương nếu được thiết lập
-     */
-    @Min(value = 1, message = "Giới hạn tổng số lần sử dụng phải là số dương")
-    private Integer maxUsageTotal;
-
-    /**
-     * Giới hạn số lần sử dụng mỗi khách hàng
-     * Phải là số dương nếu được thiết lập
-     */
-    @Min(value = 1, message = "Giới hạn số lần sử dụng mỗi khách hàng phải là số dương")
-    private Integer maxUsagePerCustomer;
-
-    /**
      * Chi tiết khuyến mãi cho line này
      * Bắt buộc và phải hợp lệ theo loại khuyến mãi
      */
@@ -102,17 +88,5 @@ public class PromotionLineRequestDTO {
             return true; // Để validation @NotNull xử lý
         }
         return endDate.isAfter(startDate);
-    }
-
-    /**
-     * Validation để đảm bảo maxUsagePerCustomer không vượt quá maxUsageTotal
-     */
-    @AssertTrue(message = "Giới hạn sử dụng mỗi khách hàng không được vượt quá tổng giới hạn")
-    @JsonIgnore
-    public boolean isMaxUsagePerCustomerValid() {
-        if (maxUsageTotal == null || maxUsagePerCustomer == null) {
-            return true; // Không bắt buộc phải có cả hai
-        }
-        return maxUsagePerCustomer <= maxUsageTotal;
     }
 }
