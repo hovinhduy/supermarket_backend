@@ -6,34 +6,14 @@ package iuh.fit.supermarket.enums;
  */
 public enum InvoiceStatus {
     /**
-     * Hóa đơn nháp
+     * Hóa đơn chưa thanh toán (dành cho thanh toán chuyển khoản)
      */
-    DRAFT("Draft"),
-    
+    UNPAID("Unpaid"),
+
     /**
-     * Hóa đơn đã phát hành
+     * Hóa đơn đã thanh toán (tiền mặt hoặc chuyển khoản đã xác nhận)
      */
-    ISSUED("Issued"),
-    
-    /**
-     * Hóa đơn đã thanh toán
-     */
-    PAID("Paid"),
-    
-    /**
-     * Hóa đơn thanh toán một phần
-     */
-    PARTIALLY_PAID("Partially_Paid"),
-    
-    /**
-     * Hóa đơn đã hủy
-     */
-    CANCELLED("Cancelled"),
-    
-    /**
-     * Hóa đơn đã hoàn tiền
-     */
-    REFUNDED("Refunded");
+    PAID("Paid");
     
     private final String value;
     

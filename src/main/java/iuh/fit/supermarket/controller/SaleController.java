@@ -23,11 +23,11 @@ public class SaleController {
     /**
      * API tạo bán hàng mới
      * - Kiểm tra tồn kho
-     * - Tạo order và invoice
+     * - Tạo invoice trực tiếp
      * - Lưu thông tin khuyến mãi đã áp dụng
-     * - CASH/CARD: trừ kho ngay và invoice PAID
-     * - ONLINE: invoice ISSUED, trừ kho khi webhook confirm
-     * 
+     * - CASH: invoice PAID và trừ kho ngay
+     * - ONLINE: invoice UNPAID, trừ kho khi webhook confirm
+     *
      * @param request thông tin bán hàng
      * @return thông tin hóa đơn đã tạo
      */
@@ -45,22 +45,22 @@ public class SaleController {
     }
 
     /**
-     * API lấy trạng thái đơn hàng
-     * - Dùng để polling kiểm tra order đã COMPLETED chưa
+     * API lấy trạng thái hóa đơn
+     * - Dùng để polling kiểm tra invoice đã PAID chưa
      * - Dùng cho thanh toán ONLINE
-     * 
-     * @param orderId ID của đơn hàng
-     * @return thông tin trạng thái đơn hàng
+     *
+     * @param invoiceId ID của hóa đơn (paymentOrderCode trả về từ createSale)
+     * @return thông tin trạng thái hóa đơn
      */
-    @GetMapping("/orders/{orderId}/status")
-    public ResponseEntity<ApiResponse<OrderStatusResponseDTO>> getOrderStatus(
-            @PathVariable Long orderId) {
-        
-        log.info("Kiểm tra trạng thái đơn hàng ID: {}", orderId);
+    @GetMapping("/invoices/{invoiceId}/status")
+    public ResponseEntity<ApiResponse<OrderStatusResponseDTO>> getInvoiceStatus(
+            @PathVariable Long invoiceId) {
 
-        OrderStatusResponseDTO response = saleService.getOrderStatus(orderId);
-        
-        return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái đơn hàng thành công", response));
+        log.info("Kiểm tra trạng thái hóa đơn ID: {}", invoiceId);
+
+        OrderStatusResponseDTO response = saleService.getInvoiceStatus(invoiceId);
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái hóa đơn thành công", response));
     }
 
     /**

@@ -1,12 +1,9 @@
 package iuh.fit.supermarket.service.impl;
 
 import iuh.fit.supermarket.config.PayOSConfig;
-import iuh.fit.supermarket.entity.Order;
 import iuh.fit.supermarket.entity.SaleInvoiceHeader;
 import iuh.fit.supermarket.enums.InvoiceStatus;
-import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
-import iuh.fit.supermarket.repository.OrderRepository;
 import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.service.PaymentService;
 import iuh.fit.supermarket.service.WarehouseService;
@@ -33,7 +30,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PayOS payOS;
     private final PayOSConfig payOSConfig;
-    private final OrderRepository orderRepository;
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final WarehouseService warehouseService;
 
@@ -73,42 +69,42 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void handlePaymentSuccess(Long orderCode) {
-        Order order = orderRepository.findById(orderCode)
-                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy order với code: " + orderCode));
+    public void handlePaymentSuccess(Long invoiceId) {
+        // invoiceId được dùng làm orderCode trong payment link
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findById(invoiceId.intValue())
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy invoice với ID: " + invoiceId));
 
-        if (order.getStatus() != OrderStatus.PENDING) {
-            log.warn("Order {} không ở trạng thái PENDING (hiện tại: {}), bỏ qua cập nhật",
-                    orderCode, order.getStatus());
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.warn("Invoice {} đã ở trạng thái PAID, bỏ qua cập nhật", invoice.getInvoiceNumber());
             return;
         }
 
-        order.setStatus(OrderStatus.COMPLETED);
-        orderRepository.save(order);
-        log.info("Đã cập nhật order {} sang COMPLETED", orderCode);
-
-        List<SaleInvoiceHeader> invoices = saleInvoiceHeaderRepository.findByOrder_OrderId(orderCode);
-        for (SaleInvoiceHeader invoice : invoices) {
-            if (invoice.getStatus() != InvoiceStatus.PAID) {
-                invoice.setStatus(InvoiceStatus.PAID);
-                invoice.setPaidAmount(invoice.getTotalAmount());
-                saleInvoiceHeaderRepository.save(invoice);
-                log.info("Đã cập nhật invoice {} sang PAID", invoice.getInvoiceNumber());
-
-                invoice.getInvoiceDetails().forEach(detail -> {
-                    try {
-                        warehouseService.stockOut(
-                                detail.getProductUnit().getId(),
-                                detail.getQuantity(),
-                                invoice.getInvoiceNumber(),
-                                "Thanh toán online thành công - Invoice: " + invoice.getInvoiceNumber());
-                    } catch (Exception e) {
-                        log.error("Lỗi khi trừ kho cho product unit {}: {}",
-                                detail.getProductUnit().getId(), e.getMessage());
-                    }
-                });
-                log.info("Đã trừ kho cho invoice {}", invoice.getInvoiceNumber());
-            }
+        if (invoice.getStatus() != InvoiceStatus.UNPAID) {
+            log.warn("Invoice {} không ở trạng thái UNPAID (hiện tại: {}), bỏ qua cập nhật",
+                    invoice.getInvoiceNumber(), invoice.getStatus());
+            return;
         }
+
+        // Cập nhật trạng thái invoice sang PAID
+        invoice.setStatus(InvoiceStatus.PAID);
+        invoice.setPaidAmount(invoice.getTotalAmount());
+        saleInvoiceHeaderRepository.save(invoice);
+        log.info("Đã cập nhật invoice {} sang PAID", invoice.getInvoiceNumber());
+
+        // Trừ kho cho các sản phẩm trong invoice
+        invoice.getInvoiceDetails().forEach(detail -> {
+            try {
+                warehouseService.stockOut(
+                        detail.getProductUnit().getId(),
+                        detail.getQuantity(),
+                        invoice.getInvoiceNumber(),
+                        "Thanh toán chuyển khoản thành công - Invoice: " + invoice.getInvoiceNumber());
+            } catch (Exception e) {
+                log.error("Lỗi khi trừ kho cho product unit {}: {}",
+                        detail.getProductUnit().getId(), e.getMessage());
+                throw new InvalidSaleDataException("Không thể trừ kho cho sản phẩm: " + e.getMessage());
+            }
+        });
+        log.info("Đã trừ kho cho invoice {}", invoice.getInvoiceNumber());
     }
 }

@@ -10,9 +10,9 @@ public interface SaleService {
     /**
      * Tạo bán hàng mới
      * - Kiểm tra tồn kho
-     * - Trừ kho và ghi transaction (nếu không phải ONLINE)
-     * - Tạo order
-     * - Tạo invoice (chỉ khi order COMPLETED)
+     * - Tạo invoice trực tiếp
+     * - CASH: invoice PAID, trừ kho ngay
+     * - ONLINE: invoice UNPAID, trừ kho khi webhook confirm
      * - Lưu thông tin khuyến mãi đã áp dụng
      *
      * @param request thông tin bán hàng
@@ -21,12 +21,14 @@ public interface SaleService {
     CreateSaleResponseDTO createSale(CreateSaleRequestDTO request);
 
     /**
-     * Lấy trạng thái đơn hàng
-     * 
-     * @param orderId ID của đơn hàng
-     * @return thông tin trạng thái đơn hàng
+     * Lấy trạng thái hóa đơn theo invoiceId
+     * - Dùng để polling kiểm tra invoice đã PAID chưa
+     * - Dùng cho thanh toán ONLINE
+     *
+     * @param invoiceId ID của hóa đơn (từ paymentOrderCode)
+     * @return thông tin trạng thái hóa đơn
      */
-    OrderStatusResponseDTO getOrderStatus(Long orderId);
+    OrderStatusResponseDTO getInvoiceStatus(Long invoiceId);
 
     /**
      * Tìm kiếm và lọc danh sách hoá đơn bán có đầy đủ thông tin khuyến mãi

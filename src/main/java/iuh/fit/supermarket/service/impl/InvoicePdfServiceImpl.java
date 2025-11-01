@@ -147,7 +147,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
     }
 
     private void addItemsTable(Document document, SaleInvoiceFullDTO invoice) {
-        Table itemsTable = new Table(new float[]{1, 4, 2, 2, 2, 3});
+        Table itemsTable = new Table(new float[] { 1, 4, 2, 2, 2, 3 });
         itemsTable.setWidth(UnitValue.createPercentValue(100));
 
         // Header của bảng
@@ -176,7 +176,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
                 promotionCell.setFontSize(9);
                 promotionCell.setItalic();
                 promotionCell.setFontColor(ColorConstants.BLUE);
-                
+
                 StringBuilder promoText = new StringBuilder("   Khuyến mãi: ");
                 for (var promo : item.appliedPromotions()) {
                     promoText.append(promo.promotionSummary())
@@ -184,7 +184,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
                             .append(CURRENCY_FORMATTER.format(promo.discountValue()))
                             .append("); ");
                 }
-                
+
                 promotionCell.add(new Paragraph(promoText.toString()));
                 itemsTable.addCell(promotionCell);
             }
@@ -203,8 +203,8 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
 
         for (AppliedOrderPromotionDetailDTO promo : invoice.appliedOrderPromotions()) {
             Paragraph promoDetail = new Paragraph(
-                    String.format("  • %s: -%s", 
-                            promo.promotionSummary(), 
+                    String.format("  • %s: -%s",
+                            promo.promotionSummary(),
                             CURRENCY_FORMATTER.format(promo.discountValue())))
                     .setFontSize(10)
                     .setFontColor(ColorConstants.BLUE)
@@ -258,7 +258,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
 
     private void addFooter(Document document) {
         document.add(new Paragraph("\n"));
-        
+
         Paragraph thankYou = new Paragraph("Cảm ơn quý khách đã mua hàng!")
                 .setFontSize(11)
                 .setBold()
@@ -295,10 +295,8 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
 
     private String getStatusText(iuh.fit.supermarket.enums.InvoiceStatus status) {
         return switch (status) {
-            case DRAFT -> "Nháp";
-            case ISSUED -> "Đã phát hành";
             case PAID -> "Đã thanh toán";
-            case CANCELLED -> "Đã hủy";
+            case UNPAID -> "Chưa thanh toán";
             default -> status.name();
         };
     }
@@ -314,7 +312,8 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
 
     /**
      * Tạo font hỗ trợ tiếng Việt
-     * Thử các font từ hệ thống Windows/Linux, fallback về Helvetica với Unicode nếu không tìm thấy
+     * Thử các font từ hệ thống Windows/Linux, fallback về Helvetica với Unicode nếu
+     * không tìm thấy
      */
     private PdfFont getVietnameseFont() {
         try {
@@ -322,7 +321,7 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
             try {
                 String arialPath = "C:/Windows/Fonts/arial.ttf";
                 if (new java.io.File(arialPath).exists()) {
-                    return PdfFontFactory.createFont(arialPath, PdfEncodings.IDENTITY_H, 
+                    return PdfFontFactory.createFont(arialPath, PdfEncodings.IDENTITY_H,
                             PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
                 }
             } catch (Exception e) {
@@ -332,10 +331,10 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
             // Thử tìm font trên Linux
             try {
                 String[] linuxFonts = {
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
                 };
-                
+
                 for (String fontPath : linuxFonts) {
                     if (new java.io.File(fontPath).exists()) {
                         return PdfFontFactory.createFont(fontPath, PdfEncodings.IDENTITY_H,
@@ -348,9 +347,9 @@ public class InvoicePdfServiceImpl implements InvoicePdfService {
 
             // Fallback: Sử dụng Helvetica với encoding Unicode
             log.warn("Không tìm thấy font hệ thống, sử dụng Helvetica (có thể không hiển thị đúng tiếng Việt)");
-            return PdfFontFactory.createFont(StandardFonts.HELVETICA, 
+            return PdfFontFactory.createFont(StandardFonts.HELVETICA,
                     PdfEncodings.IDENTITY_H, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
-            
+
         } catch (Exception e) {
             log.error("Lỗi khi tạo font: {}", e.getMessage());
             throw new RuntimeException("Không thể tạo font cho PDF", e);

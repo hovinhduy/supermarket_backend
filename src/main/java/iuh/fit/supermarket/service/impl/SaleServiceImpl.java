@@ -4,7 +4,6 @@ import iuh.fit.supermarket.dto.checkout.PromotionAppliedDTO;
 import iuh.fit.supermarket.dto.sale.*;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.InvoiceStatus;
-import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.enums.PaymentMethod;
 import iuh.fit.supermarket.exception.InsufficientStockException;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
@@ -44,8 +43,6 @@ public class SaleServiceImpl implements SaleService {
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final ProductUnitRepository productUnitRepository;
-    private final OrderRepository orderRepository;
-    private final OrderDetailRepository orderDetailRepository;
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final SaleInvoiceDetailRepository saleInvoiceDetailRepository;
     private final AppliedPromotionRepository appliedPromotionRepository;
@@ -60,24 +57,29 @@ public class SaleServiceImpl implements SaleService {
     public CreateSaleResponseDTO createSale(CreateSaleRequestDTO request) {
         log.info("Bắt đầu tạo bán hàng cho nhân viên ID: {}", request.employeeId());
 
+        // Validate nhân viên và khách hàng
         Employee employee = employeeRepository.findById(request.employeeId())
-                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy nhân viên với ID: " + request.employeeId()));
+                .orElseThrow(
+                        () -> new InvalidSaleDataException("Không tìm thấy nhân viên với ID: " + request.employeeId()));
 
         Customer customer = null;
         if (request.customerId() != null) {
             customer = customerRepository.findById(request.customerId())
-                    .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy khách hàng với ID: " + request.customerId()));
+                    .orElseThrow(() -> new InvalidSaleDataException(
+                            "Không tìm thấy khách hàng với ID: " + request.customerId()));
         }
 
+        // Kiểm tra tồn kho
         validateAndCheckStock(request.items());
 
+        // Tính toán tổng tiền
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal lineItemDiscount = BigDecimal.ZERO;
 
         for (SaleItemRequestDTO item : request.items()) {
             BigDecimal itemSubtotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
             subtotal = subtotal.add(itemSubtotal);
-            
+
             BigDecimal itemDiscount = itemSubtotal.subtract(item.lineTotal());
             lineItemDiscount = lineItemDiscount.add(itemDiscount);
         }
@@ -93,101 +95,103 @@ public class SaleServiceImpl implements SaleService {
         BigDecimal totalAmount = subtotal.subtract(totalDiscount);
 
         boolean isOnlinePayment = request.paymentMethod() == PaymentMethod.ONLINE;
-        
-        // Tạo Order
-        Order order = new Order();
-        order.setOrderDate(LocalDateTime.now());
-        order.setSubtotal(subtotal);
-        order.setTotalAmount(totalAmount);
-        order.setAmountPaid(isOnlinePayment ? BigDecimal.ZERO : request.amountPaid());
-        order.setStatus(isOnlinePayment ? OrderStatus.PENDING : OrderStatus.COMPLETED);
-        order.setPaymentMethod(request.paymentMethod());
-        order.setNote(request.note());
-        order.setEmployee(employee);
-        order.setCustomer(customer);
+        boolean isCashPayment = request.paymentMethod() == PaymentMethod.CASH;
 
-        order = orderRepository.save(order);
-        log.info("Đã tạo order {} với trạng thái: {}", order.getOrderId(), order.getStatus());
+        // Tạo Invoice trực tiếp (không cần Order)
+        // CASH: invoice PAID, trừ kho ngay
+        // ONLINE: invoice UNPAID, trừ kho khi webhook confirm
+        String invoiceNumber = generateInvoiceNumber();
+        LocalDateTime invoiceDate = LocalDateTime.now();
 
-        // Tạo OrderDetail
-        List<OrderDetail> orderDetails = new ArrayList<>();
-        for (SaleItemRequestDTO item : request.items()) {
-            ProductUnit productUnit = productUnitRepository.findById(item.productUnitId())
-                    .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy đơn vị sản phẩm với ID: " + item.productUnitId()));
+        SaleInvoiceHeader invoice = new SaleInvoiceHeader();
+        invoice.setInvoiceNumber(invoiceNumber);
+        invoice.setInvoiceDate(invoiceDate);
+        invoice.setSubtotal(subtotal);
+        invoice.setTotalDiscount(totalDiscount);
+        invoice.setTotalTax(BigDecimal.ZERO);
+        invoice.setTotalAmount(totalAmount);
+        invoice.setStatus(isCashPayment ? InvoiceStatus.PAID : InvoiceStatus.UNPAID);
+        invoice.setPaymentMethod(request.paymentMethod());
+        invoice.setPaidAmount(isCashPayment ? totalAmount : BigDecimal.ZERO);
+        invoice.setOrder(null); // Không cần Order nữa
+        invoice.setCustomer(customer);
+        invoice.setEmployee(employee);
 
-            OrderDetail orderDetail = new OrderDetail();
-            orderDetail.setOrder(order);
-            orderDetail.setProductUnit(productUnit);
-            orderDetail.setQuantity(item.quantity());
-            orderDetail.setPriceAtPurchase(item.unitPrice());
-            
-            BigDecimal itemSubtotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
-            BigDecimal itemDiscount = itemSubtotal.subtract(item.lineTotal());
-            orderDetail.setDiscount(itemDiscount);
+        invoice = saleInvoiceHeaderRepository.save(invoice);
+        log.info("Đã tạo invoice {} với trạng thái: {}", invoiceNumber, invoice.getStatus());
 
-            orderDetails.add(orderDetailRepository.save(orderDetail));
-        }
-        order.setOrderDetails(orderDetails);
-
-        // Tạo Invoice cho cả ONLINE và CASH/CARD
-        // CASH/CARD: invoice PAID, trừ kho ngay
-        // ONLINE: invoice ISSUED, trừ kho khi webhook confirm
-        String invoiceNumber = null;
-        LocalDateTime invoiceDate = null;
+        // Tạo Invoice Details
+        List<SaleInvoiceDetail> invoiceDetails = new ArrayList<>();
         List<SaleItemResponseDTO> itemResponses = new ArrayList<>();
-        
-        if (isOnlinePayment) {
-            // Tạo invoice với trạng thái ISSUED cho ONLINE payment
-            invoiceNumber = createInvoiceForPendingOrder(order);
-            log.info("Đã tạo invoice {} với trạng thái ISSUED cho thanh toán ONLINE", invoiceNumber);
-        } else {
-            // Tạo invoice và trừ kho ngay cho CASH/CARD
-            invoiceNumber = invoiceService.createInvoiceForCompletedOrder(order.getOrderId());
-            log.info("Đã tạo invoice {} và trừ kho cho thanh toán CASH/CARD", invoiceNumber);
-        }
-        
-        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByInvoiceNumber(invoiceNumber)
-                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy invoice vừa tạo"));
-        invoiceDate = invoice.getInvoiceDate();
-        
-        // Lưu thông tin khuyến mãi đã áp dụng (map theo index)
         Map<Integer, PromotionAppliedDTO> itemPromotionsByIndex = new HashMap<>();
+
         for (int i = 0; i < request.items().size(); i++) {
             SaleItemRequestDTO item = request.items().get(i);
+            ProductUnit productUnit = productUnitRepository.findById(item.productUnitId())
+                    .orElseThrow(() -> new InvalidSaleDataException(
+                            "Không tìm thấy đơn vị sản phẩm với ID: " + item.productUnitId()));
+
+            BigDecimal itemSubtotal = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
+            BigDecimal itemDiscount = itemSubtotal.subtract(item.lineTotal());
+
+            SaleInvoiceDetail invoiceDetail = new SaleInvoiceDetail();
+            invoiceDetail.setInvoice(invoice);
+            invoiceDetail.setProductUnit(productUnit);
+            invoiceDetail.setQuantity(item.quantity());
+            invoiceDetail.setUnitPrice(item.unitPrice());
+            invoiceDetail.setDiscountAmount(itemDiscount);
+            invoiceDetail.setLineTotal(item.lineTotal());
+            invoiceDetail.setTaxAmount(BigDecimal.ZERO);
+            invoiceDetail.setLineTotalWithTax(item.lineTotal());
+
+            invoiceDetails.add(saleInvoiceDetailRepository.save(invoiceDetail));
+
+            // Lưu promotion info
             if (item.promotionApplied() != null) {
                 itemPromotionsByIndex.put(i, item.promotionApplied());
             }
+
+            // Tạo item response
+            itemResponses.add(new SaleItemResponseDTO(
+                    invoiceDetail.getInvoiceDetailId(),
+                    productUnit.getId(),
+                    productUnit.getProduct().getName(),
+                    productUnit.getUnit().getName(),
+                    item.quantity(),
+                    item.unitPrice(),
+                    itemDiscount,
+                    item.lineTotal(),
+                    item.promotionApplied()));
         }
+        invoice.setInvoiceDetails(invoiceDetails);
+
+        // Lưu thông tin khuyến mãi đã áp dụng
         invoiceService.saveAppliedPromotions(invoiceNumber, request.appliedOrderPromotions(), itemPromotionsByIndex);
         log.info("Đã lưu khuyến mãi cho invoice {}", invoiceNumber);
-        
-        // Tạo item responses từ order details (match theo index)
-        for (int i = 0; i < order.getOrderDetails().size(); i++) {
-            OrderDetail orderDetail = order.getOrderDetails().get(i);
-            PromotionAppliedDTO promotion = itemPromotionsByIndex.get(i);
-            
-            itemResponses.add(new SaleItemResponseDTO(
-                    null,
-                    orderDetail.getProductUnit().getId(),
-                    orderDetail.getProductUnit().getProduct().getName(),
-                    orderDetail.getProductUnit().getUnit().getName(),
-                    orderDetail.getQuantity(),
-                    orderDetail.getPriceAtPurchase(),
-                    orderDetail.getDiscount(),
-                    orderDetail.getPriceAtPurchase()
-                            .multiply(BigDecimal.valueOf(orderDetail.getQuantity()))
-                            .subtract(orderDetail.getDiscount()),
-                    promotion
-            ));
+
+        // Trừ kho ngay cho thanh toán CASH
+        if (isCashPayment) {
+            for (SaleInvoiceDetail detail : invoiceDetails) {
+                warehouseService.stockOut(
+                        detail.getProductUnit().getId(),
+                        detail.getQuantity(),
+                        invoiceNumber,
+                        "Bán hàng thanh toán tiền mặt - Invoice: " + invoiceNumber);
+            }
+            log.info("Đã trừ kho cho invoice {} (thanh toán tiền mặt)", invoiceNumber);
         }
 
-        BigDecimal changeAmount = isOnlinePayment ? BigDecimal.ZERO : request.amountPaid().subtract(totalAmount);
+        BigDecimal changeAmount = isCashPayment ? request.amountPaid().subtract(totalAmount) : BigDecimal.ZERO;
 
         // Tạo payment link nếu ONLINE
         String paymentUrl = null;
         String qrCode = null;
-        
+        Long paymentOrderCode = null;
+
         if (isOnlinePayment) {
+            // Sử dụng invoiceId làm orderCode cho payment
+            paymentOrderCode = invoice.getInvoiceId().longValue();
+
             List<PaymentService.PaymentItemData> paymentItems = request.items().stream()
                     .map(item -> {
                         ProductUnit productUnit = productUnitRepository.findById(item.productUnitId())
@@ -195,25 +199,23 @@ public class SaleServiceImpl implements SaleService {
                         return new PaymentService.PaymentItemData(
                                 productUnit.getProduct().getName() + " - " + productUnit.getUnit().getName(),
                                 item.quantity(),
-                                item.unitPrice().intValue()
-                        );
+                                item.unitPrice().intValue());
                     })
                     .toList();
 
             CreatePaymentLinkResponse paymentResponse = paymentService.createPaymentLink(
-                    order.getOrderId(),
+                    paymentOrderCode,
                     totalAmount,
-                    "Thanh toan don hang",
-                    paymentItems
-            );
-            
+                    "Thanh toan QR",
+                    paymentItems);
+
             paymentUrl = paymentResponse.getCheckoutUrl();
             qrCode = paymentResponse.getQrCode();
-            log.info("Đã tạo payment link: {}", paymentUrl);
+            log.info("Đã tạo payment link cho invoice {}: {}", invoiceNumber, paymentUrl);
         }
 
-        log.info("Hoàn thành tạo order. Invoice: {}, Tổng tiền: {}, Trạng thái: {}", 
-                invoiceNumber, totalAmount, order.getStatus());
+        log.info("Hoàn thành tạo invoice. Invoice: {}, Tổng tiền: {}, Trạng thái: {}",
+                invoiceNumber, totalAmount, invoice.getStatus());
 
         return new CreateSaleResponseDTO(
                 invoiceNumber,
@@ -221,71 +223,20 @@ public class SaleServiceImpl implements SaleService {
                 subtotal,
                 totalDiscount,
                 totalAmount,
-                isOnlinePayment ? BigDecimal.ZERO : request.amountPaid(),
+                isCashPayment ? request.amountPaid() : BigDecimal.ZERO,
                 changeAmount,
                 customer != null ? customer.getName() : "Khách vãng lai",
                 employee.getName(),
                 itemResponses,
-                order.getOrderId(),
+                paymentOrderCode,
                 paymentUrl,
                 qrCode,
-                order.getStatus().getValue()
-        );
+                invoice.getStatus().getValue());
     }
-
-
 
     /**
-     * Tạo invoice với trạng thái ISSUED cho order PENDING (thanh toán ONLINE)
-     * Không trừ kho, chờ webhook xác nhận thanh toán
+     * Tạo mã hóa đơn tự động
      */
-    private String createInvoiceForPendingOrder(Order order) {
-        String invoiceNumber = generateInvoiceNumber();
-        
-        // Tạo Invoice Header với trạng thái ISSUED
-        SaleInvoiceHeader invoice = new SaleInvoiceHeader();
-        invoice.setInvoiceNumber(invoiceNumber);
-        invoice.setInvoiceDate(LocalDateTime.now());
-        invoice.setSubtotal(order.getSubtotal());
-        
-        BigDecimal totalDiscount = order.getOrderDetails().stream()
-                .map(OrderDetail::getDiscount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        invoice.setTotalDiscount(totalDiscount);
-        
-        invoice.setTotalTax(BigDecimal.ZERO);
-        invoice.setTotalAmount(order.getTotalAmount());
-        invoice.setStatus(InvoiceStatus.ISSUED);
-        invoice.setPaidAmount(BigDecimal.ZERO);
-        invoice.setOrder(order);
-        invoice.setCustomer(order.getCustomer());
-        invoice.setEmployee(order.getEmployee());
-
-        invoice = saleInvoiceHeaderRepository.save(invoice);
-        log.info("Đã tạo invoice {} với trạng thái ISSUED", invoiceNumber);
-
-        // Tạo Invoice Details
-        for (OrderDetail orderDetail : order.getOrderDetails()) {
-            SaleInvoiceDetail invoiceDetail = new SaleInvoiceDetail();
-            invoiceDetail.setInvoice(invoice);
-            invoiceDetail.setProductUnit(orderDetail.getProductUnit());
-            invoiceDetail.setQuantity(orderDetail.getQuantity());
-            invoiceDetail.setUnitPrice(orderDetail.getPriceAtPurchase());
-            invoiceDetail.setDiscountAmount(orderDetail.getDiscount());
-            
-            BigDecimal lineTotal = orderDetail.getPriceAtPurchase()
-                    .multiply(BigDecimal.valueOf(orderDetail.getQuantity()))
-                    .subtract(orderDetail.getDiscount());
-            invoiceDetail.setLineTotal(lineTotal);
-            invoiceDetail.setTaxAmount(BigDecimal.ZERO);
-            invoiceDetail.setLineTotalWithTax(lineTotal);
-
-            saleInvoiceDetailRepository.save(invoiceDetail);
-        }
-
-        return invoiceNumber;
-    }
-
     private String generateInvoiceNumber() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String random = String.format("%04d", new java.util.Random().nextInt(10000));
@@ -309,42 +260,31 @@ public class SaleServiceImpl implements SaleService {
             if (!warehouseService.isStockAvailable(item.productUnitId(), item.quantity())) {
                 Integer currentStock = warehouseService.getCurrentStock(item.productUnitId());
                 throw new InsufficientStockException(
-                        item.productUnitId(), 
-                        item.quantity(), 
-                        currentStock
-                );
+                        item.productUnitId(),
+                        item.quantity(),
+                        currentStock);
             }
         }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public OrderStatusResponseDTO getOrderStatus(Long orderId) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy đơn hàng với ID: " + orderId));
+    public OrderStatusResponseDTO getInvoiceStatus(Long invoiceId) {
+        log.info("Kiểm tra trạng thái hóa đơn ID: {}", invoiceId);
 
-        // Tìm invoice nếu có
-        String invoiceNumber = null;
-        LocalDateTime invoiceDate = null;
-        
-        List<SaleInvoiceHeader> invoices = saleInvoiceHeaderRepository.findByOrder_OrderId(orderId);
-        if (!invoices.isEmpty()) {
-            SaleInvoiceHeader invoice = invoices.get(0);
-            invoiceNumber = invoice.getInvoiceNumber();
-            invoiceDate = invoice.getInvoiceDate();
-        }
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findById(invoiceId.intValue())
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy hóa đơn với ID: " + invoiceId));
 
         return new OrderStatusResponseDTO(
-                order.getOrderId(),
-                order.getStatus(),
-                order.getPaymentMethod(),
-                order.getTotalAmount(),
-                order.getAmountPaid(),
-                invoiceNumber,
-                invoiceDate,
-                order.getCreatedAt(),
-                order.getUpdatedAt()
-        );
+                invoiceId,
+                invoice.getStatus(),
+                invoice.getPaymentMethod(),
+                invoice.getTotalAmount(),
+                invoice.getPaidAmount(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+                invoice.getCreatedAt(),
+                invoice.getUpdatedAt());
     }
 
     @Override
@@ -359,7 +299,8 @@ public class SaleServiceImpl implements SaleService {
             Integer productUnitId,
             int pageNumber,
             int pageSize) {
-        log.info("Tìm kiếm hoá đơn - Keyword: {}, From: {}, To: {}, Status: {}, EmployeeId: {}, CustomerId: {}, ProductUnitId: {}, Page: {}, Size: {}",
+        log.info(
+                "Tìm kiếm hoá đơn - Keyword: {}, From: {}, To: {}, Status: {}, EmployeeId: {}, CustomerId: {}, ProductUnitId: {}, Page: {}, Size: {}",
                 searchKeyword, fromDate, toDate, status, employeeId, customerId, productUnitId, pageNumber, pageSize);
 
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
@@ -371,8 +312,7 @@ public class SaleServiceImpl implements SaleService {
                 employeeId,
                 customerId,
                 productUnitId,
-                pageable
-        );
+                pageable);
 
         List<SaleInvoiceFullDTO> invoiceDTOs = invoicesPage.getContent().stream()
                 .map(this::convertToSaleInvoiceFullDTO)
@@ -382,12 +322,12 @@ public class SaleServiceImpl implements SaleService {
                 invoiceDTOs,
                 (int) invoicesPage.getTotalElements(),
                 pageNumber,
-                pageSize
-        );
+                pageSize);
     }
 
     /**
-     * Chuyển đổi entity SaleInvoiceHeader thành DTO SaleInvoiceFullDTO kèm đầy đủ thông tin khuyến mãi
+     * Chuyển đổi entity SaleInvoiceHeader thành DTO SaleInvoiceFullDTO kèm đầy đủ
+     * thông tin khuyến mãi
      */
     private SaleInvoiceFullDTO convertToSaleInvoiceFullDTO(SaleInvoiceHeader invoice) {
         // Lấy danh sách items của hóa đơn
@@ -417,12 +357,12 @@ public class SaleServiceImpl implements SaleService {
                 invoice.getPaidAmount(),
                 items,
                 orderPromotions,
-                invoice.getCreatedAt()
-        );
+                invoice.getCreatedAt());
     }
 
     /**
-     * Chuyển đổi entity SaleInvoiceDetail thành DTO SaleInvoiceItemDetailDTO kèm danh sách khuyến mãi áp dụng
+     * Chuyển đổi entity SaleInvoiceDetail thành DTO SaleInvoiceItemDetailDTO kèm
+     * danh sách khuyến mãi áp dụng
      */
     private SaleInvoiceItemDetailDTO convertToSaleInvoiceItemDetailDTO(SaleInvoiceDetail detail) {
         // Lấy danh sách khuyến mãi áp dụng cho item này
@@ -440,8 +380,7 @@ public class SaleServiceImpl implements SaleService {
                 detail.getUnitPrice(),
                 detail.getDiscountAmount(),
                 detail.getLineTotal(),
-                promotions
-        );
+                promotions);
     }
 
     /**
@@ -455,12 +394,12 @@ public class SaleServiceImpl implements SaleService {
                 promotion.getPromotionSummary(),
                 promotion.getDiscountType(),
                 promotion.getDiscountValue(),
-                promotion.getSourceLineItemId()
-        );
+                promotion.getSourceLineItemId());
     }
 
     /**
-     * Chuyển đổi entity AppliedOrderPromotion thành DTO AppliedOrderPromotionDetailDTO
+     * Chuyển đổi entity AppliedOrderPromotion thành DTO
+     * AppliedOrderPromotionDetailDTO
      */
     private AppliedOrderPromotionDetailDTO convertToAppliedOrderPromotionDetailDTO(AppliedOrderPromotion promotion) {
         return new AppliedOrderPromotionDetailDTO(
@@ -469,11 +408,8 @@ public class SaleServiceImpl implements SaleService {
                 promotion.getPromotionDetailId(),
                 promotion.getPromotionSummary(),
                 promotion.getDiscountType(),
-                promotion.getDiscountValue()
-        );
+                promotion.getDiscountValue());
     }
-
-
 
     @Override
     @Transactional(readOnly = true)
@@ -492,7 +428,7 @@ public class SaleServiceImpl implements SaleService {
         log.info("Tạo PDF cho hóa đơn ID: {}", invoiceId);
 
         SaleInvoiceFullDTO invoice = getInvoiceDetail(invoiceId);
-        
+
         return invoicePdfService.generateInvoicePdf(invoice);
     }
 
@@ -502,20 +438,20 @@ public class SaleServiceImpl implements SaleService {
         log.info("Tạo HTML để in cho hóa đơn ID: {}", invoiceId);
 
         SaleInvoiceFullDTO invoice = getInvoiceDetail(invoiceId);
-        
+
         try {
             // Load template
             InputStream templateStream = getClass().getResourceAsStream("/templates/invoice-print-template.html");
             if (templateStream == null) {
                 throw new RuntimeException("Không tìm thấy template hóa đơn");
             }
-            
+
             String template = new String(templateStream.readAllBytes(), StandardCharsets.UTF_8);
-            
+
             // Format currency
             NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
-            
+
             // Build items rows HTML
             StringBuilder itemsRows = new StringBuilder();
             int index = 1;
@@ -525,24 +461,26 @@ public class SaleServiceImpl implements SaleService {
                         .append("<td>").append(item.productName()).append("</td>")
                         .append("<td class=\"center\">").append(item.unit()).append("</td>")
                         .append("<td class=\"center\">").append(item.quantity()).append("</td>")
-                        .append("<td class=\"right\">").append(currencyFormatter.format(item.unitPrice())).append("</td>")
-                        .append("<td class=\"right\">").append(currencyFormatter.format(item.lineTotal())).append("</td>")
+                        .append("<td class=\"right\">").append(currencyFormatter.format(item.unitPrice()))
+                        .append("</td>")
+                        .append("<td class=\"right\">").append(currencyFormatter.format(item.lineTotal()))
+                        .append("</td>")
                         .append("</tr>");
-                
+
                 // Add promotions if any
                 if (item.appliedPromotions() != null && !item.appliedPromotions().isEmpty()) {
                     itemsRows.append("<tr class=\"promotion-row\">")
                             .append("<td colspan=\"6\" style=\"padding-left: 30px;\">");
-                    
+
                     for (var promo : item.appliedPromotions()) {
                         itemsRows.append("→ ").append(promo.promotionSummary())
                                 .append(" (-").append(currencyFormatter.format(promo.discountValue())).append(") ");
                     }
-                    
+
                     itemsRows.append("</td></tr>");
                 }
             }
-            
+
             // Build order promotions HTML
             String orderPromotionsHtml = "";
             if (invoice.appliedOrderPromotions() != null && !invoice.appliedOrderPromotions().isEmpty()) {
@@ -550,20 +488,20 @@ public class SaleServiceImpl implements SaleService {
                 promotions.append("<div class=\"order-promotions\">")
                         .append("<h4>KHUYẾN MÃI ĐƠN HÀNG</h4>")
                         .append("<ul>");
-                
+
                 for (var promo : invoice.appliedOrderPromotions()) {
                     promotions.append("<li>• ").append(promo.promotionSummary())
                             .append(": -").append(currencyFormatter.format(promo.discountValue()))
                             .append("</li>");
                 }
-                
+
                 promotions.append("</ul></div>");
                 orderPromotionsHtml = promotions.toString();
             }
-            
+
             // Calculate remaining
             BigDecimal remaining = invoice.totalAmount().subtract(invoice.paidAmount());
-            
+
             // Replace placeholders
             String html = template
                     .replace("{{invoiceNumber}}", invoice.invoiceNumber())
@@ -581,9 +519,9 @@ public class SaleServiceImpl implements SaleService {
                     .replace("{{paidAmount}}", currencyFormatter.format(invoice.paidAmount()))
                     .replace("{{remaining}}", currencyFormatter.format(remaining))
                     .replace("{{printTime}}", LocalDateTime.now().format(dateFormatter));
-            
+
             return html;
-            
+
         } catch (Exception e) {
             log.error("Lỗi khi tạo HTML hóa đơn: {}", e.getMessage(), e);
             throw new RuntimeException("Không thể tạo HTML hóa đơn", e);
@@ -592,15 +530,16 @@ public class SaleServiceImpl implements SaleService {
 
     private String getStatusText(InvoiceStatus status) {
         return switch (status) {
-            case DRAFT -> "Nháp";
-            case ISSUED -> "Đã phát hành";
+            case UNPAID -> "Chưa thanh toán";
             case PAID -> "Đã thanh toán";
-            case CANCELLED -> "Đã hủy";
             default -> status.name();
         };
     }
 
     private String getPaymentMethodText(PaymentMethod method) {
+        if (method == null) {
+            return "Không xác định";
+        }
         return switch (method) {
             case CASH -> "Tiền mặt";
             case CARD -> "Thẻ";

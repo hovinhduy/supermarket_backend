@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.InvoiceStatus;
+import iuh.fit.supermarket.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -71,7 +72,14 @@ public class SaleInvoiceHeader {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private InvoiceStatus status = InvoiceStatus.DRAFT;
+    private InvoiceStatus status = InvoiceStatus.UNPAID;
+
+    /**
+     * Phương thức thanh toán
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method")
+    private PaymentMethod paymentMethod;
 
     /**
      * Số tiền đã thanh toán

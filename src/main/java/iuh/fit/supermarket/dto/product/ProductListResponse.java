@@ -45,6 +45,12 @@ public class ProductListResponse {
         private Long id;
 
         /**
+         * Mã sản phẩm
+         */
+        @Schema(description = "Mã sản phẩm", example = "SP001")
+        private String productCode;
+
+        /**
          * Tên sản phẩm
          */
         @Schema(description = "Tên sản phẩm", example = "Smartphone Samsung Galaxy S24")

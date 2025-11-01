@@ -515,6 +515,7 @@ public class ProductServiceImpl implements ProductService {
     private ProductListResponse.ProductSummary mapToProductSummary(Product product) {
         ProductListResponse.ProductSummary summary = new ProductListResponse.ProductSummary();
         summary.setId(product.getId());
+        summary.setProductCode(product.getCode());
         summary.setName(product.getName());
         summary.setDescription(product.getDescription());
         summary.setIsActive(product.getIsActive());
