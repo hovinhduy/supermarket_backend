@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import iuh.fit.supermarket.dto.auth.CustomerLoginRequest;
+import iuh.fit.supermarket.dto.auth.CustomerLoginResponse;
 import iuh.fit.supermarket.dto.auth.LoginRequest;
 import iuh.fit.supermarket.dto.auth.LoginResponse;
 import iuh.fit.supermarket.dto.common.ApiResponse;
@@ -174,6 +176,56 @@ public class AuthController {
             log.error("Lỗi khi lấy thông tin user hiện tại", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Có lỗi xảy ra khi lấy thông tin user"));
+        }
+    }
+
+    /**
+     * API đăng nhập khách hàng bằng email hoặc số điện thoại
+     *
+     * @param loginRequest thông tin đăng nhập (email hoặc số điện thoại và mật khẩu)
+     * @return JWT token và thông tin khách hàng
+     */
+    @Operation(summary = "Đăng nhập khách hàng", description = "Xác thực thông tin đăng nhập khách hàng bằng email hoặc số điện thoại và trả về JWT token cùng thông tin khách hàng")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Đăng nhập thành công", content = @Content(schema = @Schema(implementation = CustomerLoginResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Thông tin đăng nhập không chính xác"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Tài khoản bị khóa")
+    })
+    @PostMapping("/customer/login")
+    public ResponseEntity<ApiResponse<CustomerLoginResponse>> customerLogin(@Valid @RequestBody CustomerLoginRequest loginRequest) {
+        log.info("Nhận yêu cầu đăng nhập từ khách hàng: {}", loginRequest.getEmailOrPhone());
+
+        try {
+            CustomerLoginResponse loginResponse = authService.customerLogin(loginRequest);
+
+            log.info("Đăng nhập thành công cho khách hàng: {}", loginRequest.getEmailOrPhone());
+            return ResponseEntity.ok(
+                    ApiResponse.success("Đăng nhập thành công", loginResponse));
+
+        } catch (BadCredentialsException e) {
+            log.warn("Đăng nhập thất bại - sai thông tin: {}", loginRequest.getEmailOrPhone());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Email/Số điện thoại hoặc mật khẩu không chính xác"));
+
+        } catch (DisabledException e) {
+            log.warn("Đăng nhập thất bại - tài khoản bị khóa: {}", loginRequest.getEmailOrPhone());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Tài khoản đã bị khóa"));
+
+        } catch (UsernameNotFoundException e) {
+            log.warn("Đăng nhập thất bại - không tìm thấy khách hàng: {}", loginRequest.getEmailOrPhone());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Email/Số điện thoại hoặc mật khẩu không chính xác"));
+
+        } catch (AuthenticationException e) {
+            log.error("Lỗi xác thực cho khách hàng: {}", loginRequest.getEmailOrPhone(), e);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Xác thực thất bại"));
+
+        } catch (Exception e) {
+            log.error("Lỗi không xác định khi đăng nhập cho khách hàng: {}", loginRequest.getEmailOrPhone(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Có lỗi xảy ra trong quá trình đăng nhập"));
         }
     }
 }

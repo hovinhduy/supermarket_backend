@@ -1,8 +1,12 @@
 package iuh.fit.supermarket.service;
 
+import iuh.fit.supermarket.dto.auth.CustomerLoginRequest;
+import iuh.fit.supermarket.dto.auth.CustomerLoginResponse;
 import iuh.fit.supermarket.dto.auth.LoginRequest;
 import iuh.fit.supermarket.dto.auth.LoginResponse;
+import iuh.fit.supermarket.entity.Customer;
 import iuh.fit.supermarket.entity.Employee;
+import iuh.fit.supermarket.repository.CustomerRepository;
 import iuh.fit.supermarket.repository.EmployeeRepository;
 import iuh.fit.supermarket.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +18,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +32,8 @@ public class AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final EmployeeRepository employeeRepository;
+    private final CustomerRepository customerRepository;
+    private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
     /**
@@ -151,5 +158,107 @@ public class AuthService {
             log.error("Lỗi khi kiểm tra quyền cho email: {}", email, e);
             return false;
         }
+    }
+
+    /**
+     * Xử lý đăng nhập khách hàng bằng email hoặc số điện thoại
+     * @param loginRequest thông tin đăng nhập (email hoặc số điện thoại và mật khẩu)
+     * @return CustomerLoginResponse chứa JWT token và thông tin khách hàng
+     * @throws AuthenticationException nếu đăng nhập thất bại
+     */
+    @Transactional(readOnly = true)
+    public CustomerLoginResponse customerLogin(CustomerLoginRequest loginRequest) throws AuthenticationException {
+        log.info("Đang xử lý đăng nhập khách hàng với: {}", loginRequest.getEmailOrPhone());
+
+        try {
+            // Tìm khách hàng bằng email hoặc số điện thoại
+            Customer customer = findCustomerByEmailOrPhone(loginRequest.getEmailOrPhone());
+
+            // Kiểm tra tài khoản có bị xóa không
+            if (customer.getIsDeleted()) {
+                log.warn("Tài khoản khách hàng {} đã bị khóa", loginRequest.getEmailOrPhone());
+                throw new DisabledException("Tài khoản đã bị khóa");
+            }
+
+            // Kiểm tra mật khẩu
+            if (!passwordEncoder.matches(loginRequest.getPassword(), customer.getPasswordHash())) {
+                log.warn("Sai mật khẩu cho khách hàng: {}", loginRequest.getEmailOrPhone());
+                throw new BadCredentialsException("Email/Số điện thoại hoặc mật khẩu không chính xác");
+            }
+
+            // Tạo JWT token với identifier (email hoặc phone)
+            String identifier = customer.getEmail() != null ? customer.getEmail() : customer.getPhone();
+            String token = jwtUtil.generateToken("CUSTOMER:" + identifier);
+
+            // Tạo response
+            CustomerLoginResponse.CustomerInfo customerInfo = new CustomerLoginResponse.CustomerInfo(
+                customer.getCustomerId(),
+                customer.getName(),
+                customer.getEmail(),
+                customer.getPhone(),
+                customer.getCustomerType()
+            );
+
+            CustomerLoginResponse response = new CustomerLoginResponse(
+                token,
+                jwtUtil.getExpirationTime(),
+                customerInfo
+            );
+
+            log.info("Đăng nhập thành công cho khách hàng: {} ({})", customer.getName(), loginRequest.getEmailOrPhone());
+            return response;
+
+        } catch (BadCredentialsException e) {
+            log.warn("Sai thông tin đăng nhập cho: {}", loginRequest.getEmailOrPhone());
+            throw new BadCredentialsException("Email/Số điện thoại hoặc mật khẩu không chính xác");
+        } catch (DisabledException e) {
+            log.warn("Tài khoản bị khóa cho: {}", loginRequest.getEmailOrPhone());
+            throw new DisabledException("Tài khoản đã bị khóa");
+        } catch (UsernameNotFoundException e) {
+            log.warn("Không tìm thấy khách hàng: {}", loginRequest.getEmailOrPhone());
+            throw new BadCredentialsException("Email/Số điện thoại hoặc mật khẩu không chính xác");
+        } catch (Exception e) {
+            log.error("Lỗi không xác định khi đăng nhập khách hàng: {}", loginRequest.getEmailOrPhone(), e);
+            throw new RuntimeException("Có lỗi xảy ra trong quá trình đăng nhập");
+        }
+    }
+
+    /**
+     * Tìm khách hàng theo email hoặc số điện thoại
+     * @param emailOrPhone email hoặc số điện thoại
+     * @return Customer entity
+     * @throws UsernameNotFoundException nếu không tìm thấy
+     */
+    private Customer findCustomerByEmailOrPhone(String emailOrPhone) throws UsernameNotFoundException {
+        // Kiểm tra xem input có phải là email không (chứa @)
+        if (emailOrPhone.contains("@")) {
+            return customerRepository.findByEmailAndIsDeletedFalse(emailOrPhone)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với email: " + emailOrPhone));
+        } else {
+            return customerRepository.findByPhoneAndIsDeletedFalse(emailOrPhone)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với số điện thoại: " + emailOrPhone));
+        }
+    }
+
+    /**
+     * Lấy thông tin khách hàng từ email
+     * @param email email của khách hàng
+     * @return Customer entity
+     */
+    @Transactional(readOnly = true)
+    public Customer getCustomerByEmail(String email) {
+        return customerRepository.findByEmailAndIsDeletedFalse(email)
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với email: " + email));
+    }
+
+    /**
+     * Lấy thông tin khách hàng từ số điện thoại
+     * @param phone số điện thoại của khách hàng
+     * @return Customer entity
+     */
+    @Transactional(readOnly = true)
+    public Customer getCustomerByPhone(String phone) {
+        return customerRepository.findByPhoneAndIsDeletedFalse(phone)
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với số điện thoại: " + phone));
     }
 }

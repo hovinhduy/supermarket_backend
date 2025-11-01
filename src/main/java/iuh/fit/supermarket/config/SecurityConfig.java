@@ -55,8 +55,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         // Public endpoints
                         .requestMatchers("/api/auth/login", "/api/auth/validate").permitAll()
-                        .requestMatchers("/public/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/api/customers/register", "/api/auth/customer/login").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
 
                         // Swagger endpoints - cho phép truy cập công khai
@@ -66,9 +65,6 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-resources/**").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
-
-                        // Demo public endpoint
-                        .requestMatchers("/demo/public").permitAll()
                         .requestMatchers("/api/payment/payos_transfer_handler").permitAll()
 
                         // Admin only endpoints
