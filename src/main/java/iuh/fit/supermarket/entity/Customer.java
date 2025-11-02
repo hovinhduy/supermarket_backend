@@ -1,20 +1,16 @@
 package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.CustomerType;
-import iuh.fit.supermarket.enums.Gender;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Entity đại diện cho khách hàng trong hệ thống
+ * Thông tin cơ bản (name, email, phone, password, gender, dateOfBirth) được lưu trong bảng User
  */
 @Entity
 @Table(name = "customers")
@@ -32,22 +28,12 @@ public class Customer {
     private Integer customerId;
 
     /**
-     * Tên khách hàng
+     * Foreign key tới bảng users
+     * Mỗi customer phải có một user tương ứng
      */
-    @Column(name = "name", nullable = false)
-    private String name;
-
-    /**
-     * Email khách hàng (duy nhất)
-     */
-    @Column(name = "email", nullable = false)
-    private String email;
-
-    /**
-     * Số điện thoại khách hàng(duy nhất)
-     */
-    @Column(name = "phone", length = 20, unique = true, nullable = false)
-    private String phone;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     /**
      * Mã khách hàng (tự động sinh: KH000001 - KH999999, hoặc tùy chỉnh)
@@ -56,29 +42,10 @@ public class Customer {
     private String customerCode;
 
     /**
-     * Mật khẩu đã được hash
+     * Địa chỉ khách hàng (thông tin riêng của customer)
      */
-    @Column(name = "password_hash")
-    private String passwordHash;
-
-    /**
-     * giới tính
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "gender")
-    private Gender gender;
-
-    /**
-     * Địa chỉ khách hàng
-     */
-    @Column(name = "address")
+    @Column(name = "address", length = 255)
     private String address;
-
-    /**
-     * Ngày sinh khách hàng
-     */
-    @Column(name = "date_of_birth")
-    private LocalDate dateOfBirth;
 
     /**
      * Loại khách hàng (Regular/VIP)
@@ -86,26 +53,6 @@ public class Customer {
     @Enumerated(EnumType.STRING)
     @Column(name = "customer_type")
     private CustomerType customerType = CustomerType.REGULAR;
-
-    /**
-     * Trạng thái xóa mềm
-     */
-    @Column(name = "is_deleted")
-    private Boolean isDeleted = false;
-
-    /**
-     * Thời gian tạo
-     */
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    /**
-     * Thời gian cập nhật
-     */
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     /**
      * Danh sách đơn hàng của khách hàng

@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
 import iuh.fit.supermarket.entity.Employee;
-import iuh.fit.supermarket.enums.EmployeeRole;
+import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -101,7 +101,7 @@ public class EmployeeController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDto>> createEmployee(
             @Parameter(description = "Thông tin nhân viên mới", required = true) @RequestBody Employee employee) {
-        log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", employee.getEmail());
+        log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", employee.getUser() != null ? employee.getUser().getEmail() : "null");
 
         try {
             Employee createdEmployee = employeeService.createEmployee(employee);
@@ -173,7 +173,7 @@ public class EmployeeController {
      */
     @GetMapping("/role/{role}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
-    public ResponseEntity<ApiResponse<List<EmployeeDto>>> getEmployeesByRole(@PathVariable EmployeeRole role) {
+    public ResponseEntity<ApiResponse<List<EmployeeDto>>> getEmployeesByRole(@PathVariable UserRole role) {
         log.info("Nhận yêu cầu lấy nhân viên theo role: {}", role);
 
         try {

@@ -2,9 +2,12 @@ package iuh.fit.supermarket.service;
 
 import iuh.fit.supermarket.dto.customer.*;
 import iuh.fit.supermarket.entity.Customer;
+import iuh.fit.supermarket.entity.User;
 import iuh.fit.supermarket.enums.CustomerType;
+import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.exception.*;
 import iuh.fit.supermarket.repository.CustomerRepository;
+import iuh.fit.supermarket.repository.UserRepository;
 import iuh.fit.supermarket.util.CustomerValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,7 @@ import java.util.stream.Collectors;
 
 /**
  * Service xử lý business logic cho Customer
+ * Sau refactoring: tạo User trước, sau đó tạo Customer với user_id FK
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +35,7 @@ import java.util.stream.Collectors;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerValidator customerValidator;
 
@@ -42,7 +47,7 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public List<CustomerDto> getAllCustomers() {
         log.debug("Lấy danh sách tất cả khách hàng");
-        return customerRepository.findAllByIsDeletedFalse()
+        return customerRepository.findAllByUser_IsDeletedFalse()
                 .stream()
                 .map(CustomerDto::fromEntity)
                 .collect(Collectors.toList());
@@ -65,7 +70,7 @@ public class CustomerService {
         Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        return customerRepository.findAllByIsDeletedFalse(pageable)
+        return customerRepository.findAllByUser_IsDeletedFalse(pageable)
                 .map(CustomerDto::fromEntity);
     }
 
@@ -79,7 +84,7 @@ public class CustomerService {
     public CustomerDto getCustomerById(Integer customerId) {
         log.debug("Lấy khách hàng với ID: {}", customerId);
 
-        Customer customer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
         return CustomerDto.fromEntity(customer);
@@ -87,7 +92,8 @@ public class CustomerService {
 
     /**
      * Lấy khách hàng theo email
-     * 
+     * Sau refactoring: tìm User trước, sau đó lấy Customer
+     *
      * @param email email khách hàng
      * @return CustomerDto
      */
@@ -96,7 +102,13 @@ public class CustomerService {
         log.debug("Lấy khách hàng với email: {}", email);
 
         String normalizedEmail = customerValidator.normalizeEmail(email);
-        Customer customer = customerRepository.findByEmailAndIsDeletedFalse(normalizedEmail)
+
+        // Tìm User với role CUSTOMER
+        User user = userRepository.findCustomerByEmailOrPhone(normalizedEmail)
+                .orElseThrow(() -> new CustomerNotFoundException("email", email));
+
+        // Lấy Customer từ user_id
+        Customer customer = customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
                 .orElseThrow(() -> new CustomerNotFoundException("email", email));
 
         return CustomerDto.fromEntity(customer);
@@ -104,7 +116,8 @@ public class CustomerService {
 
     /**
      * Lấy khách hàng theo số điện thoại
-     * 
+     * Sau refactoring: tìm User trước, sau đó lấy Customer
+     *
      * @param phone số điện thoại khách hàng
      * @return CustomerDto
      */
@@ -113,7 +126,13 @@ public class CustomerService {
         log.debug("Lấy khách hàng với phone: {}", phone);
 
         String normalizedPhone = customerValidator.normalizePhone(phone);
-        Customer customer = customerRepository.findByPhoneAndIsDeletedFalse(normalizedPhone)
+
+        // Tìm User với role CUSTOMER
+        User user = userRepository.findCustomerByEmailOrPhone(normalizedPhone)
+                .orElseThrow(() -> new CustomerNotFoundException("phone", phone));
+
+        // Lấy Customer từ user_id
+        Customer customer = customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
                 .orElseThrow(() -> new CustomerNotFoundException("phone", phone));
 
         return CustomerDto.fromEntity(customer);
@@ -177,33 +196,39 @@ public class CustomerService {
             }
         }
 
-        // Kiểm tra email đã tồn tại chưa
-        if (customerRepository.existsByEmail(normalizedEmail)) {
+        // Kiểm tra email đã tồn tại chưa (trong UserRepository)
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new DuplicateCustomerException("email", normalizedEmail);
         }
 
-        // Kiểm tra số điện thoại đã tồn tại chưa
-        Optional<Customer> existingCustomerByPhone = customerRepository.findByPhone(normalizedPhone);
+        // Kiểm tra số điện thoại đã tồn tại chưa (tìm User theo phone)
+        Optional<User> existingUserByPhone = userRepository.findByPhoneAndIsDeletedFalse(normalizedPhone);
 
-        if (existingCustomerByPhone.isPresent()) {
-            Customer existingCustomer = existingCustomerByPhone.get();
+        if (existingUserByPhone.isPresent()) {
+            User existingUser = existingUserByPhone.get();
 
-            // Nếu khách hàng đã có mật khẩu -> conflict
-            if (existingCustomer.getPasswordHash() != null && !existingCustomer.getPasswordHash().isEmpty()) {
+            // Nếu user đã có mật khẩu -> conflict
+            if (existingUser.getPasswordHash() != null && !existingUser.getPasswordHash().isEmpty()) {
                 throw new DuplicateCustomerException("phone", normalizedPhone + " (đã đăng ký)");
             }
 
-            // Nếu khách hàng chưa có mật khẩu -> cập nhật thông tin
-            log.info("Cập nhật khách hàng hiện có với phone: {} bằng cách thêm mật khẩu", normalizedPhone);
+            // Nếu user chưa có mật khẩu -> cập nhật thông tin User
+            log.info("Cập nhật user hiện có với phone: {} bằng cách thêm mật khẩu", normalizedPhone);
 
-            existingCustomer.setName(request.getName().trim());
-            existingCustomer.setEmail(normalizedEmail);
+            existingUser.setName(request.getName().trim());
+            existingUser.setEmail(normalizedEmail);
+            existingUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            existingUser.setGender(request.getGender());
+            existingUser.setDateOfBirth(request.getDateOfBirth());
+
+            User savedUser = userRepository.save(existingUser);
+
+            // Lấy Customer từ user_id và cập nhật customerCode, address
+            Customer existingCustomer = customerRepository.findByUser_UserId(savedUser.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy customer record"));
+
             existingCustomer.setCustomerCode(customerCode);
-            existingCustomer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-            existingCustomer.setGender(request.getGender());
             existingCustomer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-            existingCustomer.setDateOfBirth(request.getDateOfBirth());
-            // Giữ nguyên customerType hiện có
 
             Customer savedCustomer = customerRepository.save(existingCustomer);
             log.info("Đã cập nhật khách hàng với ID: {}", savedCustomer.getCustomerId());
@@ -211,18 +236,26 @@ public class CustomerService {
             return CustomerDto.fromEntity(savedCustomer);
         }
 
-        // Tạo khách hàng mới
+        // Tạo User mới
+        User user = new User();
+        user.setName(request.getName().trim());
+        user.setEmail(normalizedEmail);
+        user.setPhone(normalizedPhone);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setUserRole(UserRole.CUSTOMER);
+        user.setGender(request.getGender());
+        user.setDateOfBirth(request.getDateOfBirth());
+        user.setIsDeleted(false);
+
+        User savedUser = userRepository.save(user);
+        log.info("Đã tạo User mới với ID: {}", savedUser.getUserId());
+
+        // Tạo Customer mới liên kết với User
         Customer customer = new Customer();
-        customer.setName(request.getName().trim());
-        customer.setEmail(normalizedEmail);
-        customer.setPhone(normalizedPhone);
+        customer.setUser(savedUser);
         customer.setCustomerCode(customerCode);
-        customer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        customer.setGender(request.getGender());
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-        customer.setDateOfBirth(request.getDateOfBirth());
         customer.setCustomerType(CustomerType.REGULAR); // Luôn là REGULAR cho self-registration
-        customer.setIsDeleted(false);
 
         Customer savedCustomer = customerRepository.save(customer);
         log.info("Đã tạo khách hàng mới với ID: {}", savedCustomer.getCustomerId());
@@ -260,29 +293,37 @@ public class CustomerService {
             }
         }
 
-        // Kiểm tra email đã tồn tại chưa
-        if (customerRepository.existsByEmail(normalizedEmail)) {
+        // Kiểm tra email đã tồn tại chưa (trong UserRepository)
+        if (userRepository.existsByEmail(normalizedEmail)) {
             throw new DuplicateCustomerException("email", normalizedEmail);
         }
 
         // Kiểm tra số điện thoại đã tồn tại chưa (nếu có)
         if (normalizedPhone != null && !normalizedPhone.isEmpty() &&
-                customerRepository.existsByPhone(normalizedPhone)) {
+                userRepository.existsByPhone(normalizedPhone)) {
             throw new DuplicateCustomerException("phone", normalizedPhone);
         }
 
-        // Tạo entity Customer
+        // Tạo User mới (admin tạo -> không có password)
+        User user = new User();
+        user.setName(request.getName().trim());
+        user.setEmail(normalizedEmail);
+        user.setPhone(normalizedPhone);
+        user.setPasswordHash(null); // Không có mật khẩu khi admin tạo
+        user.setUserRole(UserRole.CUSTOMER);
+        user.setGender(request.getGender());
+        user.setDateOfBirth(request.getDateOfBirth());
+        user.setIsDeleted(false);
+
+        User savedUser = userRepository.save(user);
+        log.info("Đã tạo User mới với ID: {}", savedUser.getUserId());
+
+        // Tạo Customer mới liên kết với User
         Customer customer = new Customer();
-        customer.setName(request.getName().trim());
-        customer.setEmail(normalizedEmail);
-        customer.setPhone(normalizedPhone);
+        customer.setUser(savedUser);
         customer.setCustomerCode(customerCode);
-        customer.setPasswordHash(null); // Không có mật khẩu khi admin tạo
-        customer.setGender(request.getGender());
         customer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-        customer.setDateOfBirth(request.getDateOfBirth());
         customer.setCustomerType(request.getCustomerType() != null ? request.getCustomerType() : CustomerType.REGULAR);
-        customer.setIsDeleted(false);
 
         Customer savedCustomer = customerRepository.save(customer);
         log.info("Đã tạo khách hàng mới với ID: {}", savedCustomer.getCustomerId());
@@ -304,33 +345,39 @@ public class CustomerService {
         // Validate dữ liệu đầu vào
         validateUpdateCustomerRequest(request);
 
-        Customer existingCustomer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer existingCustomer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        User existingUser = existingCustomer.getUser();
 
         // Normalize dữ liệu
         String normalizedEmail = customerValidator.normalizeEmail(request.getEmail());
         String normalizedPhone = customerValidator.normalizePhone(request.getPhone());
 
-        // Kiểm tra email đã tồn tại chưa (ngoại trừ khách hàng hiện tại)
-        if (!existingCustomer.getEmail().equals(normalizedEmail) &&
-                customerRepository.existsByEmailAndCustomerIdNot(normalizedEmail, customerId)) {
+        // Kiểm tra email đã tồn tại chưa (ngoại trừ user hiện tại)
+        if (!existingUser.getEmail().equals(normalizedEmail) &&
+                userRepository.existsByEmailAndUserIdNot(normalizedEmail, existingUser.getUserId())) {
             throw new DuplicateCustomerException("email", normalizedEmail);
         }
 
-        // Kiểm tra số điện thoại đã tồn tại chưa (ngoại trừ khách hàng hiện tại)
+        // Kiểm tra số điện thoại đã tồn tại chưa (ngoại trừ user hiện tại)
         if (normalizedPhone != null && !normalizedPhone.isEmpty() &&
-                !normalizedPhone.equals(existingCustomer.getPhone()) &&
-                customerRepository.existsByPhoneAndCustomerIdNot(normalizedPhone, customerId)) {
+                !normalizedPhone.equals(existingUser.getPhone()) &&
+                userRepository.existsByPhoneAndUserIdNot(normalizedPhone, existingUser.getUserId())) {
             throw new DuplicateCustomerException("phone", normalizedPhone);
         }
 
-        // Cập nhật thông tin
-        existingCustomer.setName(request.getName().trim());
-        existingCustomer.setEmail(normalizedEmail);
-        existingCustomer.setPhone(normalizedPhone);
-        existingCustomer.setGender(request.getGender());
+        // Cập nhật thông tin User
+        existingUser.setName(request.getName().trim());
+        existingUser.setEmail(normalizedEmail);
+        existingUser.setPhone(normalizedPhone);
+        existingUser.setGender(request.getGender());
+        existingUser.setDateOfBirth(request.getDateOfBirth());
+
+        userRepository.save(existingUser);
+
+        // Cập nhật thông tin Customer (chỉ address và customerType)
         existingCustomer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-        existingCustomer.setDateOfBirth(request.getDateOfBirth());
 
         if (request.getCustomerType() != null) {
             existingCustomer.setCustomerType(request.getCustomerType());
@@ -344,6 +391,7 @@ public class CustomerService {
 
     /**
      * Xóa mềm khách hàng
+     * Sau refactoring: xóa mềm User thay vì Customer
      *
      * @param customerId ID khách hàng
      */
@@ -351,11 +399,13 @@ public class CustomerService {
     public void deleteCustomer(Integer customerId) {
         log.info("Xóa khách hàng với ID: {}", customerId);
 
-        Customer customer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
-        customer.setIsDeleted(true);
-        customerRepository.save(customer);
+        // Xóa mềm User (sẽ cascade sang Customer qua relationship)
+        User user = customer.getUser();
+        user.setIsDeleted(true);
+        userRepository.save(user);
 
         log.info("Đã xóa khách hàng với ID: {}", customerId);
     }
@@ -384,12 +434,14 @@ public class CustomerService {
         for (Integer customerId : request.getCustomerIds()) {
             try {
                 // Kiểm tra khách hàng có tồn tại và chưa bị xóa không
-                Optional<Customer> customerOpt = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId);
+                Optional<Customer> customerOpt = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId);
 
                 if (customerOpt.isPresent()) {
                     Customer customer = customerOpt.get();
-                    customer.setIsDeleted(true);
-                    customerRepository.save(customer);
+                    // Xóa mềm User
+                    User user = customer.getUser();
+                    user.setIsDeleted(true);
+                    userRepository.save(user);
 
                     successIds.add(customerId);
                     log.debug("Đã xóa thành công khách hàng với ID: {}", customerId);
@@ -420,7 +472,8 @@ public class CustomerService {
 
     /**
      * Khôi phục khách hàng đã bị xóa
-     * 
+     * Sau refactoring: khôi phục User
+     *
      * @param customerId ID khách hàng
      */
     @Transactional
@@ -430,8 +483,10 @@ public class CustomerService {
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
-        customer.setIsDeleted(false);
-        customerRepository.save(customer);
+        // Khôi phục User
+        User user = customer.getUser();
+        user.setIsDeleted(false);
+        userRepository.save(user);
 
         log.info("Đã khôi phục khách hàng với ID: {}", customerId);
     }
@@ -456,16 +511,18 @@ public class CustomerService {
             throw new CustomerValidationException("newPassword", "Mật khẩu mới phải từ 6 đến 50 ký tự");
         }
 
-        Customer customer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
+        User user = customer.getUser();
+
         // Verify old password
-        if (!passwordEncoder.matches(request.getOldPassword(), customer.getPasswordHash())) {
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
             throw new CustomerValidationException("oldPassword", "Mật khẩu cũ không đúng");
         }
 
-        customer.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-        customerRepository.save(customer);
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
 
         log.info("Đã đổi mật khẩu cho khách hàng với ID: {}", customerId);
     }
@@ -497,10 +554,10 @@ public class CustomerService {
             }
         } else if (request.getCustomerType() != null) {
             // Filter by customer type only
-            customers = customerRepository.findByCustomerTypeAndIsDeletedFalse(request.getCustomerType(), pageable);
+            customers = customerRepository.findByCustomerTypeAndUser_IsDeletedFalse(request.getCustomerType(), pageable);
         } else {
             // Get all customers
-            customers = customerRepository.findAllByIsDeletedFalse(pageable);
+            customers = customerRepository.findAllByUser_IsDeletedFalse(pageable);
         }
 
         return customers.map(CustomerDto::fromEntity);
@@ -588,7 +645,7 @@ public class CustomerService {
     @Transactional(readOnly = true)
     public List<CustomerDto> getCustomersByType(CustomerType customerType) {
         log.debug("Lấy danh sách khách hàng với loại: {}", customerType);
-        return customerRepository.findByCustomerTypeAndIsDeletedFalse(customerType)
+        return customerRepository.findByCustomerTypeAndUser_IsDeletedFalse(customerType)
                 .stream()
                 .map(CustomerDto::fromEntity)
                 .collect(Collectors.toList());
@@ -617,11 +674,12 @@ public class CustomerService {
     public void upgradeToVip(Integer customerId) {
         log.info("Nâng cấp khách hàng lên VIP với ID: {}", customerId);
 
-        Customer customer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
         // Check if customer is eligible for VIP
-        if (customer.getDateOfBirth() != null && !customerValidator.isEligibleForVip(customer.getDateOfBirth())) {
+        User user = customer.getUser();
+        if (user.getDateOfBirth() != null && !customerValidator.isEligibleForVip(user.getDateOfBirth())) {
             throw new CustomerValidationException("age", "Khách hàng phải từ 18 tuổi trở lên để trở thành VIP");
         }
 
@@ -640,7 +698,7 @@ public class CustomerService {
     public void downgradeToRegular(Integer customerId) {
         log.info("Hạ cấp khách hàng xuống REGULAR với ID: {}", customerId);
 
-        Customer customer = customerRepository.findByCustomerIdAndIsDeletedFalse(customerId)
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
 
         customer.setCustomerType(CustomerType.REGULAR);

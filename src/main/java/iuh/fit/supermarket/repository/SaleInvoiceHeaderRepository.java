@@ -46,11 +46,12 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
     @Query("""
             SELECT DISTINCT i FROM SaleInvoiceHeader i
             LEFT JOIN i.customer c
+            LEFT JOIN c.user cu
             LEFT JOIN i.employee e
             LEFT JOIN i.invoiceDetails d
-            WHERE (:searchKeyword IS NULL OR 
+            WHERE (:searchKeyword IS NULL OR
                    LOWER(i.invoiceNumber) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
-                   (c IS NOT NULL AND LOWER(c.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
+                   (cu IS NOT NULL AND LOWER(cu.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
             AND (:fromDate IS NULL OR CAST(i.invoiceDate AS DATE) >= :fromDate)
             AND (:toDate IS NULL OR CAST(i.invoiceDate AS DATE) <= :toDate)
             AND (:status IS NULL OR i.status = :status)
@@ -82,17 +83,18 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
      * Nhóm theo nhân viên và ngày, chỉ lấy hóa đơn PAID
      */
     @Query("""
-            SELECT e.employeeCode, e.name, MIN(i.invoiceDate),
+            SELECT e.employeeCode, u.name, MIN(i.invoiceDate),
                    COALESCE(SUM(i.totalDiscount), 0.0),
                    COALESCE(SUM(i.subtotal), 0.0),
                    COALESCE(SUM(i.totalAmount), 0.0)
             FROM SaleInvoiceHeader i
             JOIN i.employee e
+            JOIN e.user u
             WHERE i.status = 'PAID'
             AND FUNCTION('DATE', i.invoiceDate) >= :fromDate
             AND FUNCTION('DATE', i.invoiceDate) <= :toDate
             AND (:employeeId IS NULL OR e.employeeId = :employeeId)
-            GROUP BY e.employeeCode, e.name, FUNCTION('DATE', i.invoiceDate)
+            GROUP BY e.employeeCode, u.name, FUNCTION('DATE', i.invoiceDate)
             ORDER BY e.employeeCode, FUNCTION('DATE', i.invoiceDate)
             """)
     List<Object[]> getSalesDailyReportRaw(

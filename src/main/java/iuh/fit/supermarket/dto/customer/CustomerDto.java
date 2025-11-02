@@ -79,25 +79,29 @@ public class CustomerDto {
 
     /**
      * Constructor từ Customer entity
+     * Sau refactoring: lấy name, email, phone, gender, dateOfBirth, isDeleted từ User entity
      */
     public static CustomerDto fromEntity(iuh.fit.supermarket.entity.Customer customer) {
         if (customer == null) {
             return null;
         }
-        
+
+        // Lấy thông tin từ User entity
+        var user = customer.getUser();
+
         return new CustomerDto(
             customer.getCustomerId(),
-            customer.getName(),
-            customer.getEmail(),
-            customer.getPhone(),
+            user.getName(),           // Từ User
+            user.getEmail(),          // Từ User
+            user.getPhone(),          // Từ User
             customer.getCustomerCode(),
-            customer.getGender(),
+            user.getGender(),         // Từ User
             customer.getAddress(),
-            customer.getDateOfBirth(),
+            user.getDateOfBirth(),    // Từ User
             customer.getCustomerType(),
-            customer.getIsDeleted(),
-            customer.getCreatedAt(),
-            customer.getUpdatedAt()
+            user.getIsDeleted(),      // Từ User
+            user.getCreatedAt(),      // Từ User
+            user.getUpdatedAt()       // Từ User
         );
     }
 }

@@ -871,8 +871,8 @@ public class PriceServiceImpl implements PriceService {
         if (price.getCreatedBy() != null) {
             PriceResponse.EmployeeInfo createdBy = new PriceResponse.EmployeeInfo();
             createdBy.setEmployeeId(price.getCreatedBy().getEmployeeId());
-            createdBy.setName(price.getCreatedBy().getName());
-            createdBy.setEmail(price.getCreatedBy().getEmail());
+            createdBy.setName(price.getCreatedBy().getUser().getName());
+            createdBy.setEmail(price.getCreatedBy().getUser().getEmail());
             response.setCreatedBy(createdBy);
         }
 
@@ -880,8 +880,8 @@ public class PriceServiceImpl implements PriceService {
         if (price.getUpdatedBy() != null) {
             PriceResponse.EmployeeInfo updatedBy = new PriceResponse.EmployeeInfo();
             updatedBy.setEmployeeId(price.getUpdatedBy().getEmployeeId());
-            updatedBy.setName(price.getUpdatedBy().getName());
-            updatedBy.setEmail(price.getUpdatedBy().getEmail());
+            updatedBy.setName(price.getUpdatedBy().getUser().getName());
+            updatedBy.setEmail(price.getUpdatedBy().getUser().getEmail());
             response.setUpdatedBy(updatedBy);
         }
 

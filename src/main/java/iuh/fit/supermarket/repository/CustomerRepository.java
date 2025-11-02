@@ -16,75 +16,26 @@ import java.util.Optional;
 
 /**
  * Repository interface cho Customer entity
+ * Các query liên quan đến email, phone, name hiện join với bảng User
  */
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Integer> {
 
     /**
-     * Tìm khách hàng theo email
-     * 
-     * @param email email của khách hàng
+     * Tìm khách hàng theo user_id
+     *
+     * @param userId ID của user
      * @return Optional<Customer>
      */
-    Optional<Customer> findByEmail(String email);
+    Optional<Customer> findByUser_UserId(Long userId);
 
     /**
-     * Tìm khách hàng theo email và chưa bị xóa
-     * 
-     * @param email email của khách hàng
+     * Tìm khách hàng theo user_id và user chưa bị xóa
+     *
+     * @param userId ID của user
      * @return Optional<Customer>
      */
-    Optional<Customer> findByEmailAndIsDeletedFalse(String email);
-
-    /**
-     * Tìm khách hàng theo số điện thoại
-     * 
-     * @param phone số điện thoại của khách hàng
-     * @return Optional<Customer>
-     */
-    Optional<Customer> findByPhone(String phone);
-
-    /**
-     * Tìm khách hàng theo số điện thoại và chưa bị xóa
-     * 
-     * @param phone số điện thoại của khách hàng
-     * @return Optional<Customer>
-     */
-    Optional<Customer> findByPhoneAndIsDeletedFalse(String phone);
-
-    /**
-     * Kiểm tra email đã tồn tại chưa
-     * 
-     * @param email email cần kiểm tra
-     * @return true nếu email đã tồn tại
-     */
-    boolean existsByEmail(String email);
-
-    /**
-     * Kiểm tra email đã tồn tại chưa (loại trừ khách hàng hiện tại)
-     * 
-     * @param email      email cần kiểm tra
-     * @param customerId ID khách hàng hiện tại
-     * @return true nếu email đã tồn tại
-     */
-    boolean existsByEmailAndCustomerIdNot(String email, Integer customerId);
-
-    /**
-     * Kiểm tra số điện thoại đã tồn tại chưa
-     * 
-     * @param phone số điện thoại cần kiểm tra
-     * @return true nếu số điện thoại đã tồn tại
-     */
-    boolean existsByPhone(String phone);
-
-    /**
-     * Kiểm tra số điện thoại đã tồn tại chưa (loại trừ khách hàng hiện tại)
-     * 
-     * @param phone      số điện thoại cần kiểm tra
-     * @param customerId ID khách hàng hiện tại
-     * @return true nếu số điện thoại đã tồn tại
-     */
-    boolean existsByPhoneAndCustomerIdNot(String phone, Integer customerId);
+    Optional<Customer> findByUser_UserIdAndUser_IsDeletedFalse(Long userId);
 
     /**
      * Kiểm tra mã khách hàng đã tồn tại chưa
@@ -103,129 +54,129 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
     Optional<Customer> findTopByOrderByCustomerCodeDesc();
 
     /**
-     * Tìm tất cả khách hàng chưa bị xóa
-     * 
+     * Tìm tất cả khách hàng mà user chưa bị xóa
+     *
      * @return List<Customer>
      */
-    List<Customer> findAllByIsDeletedFalse();
+    List<Customer> findAllByUser_IsDeletedFalse();
 
     /**
-     * Tìm tất cả khách hàng chưa bị xóa với phân trang
-     * 
+     * Tìm tất cả khách hàng mà user chưa bị xóa với phân trang
+     *
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
-    Page<Customer> findAllByIsDeletedFalse(Pageable pageable);
+    Page<Customer> findAllByUser_IsDeletedFalse(Pageable pageable);
 
     /**
-     * Tìm khách hàng theo loại khách hàng
-     * 
+     * Tìm khách hàng theo loại khách hàng và user chưa bị xóa
+     *
      * @param customerType loại khách hàng
      * @return List<Customer>
      */
-    List<Customer> findByCustomerTypeAndIsDeletedFalse(CustomerType customerType);
+    List<Customer> findByCustomerTypeAndUser_IsDeletedFalse(CustomerType customerType);
 
     /**
-     * Tìm khách hàng theo loại khách hàng với phân trang
-     * 
+     * Tìm khách hàng theo loại khách hàng với phân trang và user chưa bị xóa
+     *
      * @param customerType loại khách hàng
      * @param pageable     thông tin phân trang
      * @return Page<Customer>
      */
-    Page<Customer> findByCustomerTypeAndIsDeletedFalse(CustomerType customerType, Pageable pageable);
+    Page<Customer> findByCustomerTypeAndUser_IsDeletedFalse(CustomerType customerType, Pageable pageable);
 
     /**
-     * Tìm khách hàng theo ID và chưa bị xóa
-     * 
+     * Tìm khách hàng theo ID và user chưa bị xóa
+     *
      * @param customerId ID khách hàng
      * @return Optional<Customer>
      */
-    Optional<Customer> findByCustomerIdAndIsDeletedFalse(Integer customerId);
+    Optional<Customer> findByCustomerIdAndUser_IsDeletedFalse(Integer customerId);
 
     /**
-     * Tìm khách hàng theo tên (tìm kiếm gần đúng)
-     * 
+     * Tìm khách hàng theo tên (join với User)
+     *
      * @param name tên khách hàng
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.name LIKE %:name% AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE u.name LIKE %:name% AND u.isDeleted = false")
     List<Customer> findByNameContainingAndIsDeletedFalse(@Param("name") String name);
 
     /**
-     * Tìm khách hàng theo tên với phân trang
-     * 
+     * Tìm khách hàng theo tên với phân trang (join với User)
+     *
      * @param name     tên khách hàng
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.name LIKE %:name% AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE u.name LIKE %:name% AND u.isDeleted = false")
     Page<Customer> findByNameContainingAndIsDeletedFalse(@Param("name") String name, Pageable pageable);
 
     /**
-     * Tìm khách hàng theo email (tìm kiếm gần đúng)
-     * 
+     * Tìm khách hàng theo email (join với User)
+     *
      * @param email email khách hàng
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.email LIKE %:email% AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE u.email LIKE %:email% AND u.isDeleted = false")
     List<Customer> findByEmailContainingAndIsDeletedFalse(@Param("email") String email);
 
     /**
-     * Tìm khách hàng theo số điện thoại (tìm kiếm gần đúng)
-     * 
+     * Tìm khách hàng theo số điện thoại (join với User)
+     *
      * @param phone số điện thoại khách hàng
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.phone LIKE %:phone% AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE u.phone LIKE %:phone% AND u.isDeleted = false")
     List<Customer> findByPhoneContainingAndIsDeletedFalse(@Param("phone") String phone);
 
     /**
-     * Tìm kiếm khách hàng theo nhiều tiêu chí
-     * 
+     * Tìm kiếm khách hàng theo nhiều tiêu chí (join với User)
+     *
      * @param searchTerm từ khóa tìm kiếm
      * @param pageable   thông tin phân trang
      * @return Page<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE " +
-            "(c.name LIKE %:searchTerm% OR c.email LIKE %:searchTerm% OR c.phone LIKE %:searchTerm%) " +
-            "AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE " +
+            "(u.name LIKE %:searchTerm% OR u.email LIKE %:searchTerm% OR u.phone LIKE %:searchTerm%) " +
+            "AND u.isDeleted = false")
     Page<Customer> searchCustomers(@Param("searchTerm") String searchTerm, Pageable pageable);
 
     /**
-     * Đếm số lượng khách hàng theo loại
-     * 
+     * Đếm số lượng khách hàng theo loại (join với User)
+     *
      * @param customerType loại khách hàng
      * @return số lượng khách hàng
      */
-    @Query("SELECT COUNT(c) FROM Customer c WHERE c.customerType = :customerType AND c.isDeleted = false")
+    @Query("SELECT COUNT(c) FROM Customer c JOIN c.user u WHERE c.customerType = :customerType AND u.isDeleted = false")
     long countByCustomerTypeAndIsDeletedFalse(@Param("customerType") CustomerType customerType);
 
     /**
-     * Tìm khách hàng sinh nhật trong khoảng thời gian
-     * 
+     * Tìm khách hàng sinh nhật trong khoảng thời gian (join với User)
+     *
      * @param startDate ngày bắt đầu
      * @param endDate   ngày kết thúc
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.dateOfBirth BETWEEN :startDate AND :endDate AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE u.dateOfBirth BETWEEN :startDate AND :endDate AND u.isDeleted = false")
     List<Customer> findCustomersWithBirthdayBetween(@Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
 
     /**
      * Tìm khách hàng theo địa chỉ
-     * 
+     *
      * @param address địa chỉ khách hàng
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.address LIKE %:address% AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE c.address LIKE %:address% AND u.isDeleted = false")
     List<Customer> findByAddressContainingAndIsDeletedFalse(@Param("address") String address);
 
     /**
      * Tìm khách hàng VIP
-     * 
+     *
      * @return List<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.customerType = 'VIP' AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE c.customerType = 'VIP' AND u.isDeleted = false")
     List<Customer> findVipCustomers();
 
     /**
@@ -234,25 +185,25 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
      * @param pageable thông tin phân trang
      * @return Page<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE c.customerType = 'VIP' AND c.isDeleted = false")
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE c.customerType = 'VIP' AND u.isDeleted = false")
     Page<Customer> findVipCustomers(Pageable pageable);
 
     /**
-     * Tìm kiếm khách hàng nâng cao với nhiều tiêu chí tùy chọn
+     * Tìm kiếm khách hàng nâng cao với nhiều tiêu chí tùy chọn (join với User)
      *
-     * @param searchTerm   từ khóa tìm kiếm (tìm trong tên, email, số điện thoại)
-     * @param gender       giới tính (có thể null)
+     * @param searchTerm   từ khóa tìm kiếm (tìm trong tên, email, số điện thoại từ User)
+     * @param gender       giới tính (có thể null - từ User)
      * @param customerType loại khách hàng (có thể null)
      * @param pageable     thông tin phân trang
      * @return Page<Customer>
      */
-    @Query("SELECT c FROM Customer c WHERE " +
-            "c.isDeleted = false " +
+    @Query("SELECT c FROM Customer c JOIN c.user u WHERE " +
+            "u.isDeleted = false " +
             "AND (:searchTerm IS NULL OR :searchTerm = '' OR " +
-            "     LOWER(c.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            "     LOWER(c.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
-            "     c.phone LIKE CONCAT('%', :searchTerm, '%')) " +
-            "AND (:gender IS NULL OR c.gender = :gender) " +
+            "     LOWER(u.name) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     LOWER(u.email) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+            "     u.phone LIKE CONCAT('%', :searchTerm, '%')) " +
+            "AND (:gender IS NULL OR u.gender = :gender) " +
             "AND (:customerType IS NULL OR c.customerType = :customerType)")
     Page<Customer> searchCustomersAdvanced(
             @Param("searchTerm") String searchTerm,

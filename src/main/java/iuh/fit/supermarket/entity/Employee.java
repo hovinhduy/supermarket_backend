@@ -1,19 +1,17 @@
 package iuh.fit.supermarket.entity;
 
-import iuh.fit.supermarket.enums.EmployeeRole;
+import iuh.fit.supermarket.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Entity đại diện cho nhân viên trong hệ thống
+ * Thông tin cơ bản (name, email, password, role) được lưu trong bảng User
  */
 @Entity
 @Table(name = "employees")
@@ -31,55 +29,18 @@ public class Employee {
     private Integer employeeId;
 
     /**
-     * Tên nhân viên
+     * Foreign key tới bảng users
+     * Mỗi employee phải có một user tương ứng
      */
-    @Column(name = "name", nullable = false)
-    private String name;
-
-    /**
-     * Email nhân viên (duy nhất)
-     */
-    @Column(name = "email", nullable = false, unique = true)
-    private String email;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
+    private User user;
 
     /**
      * Mã nhân viên (tự động sinh: NV000001 - NV999999, hoặc tùy chỉnh)
      */
     @Column(name = "employee_code", length = 50, unique = true)
     private String employeeCode;
-
-    /**
-     * Mật khẩu đã được hash
-     */
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
-
-    /**
-     * Vai trò của nhân viên (Admin/Manager/Staff)
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private EmployeeRole role;
-
-    /**
-     * Trạng thái xóa mềm
-     */
-    @Column(name = "is_deleted")
-    private Boolean isDeleted = false;
-
-    /**
-     * Thời gian tạo
-     */
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    /**
-     * Thời gian cập nhật
-     */
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     /**
      * Danh sách đơn hàng được xử lý bởi nhân viên này

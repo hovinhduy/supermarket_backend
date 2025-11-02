@@ -1,6 +1,6 @@
 package iuh.fit.supermarket.dto.employee;
 
-import iuh.fit.supermarket.enums.EmployeeRole;
+import iuh.fit.supermarket.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -36,9 +36,9 @@ public class EmployeeDto {
     private String employeeCode;
 
     /**
-     * Vai trò của nhân viên
+     * Vai trò của nhân viên (từ User.userRole)
      */
-    private EmployeeRole role;
+    private UserRole role;
 
     /**
      * Trạng thái xóa mềm
@@ -57,21 +57,25 @@ public class EmployeeDto {
 
     /**
      * Constructor từ Employee entity
+     * Sau refactoring: lấy name, email, role, isDeleted từ User entity
      */
     public static EmployeeDto fromEntity(iuh.fit.supermarket.entity.Employee employee) {
         if (employee == null) {
             return null;
         }
-        
+
+        // Lấy thông tin từ User entity
+        var user = employee.getUser();
+
         return new EmployeeDto(
             employee.getEmployeeId(),
-            employee.getName(),
-            employee.getEmail(),
+            user.getName(),           // Từ User
+            user.getEmail(),          // Từ User
             employee.getEmployeeCode(),
-            employee.getRole(),
-            employee.getIsDeleted(),
-            employee.getCreatedAt(),
-            employee.getUpdatedAt()
+            user.getUserRole(),       // Từ User (was employee.getRole())
+            user.getIsDeleted(),      // Từ User
+            user.getCreatedAt(),      // Từ User
+            user.getUpdatedAt()       // Từ User
         );
     }
 }

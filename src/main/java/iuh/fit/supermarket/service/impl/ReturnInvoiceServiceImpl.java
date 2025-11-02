@@ -208,15 +208,15 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
         if (returnHeader.getCustomer() != null) {
             customerInfo = new ReturnInvoiceDetailResponse.CustomerInfo(
                     returnHeader.getCustomer().getCustomerId(),
-                    returnHeader.getCustomer().getName(),
-                    returnHeader.getCustomer().getPhone(),
-                    returnHeader.getCustomer().getEmail());
+                    returnHeader.getCustomer().getUser().getName(),
+                    returnHeader.getCustomer().getUser().getPhone(),
+                    returnHeader.getCustomer().getUser().getEmail());
         }
 
         ReturnInvoiceDetailResponse.EmployeeInfo employeeInfo = new ReturnInvoiceDetailResponse.EmployeeInfo(
                 returnHeader.getEmployee().getEmployeeId(),
-                returnHeader.getEmployee().getName(),
-                returnHeader.getEmployee().getEmail());
+                returnHeader.getEmployee().getUser().getName(),
+                returnHeader.getEmployee().getUser().getEmail());
 
         List<ReturnInvoiceDetailResponse.ReturnItemDetail> returnItemDetails = returnHeader.getReturnDetails()
                 .stream()
@@ -273,9 +273,9 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
                 header.getReturnCode(),
                 header.getReturnDate(),
                 header.getOriginalInvoice().getInvoiceNumber(),
-                header.getCustomer() != null ? header.getCustomer().getName() : null,
-                header.getCustomer() != null ? header.getCustomer().getPhone() : null,
-                header.getEmployee().getName(),
+                header.getCustomer() != null ? header.getCustomer().getUser().getName() : null,
+                header.getCustomer() != null ? header.getCustomer().getUser().getPhone() : null,
+                header.getEmployee().getUser().getName(),
                 header.getTotalRefundAmount(),
                 header.getReclaimedDiscountAmount(),
                 header.getFinalRefundAmount(),
@@ -440,8 +440,8 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
             totalAvailableQuantity += availableQuantity;
         }
 
-        String customerName = invoice.getCustomer() != null ? invoice.getCustomer().getName() : null;
-        String customerPhone = invoice.getCustomer() != null ? invoice.getCustomer().getPhone() : null;
+        String customerName = invoice.getCustomer() != null ? invoice.getCustomer().getUser().getName() : null;
+        String customerPhone = invoice.getCustomer() != null ? invoice.getCustomer().getUser().getPhone() : null;
 
         log.info("Hoàn tất kiểm tra. Tổng ban đầu: {}, Đã trả: {}, Còn lại: {}",
                 totalOriginalQuantity, totalReturnedQuantity, totalAvailableQuantity);

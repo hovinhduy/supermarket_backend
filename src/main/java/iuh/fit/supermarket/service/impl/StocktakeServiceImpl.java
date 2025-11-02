@@ -730,16 +730,16 @@ public class StocktakeServiceImpl implements StocktakeService {
         if (stocktake.getCreatedBy() != null) {
             dto.setCreatedBy(new StocktakeDto.EmployeeInfo(
                     stocktake.getCreatedBy().getEmployeeId(),
-                    stocktake.getCreatedBy().getName(),
-                    stocktake.getCreatedBy().getEmail()));
+                    stocktake.getCreatedBy().getUser().getName(),
+                    stocktake.getCreatedBy().getUser().getEmail()));
         }
 
         // Map thông tin nhân viên hoàn thành
         if (stocktake.getCompletedBy() != null) {
             dto.setCompletedBy(new StocktakeDto.EmployeeInfo(
                     stocktake.getCompletedBy().getEmployeeId(),
-                    stocktake.getCompletedBy().getName(),
-                    stocktake.getCompletedBy().getEmail()));
+                    stocktake.getCompletedBy().getUser().getName(),
+                    stocktake.getCompletedBy().getUser().getEmail()));
         }
 
         // Map chi tiết kiểm kê

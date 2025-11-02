@@ -1,7 +1,7 @@
 package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.Employee;
-import iuh.fit.supermarket.enums.EmployeeRole;
+import iuh.fit.supermarket.enums.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,38 +12,26 @@ import java.util.Optional;
 
 /**
  * Repository interface cho Employee entity
+ * Các query liên quan đến email, name, role hiện join với bảng User
  */
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     /**
-     * Tìm nhân viên theo email
-     * @param email email của nhân viên
+     * Tìm nhân viên theo user_id
+     *
+     * @param userId ID của user
      * @return Optional<Employee>
      */
-    Optional<Employee> findByEmail(String email);
+    Optional<Employee> findByUser_UserId(Long userId);
 
     /**
-     * Tìm nhân viên theo email và chưa bị xóa
-     * @param email email của nhân viên
+     * Tìm nhân viên theo user_id và user chưa bị xóa
+     *
+     * @param userId ID của user
      * @return Optional<Employee>
      */
-    Optional<Employee> findByEmailAndIsDeletedFalse(String email);
-
-    /**
-     * Kiểm tra email đã tồn tại chưa
-     * @param email email cần kiểm tra
-     * @return true nếu email đã tồn tại
-     */
-    boolean existsByEmail(String email);
-
-    /**
-     * Kiểm tra email đã tồn tại chưa (loại trừ nhân viên hiện tại)
-     * @param email email cần kiểm tra
-     * @param employeeId ID nhân viên hiện tại
-     * @return true nếu email đã tồn tại
-     */
-    boolean existsByEmailAndEmployeeIdNot(String email, Integer employeeId);
+    Optional<Employee> findByUser_UserIdAndUser_IsDeletedFalse(Long userId);
 
     /**
      * Kiểm tra mã nhân viên đã tồn tại chưa
@@ -60,38 +48,43 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
     Optional<Employee> findTopByOrderByEmployeeCodeDesc();
 
     /**
-     * Tìm tất cả nhân viên chưa bị xóa
+     * Tìm tất cả nhân viên mà user chưa bị xóa
+     *
      * @return List<Employee>
      */
-    List<Employee> findAllByIsDeletedFalse();
+    List<Employee> findAllByUser_IsDeletedFalse();
 
     /**
-     * Tìm nhân viên theo role
-     * @param role vai trò nhân viên
+     * Tìm nhân viên theo role (từ User.userRole)
+     *
+     * @param userRole vai trò nhân viên (ADMIN, MANAGER, STAFF)
      * @return List<Employee>
      */
-    List<Employee> findByRoleAndIsDeletedFalse(EmployeeRole role);
+    List<Employee> findByUser_UserRoleAndUser_IsDeletedFalse(UserRole userRole);
 
     /**
-     * Tìm nhân viên theo ID và chưa bị xóa
+     * Tìm nhân viên theo ID và user chưa bị xóa
+     *
      * @param employeeId ID nhân viên
      * @return Optional<Employee>
      */
-    Optional<Employee> findByEmployeeIdAndIsDeletedFalse(Integer employeeId);
+    Optional<Employee> findByEmployeeIdAndUser_IsDeletedFalse(Integer employeeId);
 
     /**
-     * Đếm số lượng nhân viên theo role
-     * @param role vai trò nhân viên
+     * Đếm số lượng nhân viên theo role (từ User.userRole)
+     *
+     * @param userRole vai trò nhân viên
      * @return số lượng nhân viên
      */
-    @Query("SELECT COUNT(e) FROM Employee e WHERE e.role = :role AND e.isDeleted = false")
-    long countByRoleAndIsDeletedFalse(@Param("role") EmployeeRole role);
+    @Query("SELECT COUNT(e) FROM Employee e JOIN e.user u WHERE u.userRole = :userRole AND u.isDeleted = false")
+    long countByRoleAndIsDeletedFalse(@Param("userRole") UserRole userRole);
 
     /**
-     * Tìm nhân viên theo tên (tìm kiếm gần đúng)
+     * Tìm nhân viên theo tên (join với User)
+     *
      * @param name tên nhân viên
      * @return List<Employee>
      */
-    @Query("SELECT e FROM Employee e WHERE e.name LIKE %:name% AND e.isDeleted = false")
+    @Query("SELECT e FROM Employee e JOIN e.user u WHERE u.name LIKE %:name% AND u.isDeleted = false")
     List<Employee> findByNameContainingAndIsDeletedFalse(@Param("name") String name);
 }

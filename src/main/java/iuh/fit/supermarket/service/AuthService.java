@@ -6,8 +6,11 @@ import iuh.fit.supermarket.dto.auth.LoginRequest;
 import iuh.fit.supermarket.dto.auth.LoginResponse;
 import iuh.fit.supermarket.entity.Customer;
 import iuh.fit.supermarket.entity.Employee;
+import iuh.fit.supermarket.entity.User;
+import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.repository.CustomerRepository;
 import iuh.fit.supermarket.repository.EmployeeRepository;
+import iuh.fit.supermarket.repository.UserRepository;
 import iuh.fit.supermarket.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service xử lý authentication và authorization
+ * Sau refactoring: sử dụng UserRepository thống nhất cho cả Employee và Customer
  */
 @Service
 @RequiredArgsConstructor
@@ -31,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
@@ -38,6 +43,7 @@ public class AuthService {
 
     /**
      * Xử lý đăng nhập nhân viên
+     * Sau refactoring: load user từ UserRepository, sau đó load Employee
      * @param loginRequest thông tin đăng nhập
      * @return LoginResponse chứa JWT token và thông tin nhân viên
      * @throws AuthenticationException nếu đăng nhập thất bại
@@ -45,7 +51,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest loginRequest) throws AuthenticationException {
         log.info("Đang xử lý đăng nhập cho email: {}", loginRequest.getEmail());
-        
+
         try {
             // Authenticate user
             Authentication authentication = authenticationManager.authenticate(
@@ -55,28 +61,32 @@ public class AuthService {
                 )
             );
 
-            // Lấy thông tin nhân viên từ database
-            Employee employee = employeeRepository.findByEmailAndIsDeletedFalse(loginRequest.getEmail())
+            // Lấy thông tin user từ database (chỉ employee users)
+            User user = userRepository.findEmployeeByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> {
-                    log.error("Không tìm thấy nhân viên với email: {}", loginRequest.getEmail());
+                    log.error("Không tìm thấy employee với email: {}", loginRequest.getEmail());
                     return new UsernameNotFoundException("Không tìm thấy nhân viên với email: " + loginRequest.getEmail());
                 });
 
             // Kiểm tra tài khoản có bị khóa không
-            if (employee.getIsDeleted()) {
+            if (user.getIsDeleted()) {
                 log.warn("Tài khoản nhân viên {} đã bị khóa", loginRequest.getEmail());
                 throw new DisabledException("Tài khoản đã bị khóa");
             }
 
+            // Lấy Employee entity từ user_id
+            Employee employee = employeeRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy employee record"));
+
             // Tạo JWT token
-            String token = jwtUtil.generateToken(employee.getEmail());
-            
-            // Tạo response
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            // Tạo response với thông tin từ User và Employee
             LoginResponse.EmployeeInfo employeeInfo = new LoginResponse.EmployeeInfo(
                 employee.getEmployeeId(),
-                employee.getName(),
-                employee.getEmail(),
-                employee.getRole()
+                user.getName(),
+                user.getEmail(),
+                user.getUserRole()
             );
 
             LoginResponse response = new LoginResponse(
@@ -85,7 +95,7 @@ public class AuthService {
                 employeeInfo
             );
 
-            log.info("Đăng nhập thành công cho nhân viên: {} ({})", employee.getName(), employee.getEmail());
+            log.info("Đăng nhập thành công cho nhân viên: {} ({})", user.getName(), user.getEmail());
             return response;
 
         } catch (BadCredentialsException e) {
@@ -138,8 +148,13 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public Employee getEmployeeByEmail(String email) {
-        return employeeRepository.findByEmailAndIsDeletedFalse(email)
+        // Tìm User từ email (chỉ employee users)
+        User user = userRepository.findEmployeeByEmail(email)
             .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy nhân viên với email: " + email));
+
+        // Lấy Employee entity từ user_id
+        return employeeRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy employee record"));
     }
 
     /**
@@ -151,8 +166,11 @@ public class AuthService {
     @Transactional(readOnly = true)
     public boolean hasPermission(String email, String requiredRole) {
         try {
-            Employee employee = getEmployeeByEmail(email);
-            String userRole = "ROLE_" + employee.getRole().name();
+            // Tìm User từ email (chỉ employee users)
+            User user = userRepository.findEmployeeByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy nhân viên với email: " + email));
+
+            String userRole = "ROLE_" + user.getUserRole().name();
             return userRole.equals(requiredRole);
         } catch (Exception e) {
             log.error("Lỗi khi kiểm tra quyền cho email: {}", email, e);
@@ -171,31 +189,39 @@ public class AuthService {
         log.info("Đang xử lý đăng nhập khách hàng với: {}", loginRequest.getEmailOrPhone());
 
         try {
-            // Tìm khách hàng bằng email hoặc số điện thoại
-            Customer customer = findCustomerByEmailOrPhone(loginRequest.getEmailOrPhone());
+            // Tìm User với role CUSTOMER bằng email hoặc số điện thoại
+            User user = userRepository.findCustomerByEmailOrPhone(loginRequest.getEmailOrPhone())
+                .orElseThrow(() -> {
+                    log.warn("Không tìm thấy khách hàng: {}", loginRequest.getEmailOrPhone());
+                    return new BadCredentialsException("Email/Số điện thoại hoặc mật khẩu không chính xác");
+                });
 
             // Kiểm tra tài khoản có bị xóa không
-            if (customer.getIsDeleted()) {
+            if (user.getIsDeleted()) {
                 log.warn("Tài khoản khách hàng {} đã bị khóa", loginRequest.getEmailOrPhone());
                 throw new DisabledException("Tài khoản đã bị khóa");
             }
 
             // Kiểm tra mật khẩu
-            if (!passwordEncoder.matches(loginRequest.getPassword(), customer.getPasswordHash())) {
+            if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPasswordHash())) {
                 log.warn("Sai mật khẩu cho khách hàng: {}", loginRequest.getEmailOrPhone());
                 throw new BadCredentialsException("Email/Số điện thoại hoặc mật khẩu không chính xác");
             }
 
+            // Lấy Customer entity từ user_id
+            Customer customer = customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy customer record"));
+
             // Tạo JWT token với identifier (email hoặc phone)
-            String identifier = customer.getEmail() != null ? customer.getEmail() : customer.getPhone();
+            String identifier = user.getEmail() != null ? user.getEmail() : user.getPhone();
             String token = jwtUtil.generateToken("CUSTOMER:" + identifier);
 
-            // Tạo response
+            // Tạo response với thông tin từ User và Customer
             CustomerLoginResponse.CustomerInfo customerInfo = new CustomerLoginResponse.CustomerInfo(
                 customer.getCustomerId(),
-                customer.getName(),
-                customer.getEmail(),
-                customer.getPhone(),
+                user.getName(),      // Từ User entity
+                user.getEmail(),     // Từ User entity
+                user.getPhone(),     // Từ User entity
                 customer.getCustomerType()
             );
 
@@ -205,7 +231,7 @@ public class AuthService {
                 customerInfo
             );
 
-            log.info("Đăng nhập thành công cho khách hàng: {} ({})", customer.getName(), loginRequest.getEmailOrPhone());
+            log.info("Đăng nhập thành công cho khách hàng: {} ({})", user.getName(), loginRequest.getEmailOrPhone());
             return response;
 
         } catch (BadCredentialsException e) {
@@ -223,22 +249,6 @@ public class AuthService {
         }
     }
 
-    /**
-     * Tìm khách hàng theo email hoặc số điện thoại
-     * @param emailOrPhone email hoặc số điện thoại
-     * @return Customer entity
-     * @throws UsernameNotFoundException nếu không tìm thấy
-     */
-    private Customer findCustomerByEmailOrPhone(String emailOrPhone) throws UsernameNotFoundException {
-        // Kiểm tra xem input có phải là email không (chứa @)
-        if (emailOrPhone.contains("@")) {
-            return customerRepository.findByEmailAndIsDeletedFalse(emailOrPhone)
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với email: " + emailOrPhone));
-        } else {
-            return customerRepository.findByPhoneAndIsDeletedFalse(emailOrPhone)
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với số điện thoại: " + emailOrPhone));
-        }
-    }
 
     /**
      * Lấy thông tin khách hàng từ email
@@ -247,8 +257,13 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public Customer getCustomerByEmail(String email) {
-        return customerRepository.findByEmailAndIsDeletedFalse(email)
+        // Tìm User với role CUSTOMER theo email
+        User user = userRepository.findCustomerByEmailOrPhone(email)
             .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với email: " + email));
+
+        // Lấy Customer entity từ user_id
+        return customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy customer record"));
     }
 
     /**
@@ -258,7 +273,12 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public Customer getCustomerByPhone(String phone) {
-        return customerRepository.findByPhoneAndIsDeletedFalse(phone)
+        // Tìm User với role CUSTOMER theo phone
+        User user = userRepository.findCustomerByEmailOrPhone(phone)
             .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng với số điện thoại: " + phone));
+
+        // Lấy Customer entity từ user_id
+        return customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy customer record"));
     }
 }

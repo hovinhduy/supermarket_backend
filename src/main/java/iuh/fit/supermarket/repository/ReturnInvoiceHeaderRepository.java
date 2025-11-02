@@ -43,13 +43,14 @@ public interface ReturnInvoiceHeaderRepository extends JpaRepository<ReturnInvoi
             SELECT DISTINCT r FROM ReturnInvoiceHeader r
             LEFT JOIN r.originalInvoice inv
             LEFT JOIN r.customer c
+            LEFT JOIN c.user cu
             LEFT JOIN r.employee e
             LEFT JOIN r.returnDetails rd
-            WHERE (:searchKeyword IS NULL OR 
+            WHERE (:searchKeyword IS NULL OR
                    LOWER(r.returnCode) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
                    LOWER(inv.invoiceNumber) LIKE LOWER(CONCAT('%', :searchKeyword, '%')) OR
-                   (c IS NOT NULL AND LOWER(c.name) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))) OR
-                   (c IS NOT NULL AND LOWER(c.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
+                   (cu IS NOT NULL AND LOWER(cu.name) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))) OR
+                   (cu IS NOT NULL AND LOWER(cu.phone) LIKE LOWER(CONCAT('%', :searchKeyword, '%'))))
             AND (:fromDate IS NULL OR CAST(r.returnDate AS DATE) >= :fromDate)
             AND (:toDate IS NULL OR CAST(r.returnDate AS DATE) <= :toDate)
             AND (:employeeId IS NULL OR e.employeeId = :employeeId)

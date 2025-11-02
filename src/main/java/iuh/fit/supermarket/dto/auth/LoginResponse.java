@@ -1,12 +1,13 @@
 package iuh.fit.supermarket.dto.auth;
 
-import iuh.fit.supermarket.enums.EmployeeRole;
+import iuh.fit.supermarket.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
  * DTO cho phản hồi đăng nhập thành công
+ * Sau refactoring: role đổi sang UserRole thay vì EmployeeRole
  */
 @Data
 @NoArgsConstructor
@@ -44,6 +45,7 @@ public class LoginResponse {
 
     /**
      * Thông tin cơ bản của nhân viên
+     * Sau refactoring: role là UserRole (ADMIN, MANAGER, STAFF)
      */
     @Data
     @NoArgsConstructor
@@ -52,6 +54,6 @@ public class LoginResponse {
         private Integer employeeId;
         private String name;
         private String email;
-        private EmployeeRole role;
+        private UserRole role;
     }
 }

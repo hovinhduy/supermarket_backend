@@ -1,7 +1,9 @@
 package iuh.fit.supermarket.util;
 
 import iuh.fit.supermarket.entity.Employee;
+import iuh.fit.supermarket.entity.User;
 import iuh.fit.supermarket.repository.EmployeeRepository;
+import iuh.fit.supermarket.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class SecurityUtil {
 
     private final EmployeeRepository employeeRepository;
+    private final UserRepository userRepository;
 
     /**
      * Lấy thông tin nhân viên hiện tại từ SecurityContext
@@ -43,9 +46,16 @@ public class SecurityUtil {
 
         log.debug("Lấy thông tin nhân viên với email: {}", email);
 
-        return employeeRepository.findByEmailAndIsDeletedFalse(email)
+        // Tìm User trước, sau đó lấy Employee từ user_id
+        User user = userRepository.findByEmailAndIsDeletedFalse(email)
                 .orElseThrow(() -> {
-                    log.error("Không tìm thấy nhân viên với email: {}", email);
+                    log.error("Không tìm thấy user với email: {}", email);
+                    return new IllegalStateException("Không tìm thấy user với email: " + email);
+                });
+
+        return employeeRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+                .orElseThrow(() -> {
+                    log.error("Không tìm thấy nhân viên với user_id: {}", user.getUserId());
                     return new IllegalStateException("Không tìm thấy nhân viên với email: " + email);
                 });
     }

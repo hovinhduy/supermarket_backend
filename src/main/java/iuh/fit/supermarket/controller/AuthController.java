@@ -163,11 +163,12 @@ public class AuthController {
             }
 
             var employee = authService.getEmployeeByEmail(email);
+            var user = employee.getUser();
             var employeeInfo = new LoginResponse.EmployeeInfo(
                     employee.getEmployeeId(),
-                    employee.getName(),
-                    employee.getEmail(),
-                    employee.getRole());
+                    user.getName(),
+                    user.getEmail(),
+                    user.getUserRole());
 
             return ResponseEntity.ok(
                     ApiResponse.success("Lấy thông tin user thành công", employeeInfo));
