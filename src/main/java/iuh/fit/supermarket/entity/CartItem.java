@@ -25,6 +25,12 @@ public class CartItem {
      */
     @Column(name = "quantity", nullable = false)
     private Integer quantity = 1;
+
+    /**
+     * Giá tại thời điểm thêm vào giỏ hàng
+     */
+    @Column(name = "unit_price", nullable = false)
+    private Double unitPrice;
     
     /**
      * Thời gian tạo

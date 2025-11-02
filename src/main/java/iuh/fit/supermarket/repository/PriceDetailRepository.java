@@ -34,19 +34,28 @@ public interface PriceDetailRepository extends JpaRepository<PriceDetail, Long> 
         boolean existsByPricePriceIdAndProductUnitId(Long priceId, Long productUnitId);
 
         /**
-         * Tìm giá hiện tại của đơn vị sản phẩm (từ bảng giá CURRENT) với thông tin unit
+         * Tìm giá hiện tại của đơn vị sản phẩm (từ bảng giá ACTIVE) với thông tin unit
+         * Kiểm tra: status = ACTIVE, startDate <= now, endDate > now
          */
         @Query("SELECT pd FROM PriceDetail pd " +
                         "JOIN FETCH pd.productUnit pu " +
                         "JOIN FETCH pu.unit u " +
-                        "WHERE pd.productUnit.id = :productUnitId AND pd.price.status = :status")
+                        "WHERE pd.productUnit.id = :productUnitId " +
+                        "AND pd.price.status = :status " +
+                        "AND pd.price.startDate <= CURRENT_TIMESTAMP " +
+                        "AND pd.price.endDate > CURRENT_TIMESTAMP")
         Optional<PriceDetail> findCurrentPriceByProductUnitId(@Param("productUnitId") Long productUnitId,
                         @Param("status") PriceType status);
 
         /**
          * Tìm tất cả giá của đơn vị sản phẩm theo trạng thái bảng giá
+         * Kiểm tra: status = status, startDate <= now, endDate > now
          */
-        @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.id = :productUnitId AND pd.price.status = :status")
+        @Query("SELECT pd FROM PriceDetail pd " +
+                        "WHERE pd.productUnit.id = :productUnitId " +
+                        "AND pd.price.status = :status " +
+                        "AND pd.price.startDate <= CURRENT_TIMESTAMP " +
+                        "AND pd.price.endDate > CURRENT_TIMESTAMP")
         List<PriceDetail> findByProductUnitIdAndPriceStatus(@Param("productUnitId") Long productUnitId,
                         @Param("status") PriceType status);
 
@@ -87,16 +96,26 @@ public interface PriceDetailRepository extends JpaRepository<PriceDetail, Long> 
 
         /**
          * Tìm chi tiết giá theo danh sách ID đơn vị sản phẩm và trạng thái bảng giá
+         * Kiểm tra: status = status, startDate <= now, endDate > now
          */
-        @Query("SELECT pd FROM PriceDetail pd WHERE pd.productUnit.id IN :productUnitIds AND pd.price.status = :status")
+        @Query("SELECT pd FROM PriceDetail pd " +
+                        "WHERE pd.productUnit.id IN :productUnitIds " +
+                        "AND pd.price.status = :status " +
+                        "AND pd.price.startDate <= CURRENT_TIMESTAMP " +
+                        "AND pd.price.endDate > CURRENT_TIMESTAMP")
         List<PriceDetail> findByProductUnitIdsAndPriceStatus(@Param("productUnitIds") List<Long> productUnitIds,
                         @Param("status") PriceType status);
 
         /**
-         * Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá CURRENT khác không
+         * Kiểm tra đơn vị sản phẩm có tồn tại trong bảng giá ACTIVE khác không
+         * Kiểm tra: status = status, startDate <= now, endDate > now
          */
         @Query("SELECT COUNT(pd) > 0 FROM PriceDetail pd WHERE " +
-                        "pd.productUnit.id = :productUnitId AND pd.price.status = :status AND pd.price.priceId != :excludePriceId")
+                        "pd.productUnit.id = :productUnitId " +
+                        "AND pd.price.status = :status " +
+                        "AND pd.price.priceId != :excludePriceId " +
+                        "AND pd.price.startDate <= CURRENT_TIMESTAMP " +
+                        "AND pd.price.endDate > CURRENT_TIMESTAMP")
         boolean existsProductUnitInOtherCurrentPrice(@Param("productUnitId") Long productUnitId,
                         @Param("status") PriceType status,
                         @Param("excludePriceId") Long excludePriceId);
