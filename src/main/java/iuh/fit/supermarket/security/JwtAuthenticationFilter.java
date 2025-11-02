@@ -98,10 +98,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        
+
         // Bỏ qua filter cho các endpoint public
         return path.startsWith("/api/auth/login") ||
                path.startsWith("/api/auth/register") ||
+               path.startsWith("/api/auth/customer/login") ||
+               path.startsWith("/api/customers/register") ||
                path.startsWith("/api/public/") ||
                path.startsWith("/h2-console/") ||
                path.startsWith("/actuator/") ||

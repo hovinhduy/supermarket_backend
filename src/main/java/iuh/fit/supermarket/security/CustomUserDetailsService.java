@@ -29,23 +29,42 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     /**
-     * Load user by username (email trong trường hợp này)
-     * Chỉ load employee users (ADMIN, MANAGER, STAFF)
-     * @param username email của user
+     * Load user by username (email hoặc identifier)
+     * Hỗ trợ cả employee users (ADMIN, MANAGER, STAFF) và customer users
+     * @param username email của employee hoặc "CUSTOMER:email/phone" cho customer
      * @return UserDetails
      * @throws UsernameNotFoundException nếu không tìm thấy user
      */
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        log.debug("Đang load employee user với email: {}", username);
+        log.debug("Đang load user với identifier: {}", username);
 
-        // Tìm employee user (role là ADMIN, MANAGER, hoặc STAFF)
-        User user = userRepository.findEmployeeByEmail(username)
-                .orElseThrow(() -> {
-                    log.warn("Không tìm thấy employee với email: {}", username);
-                    return new UsernameNotFoundException("Không tìm thấy employee với email: " + username);
-                });
+        User user;
+
+        // Kiểm tra xem đây có phải là customer token không
+        if (username.startsWith("CUSTOMER:")) {
+            // Đây là customer - lấy email/phone sau prefix
+            String emailOrPhone = username.substring(9); // Bỏ "CUSTOMER:" prefix
+            log.debug("Đang load customer với email/phone: {}", emailOrPhone);
+
+            // Tìm customer user
+            user = userRepository.findCustomerByEmailOrPhone(emailOrPhone)
+                    .orElseThrow(() -> {
+                        log.warn("Không tìm thấy customer với email/phone: {}", emailOrPhone);
+                        return new UsernameNotFoundException("Không tìm thấy customer với email/phone: " + emailOrPhone);
+                    });
+        } else {
+            // Đây là employee - chỉ có email
+            log.debug("Đang load employee với email: {}", username);
+
+            // Tìm employee user (role là ADMIN, MANAGER, hoặc STAFF)
+            user = userRepository.findEmployeeByEmail(username)
+                    .orElseThrow(() -> {
+                        log.warn("Không tìm thấy employee với email: {}", username);
+                        return new UsernameNotFoundException("Không tìm thấy employee với email: " + username);
+                    });
+        }
 
         log.debug("Tìm thấy user: {} với role: {}", user.getName(), user.getUserRole());
 
@@ -60,8 +79,16 @@ public class CustomUserDetailsService implements UserDetailsService {
     private UserDetails createUserDetails(User user) {
         Collection<GrantedAuthority> authorities = getAuthorities(user);
 
+        // Xác định username: ưu tiên email, nếu không có thì dùng phone
+        String username = user.getEmail() != null ? user.getEmail() : user.getPhone();
+
+        // Nếu là customer và có cả email và phone, thêm prefix để phân biệt
+        if (user.getUserRole() == UserRole.CUSTOMER && username != null) {
+            username = "CUSTOMER:" + username;
+        }
+
         return org.springframework.security.core.userdetails.User.builder()
-                .username(user.getEmail())
+                .username(username)
                 .password(user.getPasswordHash())
                 .authorities(authorities)
                 .accountExpired(false)

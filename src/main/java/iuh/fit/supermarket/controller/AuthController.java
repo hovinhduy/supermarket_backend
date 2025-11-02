@@ -11,6 +11,7 @@ import iuh.fit.supermarket.dto.auth.CustomerLoginRequest;
 import iuh.fit.supermarket.dto.auth.CustomerLoginResponse;
 import iuh.fit.supermarket.dto.auth.LoginRequest;
 import iuh.fit.supermarket.dto.auth.LoginResponse;
+import iuh.fit.supermarket.dto.auth.UserInfoResponse;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.service.AuthService;
 import jakarta.validation.Valid;
@@ -135,43 +136,64 @@ public class AuthController {
     }
 
     /**
-     * API lấy thông tin user hiện tại từ token
+     * API lấy thông tin user hiện tại từ SecurityContext
+     * Hỗ trợ cả nhân viên (Employee) và khách hàng (Customer)
+     * Token được tự động lấy từ Authorization header bởi Spring Security
      *
-     * @param authorization Authorization header
-     * @return thông tin user
+     * @return thông tin user (employee hoặc customer)
      */
-    @Operation(summary = "Lấy thông tin user hiện tại", description = "Lấy thông tin chi tiết của nhân viên đang đăng nhập từ JWT token")
+    @Operation(
+        summary = "Lấy thông tin user hiện tại",
+        description = "Lấy thông tin chi tiết của user đang đăng nhập. Token tự động được lấy từ header Authorization. Hỗ trợ cả nhân viên (Employee) và khách hàng (Customer)"
+    )
     @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy thông tin thành công", content = @Content(schema = @Schema(implementation = LoginResponse.EmployeeInfo.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Token không hợp lệ hoặc đã hết hạn")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Lấy thông tin thành công",
+                content = @Content(schema = @Schema(implementation = UserInfoResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "Token không hợp lệ hoặc đã hết hạn"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "403",
+                description = "Tài khoản bị khóa"
+            )
     })
     @SecurityRequirement(name = "Bearer Authentication")
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<LoginResponse.EmployeeInfo>> getCurrentUser(
-            @Parameter(description = "JWT token với prefix 'Bearer '", required = true) @RequestHeader("Authorization") String authorization) {
+    public ResponseEntity<ApiResponse<UserInfoResponse>> getCurrentUser() {
 
         log.debug("Nhận yêu cầu lấy thông tin user hiện tại");
 
         try {
-            // Lấy token từ header
-            String token = authorization.substring(7); // Bỏ "Bearer " prefix
-            String email = authService.getEmailFromToken(token);
+            // Lấy username từ SecurityContext (đã được set bởi JwtAuthenticationFilter)
+            String username = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext()
+                    .getAuthentication()
+                    .getName();
 
-            if (email == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("Token không hợp lệ"));
-            }
+            log.debug("Lấy thông tin cho username từ SecurityContext: {}", username);
 
-            var employee = authService.getEmployeeByEmail(email);
-            var user = employee.getUser();
-            var employeeInfo = new LoginResponse.EmployeeInfo(
-                    employee.getEmployeeId(),
-                    user.getName(),
-                    user.getEmail(),
-                    user.getUserRole());
+            // Gọi service để lấy thông tin user (tự động phát hiện employee hoặc customer)
+            UserInfoResponse userInfo = authService.getUserByUsername(username);
+
+            log.debug("Lấy thông tin user thành công: type={}, name={}",
+                userInfo.getUserType(), userInfo.getName());
 
             return ResponseEntity.ok(
-                    ApiResponse.success("Lấy thông tin user thành công", employeeInfo));
+                    ApiResponse.success("Lấy thông tin user thành công", userInfo));
+
+        } catch (UsernameNotFoundException e) {
+            log.warn("User không tồn tại: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("User không tồn tại"));
+
+        } catch (DisabledException e) {
+            log.warn("Tài khoản bị khóa: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("Tài khoản đã bị khóa"));
 
         } catch (Exception e) {
             log.error("Lỗi khi lấy thông tin user hiện tại", e);

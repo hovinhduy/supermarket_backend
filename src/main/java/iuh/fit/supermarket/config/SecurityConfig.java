@@ -79,8 +79,8 @@ public class SecurityConfig {
                         .requestMatchers("/sales/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
                         .requestMatchers("/inventory/view/**").hasAnyRole("ADMIN", "MANAGER", "STAFF")
 
-                        // Authenticated endpoints
-                        .requestMatchers("/auth/me", "/auth/logout").authenticated()
+                        // Authenticated endpoints - cả employee và customer đều có thể truy cập
+                        .requestMatchers("/api/auth/me", "/api/auth/logout").authenticated()
 
                         // All other requests need authentication
                         .anyRequest().authenticated())

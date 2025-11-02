@@ -4,6 +4,7 @@ import iuh.fit.supermarket.dto.auth.CustomerLoginRequest;
 import iuh.fit.supermarket.dto.auth.CustomerLoginResponse;
 import iuh.fit.supermarket.dto.auth.LoginRequest;
 import iuh.fit.supermarket.dto.auth.LoginResponse;
+import iuh.fit.supermarket.dto.auth.UserInfoResponse;
 import iuh.fit.supermarket.entity.Customer;
 import iuh.fit.supermarket.entity.Employee;
 import iuh.fit.supermarket.entity.User;
@@ -280,5 +281,121 @@ public class AuthService {
         // Lấy Customer entity từ user_id
         return customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
             .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy customer record"));
+    }
+
+    /**
+     * Lấy thông tin user hiện tại từ JWT token
+     * Hỗ trợ cả nhân viên (Employee) và khách hàng (Customer)
+     * @param token JWT token
+     * @return UserInfoResponse chứa thông tin user
+     * @throws UsernameNotFoundException nếu không tìm thấy user
+     */
+    @Transactional(readOnly = true)
+    public UserInfoResponse getUserByToken(String token) {
+        log.debug("Đang lấy thông tin user từ token");
+
+        try {
+            // Lấy identifier từ token
+            String identifier = jwtUtil.getUsernameFromToken(token);
+
+            if (identifier == null) {
+                throw new UsernameNotFoundException("Token không hợp lệ");
+            }
+
+            return getUserByUsername(identifier);
+
+        } catch (UsernameNotFoundException e) {
+            log.warn("Không tìm thấy user: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy thông tin user từ token", e);
+            throw new RuntimeException("Có lỗi xảy ra khi lấy thông tin user");
+        }
+    }
+
+    /**
+     * Lấy thông tin user hiện tại từ username (identifier)
+     * Hỗ trợ cả nhân viên (Employee) và khách hàng (Customer)
+     * @param username email của employee hoặc "CUSTOMER:email/phone" cho customer
+     * @return UserInfoResponse chứa thông tin user
+     * @throws UsernameNotFoundException nếu không tìm thấy user
+     */
+    @Transactional(readOnly = true)
+    public UserInfoResponse getUserByUsername(String username) {
+        log.debug("Đang lấy thông tin user với username: {}", username);
+
+        try {
+            // Kiểm tra xem đây là customer hay employee
+            if (username.startsWith("CUSTOMER:")) {
+                // Đây là customer token
+                String emailOrPhone = username.substring(9); // Bỏ "CUSTOMER:" prefix
+                return getUserInfoForCustomer(emailOrPhone);
+            } else {
+                // Đây là employee token (chỉ có email)
+                return getUserInfoForEmployee(username);
+            }
+
+        } catch (UsernameNotFoundException e) {
+            log.warn("Không tìm thấy user: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy thông tin user", e);
+            throw new RuntimeException("Có lỗi xảy ra khi lấy thông tin user");
+        }
+    }
+
+    /**
+     * Lấy thông tin cho nhân viên
+     * @param email email của nhân viên
+     * @return UserInfoResponse
+     */
+    private UserInfoResponse getUserInfoForEmployee(String email) {
+        // Tìm User từ email (chỉ employee users)
+        User user = userRepository.findEmployeeByEmail(email)
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy nhân viên với email: " + email));
+
+        // Kiểm tra tài khoản có bị khóa không
+        if (user.getIsDeleted()) {
+            throw new DisabledException("Tài khoản đã bị khóa");
+        }
+
+        // Lấy Employee entity từ user_id
+        Employee employee = employeeRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy employee record"));
+
+        return UserInfoResponse.forEmployee(
+            employee.getEmployeeId(),
+            user.getName(),
+            user.getEmail(),
+            user.getUserRole()
+        );
+    }
+
+    /**
+     * Lấy thông tin cho khách hàng
+     * @param emailOrPhone email hoặc số điện thoại của khách hàng
+     * @return UserInfoResponse
+     */
+    private UserInfoResponse getUserInfoForCustomer(String emailOrPhone) {
+        // Tìm User với role CUSTOMER theo email hoặc phone
+        User user = userRepository.findCustomerByEmailOrPhone(emailOrPhone)
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy khách hàng: " + emailOrPhone));
+
+        // Kiểm tra tài khoản có bị khóa không
+        if (user.getIsDeleted()) {
+            throw new DisabledException("Tài khoản đã bị khóa");
+        }
+
+        // Lấy Customer entity từ user_id
+        Customer customer = customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
+            .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy customer record"));
+
+        return UserInfoResponse.forCustomer(
+            customer.getCustomerId(),
+            user.getName(),
+            user.getEmail(),
+            user.getPhone(),
+            customer.getCustomerType()
+        );
     }
 }
