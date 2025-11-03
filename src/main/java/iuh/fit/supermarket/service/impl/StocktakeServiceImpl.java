@@ -602,9 +602,24 @@ public class StocktakeServiceImpl implements StocktakeService {
     private void updateStocktakeDetails(Stocktake stocktake,
             List<StocktakeUpdateRequest.StocktakeDetailUpdateRequest> detailRequests) {
         for (StocktakeUpdateRequest.StocktakeDetailUpdateRequest detailRequest : detailRequests) {
-            StocktakeDetail detail = stocktakeDetailRepository.findById(detailRequest.getStocktakeDetailId())
-                    .orElseThrow(() -> new StocktakeException(
-                            "Không tìm thấy chi tiết kiểm kê với ID: " + detailRequest.getStocktakeDetailId()));
+            StocktakeDetail detail = null;
+
+            // Ưu tiên tìm theo productUnitId nếu có
+            if (detailRequest.getProductUnitId() != null) {
+                // Tìm chi tiết kiểm kê theo stocktakeId và productUnitId
+                detail = stocktakeDetailRepository
+                        .findByStocktakeIdAndProductUnitId(stocktake.getStocktakeId(), detailRequest.getProductUnitId())
+                        .orElseThrow(() -> new StocktakeException(
+                                "Không tìm thấy chi tiết kiểm kê cho sản phẩm ID: " + detailRequest.getProductUnitId()));
+            }
+            // Nếu không có productUnitId thì tìm theo stocktakeDetailId
+            else if (detailRequest.getStocktakeDetailId() != null) {
+                detail = stocktakeDetailRepository.findById(detailRequest.getStocktakeDetailId())
+                        .orElseThrow(() -> new StocktakeException(
+                                "Không tìm thấy chi tiết kiểm kê với ID: " + detailRequest.getStocktakeDetailId()));
+            } else {
+                throw new StocktakeException("Phải cung cấp productUnitId hoặc stocktakeDetailId để cập nhật chi tiết kiểm kê");
+            }
 
             // Cập nhật thông tin
             if (detailRequest.getQuantityCounted() != null) {

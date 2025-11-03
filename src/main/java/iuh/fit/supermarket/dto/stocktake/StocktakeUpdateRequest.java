@@ -49,10 +49,17 @@ public class StocktakeUpdateRequest {
     public static class StocktakeDetailUpdateRequest {
 
         /**
-         * ID chi tiết kiểm kê (để xác định bản ghi cần cập nhật)
+         * ID đơn vị sản phẩm để xác định chi tiết cần cập nhật
+         * (Có thể dùng productUnitId hoặc stocktakeDetailId)
          */
-        @NotNull(message = "ID chi tiết kiểm kê không được để trống")
-        @Schema(description = "ID chi tiết kiểm kê", example = "1", required = true)
+        @Schema(description = "ID đơn vị sản phẩm để cập nhật", example = "1")
+        private Long productUnitId;
+
+        /**
+         * ID chi tiết kiểm kê (để xác định bản ghi cần cập nhật)
+         * (Tùy chọn - có thể dùng productUnitId thay thế)
+         */
+        @Schema(description = "ID chi tiết kiểm kê", example = "1")
         private Integer stocktakeDetailId;
 
         /**
