@@ -7,7 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -46,21 +46,17 @@ public class PromotionLineOnlyRequestDTO {
 
     /**
      * Ngày bắt đầu cho line này
-     * Bắt buộc và phải là thời điểm trong tương lai
+     * Bắt buộc
      */
     @NotNull(message = "Ngày bắt đầu line không được để trống")
-    @Future(message = "Ngày bắt đầu line phải là thời điểm trong tương lai")
-
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc cho line này
      * Bắt buộc và phải sau ngày bắt đầu
      */
     @NotNull(message = "Ngày kết thúc line không được để trống")
-    @Future(message = "Ngày kết thúc line phải là thời điểm trong tương lai")
-
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Trạng thái khuyến mãi line

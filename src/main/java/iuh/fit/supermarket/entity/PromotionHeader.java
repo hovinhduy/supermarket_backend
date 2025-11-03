@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import iuh.fit.supermarket.enums.PromotionStatus;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -46,13 +47,13 @@ public class PromotionHeader {
      * Ngày bắt đầu
      */
     @Column(name = "start_date", nullable = false)
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc
      */
     @Column(name = "end_date", nullable = false)
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Trạng thái khuyến mãi

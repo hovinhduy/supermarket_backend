@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -37,14 +38,12 @@ public class PromotionHeaderResponseDTO {
     /**
      * Ngày bắt đầu chương trình
      */
-    
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc chương trình
      */
-    
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Trạng thái chương trình khuyến mãi
@@ -87,7 +86,7 @@ public class PromotionHeaderResponseDTO {
      * Constructor để tạo response từ entity (không bao gồm promotion lines)
      */
     public PromotionHeaderResponseDTO(Long promotionId, String promotionName, String description,
-            LocalDateTime startDate, LocalDateTime endDate, PromotionStatus status,
+            LocalDate startDate, LocalDate endDate, PromotionStatus status,
             LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.promotionId = promotionId;
         this.promotionName = promotionName;
@@ -100,10 +99,10 @@ public class PromotionHeaderResponseDTO {
     }
 
     /**
-     * Tính toán trạng thái tổng quan dựa trên thời gian hiện tại và trạng thái
+     * Tính toán trạng thái tổng quan dựa trên ngày hiện tại và trạng thái
      */
     public void calculateOverallStatus() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         if (status == PromotionStatus.CANCELLED) {
             this.overallStatus = "Đã hủy";

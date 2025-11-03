@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -55,8 +55,14 @@ public class PromotionCheckService {
         // Tải tất cả khuyến mãi giảm giá sản phẩm đang active
         List<ProductDiscountDetail> productDiscounts = findApplicableProductDiscounts();
 
+        // Tải tất cả khuyến mãi BuyXGetY đang active (để kiểm tra gift product)
+        List<BuyXGetYDetail> allBuyXGetYPromotions = findAllActiveBuyXGetYPromotions();
+
         List<CartItemResponseDTO> resultItems = new ArrayList<>();
         Long lineItemId = 1L;
+
+        // Map để lưu productUnitId → lineItemId (dùng để tìm sourceLineItemId cho gift product)
+        Map<Long, Long> productUnitIdToLineItemId = new HashMap<>();
 
         for (CartItemRequestDTO item : request.items()) {
             ProductUnit productUnit = productUnitMap.get(item.productUnitId());
@@ -67,25 +73,29 @@ public class PromotionCheckService {
             BigDecimal unitPrice = priceMap.getOrDefault(item.productUnitId(), BigDecimal.ZERO);
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
 
+            // Lưu lineItemId hiện tại cho productUnitId này
+            Long currentLineItemId = lineItemId;
+            productUnitIdToLineItemId.put(item.productUnitId(), currentLineItemId);
+
             // 1. Kiểm tra PRODUCT_DISCOUNT (giảm giá trực tiếp)
             ProductDiscountDetail applicableDiscount = findBestProductDiscount(
-                    productDiscounts, 
-                    productUnit, 
-                    item.quantity(), 
+                    productDiscounts,
+                    productUnit,
+                    item.quantity(),
                     lineTotal
             );
 
-            PromotionAppliedDTO productDiscountApplied = null;
+            PromotionAppliedDTO promotionApplied = null;
             if (applicableDiscount != null) {
                 BigDecimal discountAmount = calculateProductDiscountAmount(
                         applicableDiscount,
                         lineTotal
                 );
                 lineTotal = lineTotal.subtract(discountAmount);
-                
-                productDiscountApplied = new PromotionAppliedDTO(
+
+                promotionApplied = new PromotionAppliedDTO(
                         applicableDiscount.getPromotionLine().getPromotionCode(),
-                        applicableDiscount.getPromotionLine().getDescription() != null 
+                        applicableDiscount.getPromotionLine().getDescription() != null
                             ? applicableDiscount.getPromotionLine().getDescription()
                             : "Giảm giá sản phẩm",
                         applicableDiscount.getDetailId(),
@@ -96,35 +106,337 @@ public class PromotionCheckService {
                 );
             }
 
-            // 2. Kiểm tra BUY_X_GET_Y (mua X tặng Y)
-            List<BuyXGetYDetail> applicableBuyXGetY = findApplicableBuyXGetY(
+            // 2. Kiểm tra xem item hiện tại có phải là GIFT PRODUCT của promotion giảm giá không
+            // (PERCENTAGE/FIXED_AMOUNT - khách tự thêm vào giỏ)
+            boolean hasGiftDiscountPromotion = false;
+            if (promotionApplied == null) {
+                BuyXGetYDetail giftPromotion = findApplicableGiftDiscount(
+                        allBuyXGetYPromotions,
+                        productUnit.getId(),
+                        item.quantity(),
+                        request.items(),
+                        productUnitMap
+                );
+
+                if (giftPromotion != null) {
+                    hasGiftDiscountPromotion = true;
+
+                    // Tìm sourceLineItemId từ buy product
+                    Long buyProductId = giftPromotion.getBuyProduct().getId();
+                    Long sourceLineItemId = productUnitIdToLineItemId.get(buyProductId);
+
+                    // Kiểm tra xem gift product có GIỐNG buy product không
+                    boolean isSameProduct = giftPromotion.getBuyProduct().getId()
+                            .equals(giftPromotion.getGiftProduct().getId());
+
+                    if (isSameProduct) {
+                        // Trường hợp đặc biệt: Gift product GIỐNG buy product
+                        // Chỉ áp dụng giảm giá cho phần vượt quá buyMinQuantity
+                        int buyMinQty = giftPromotion.getBuyMinQuantity() != null
+                                ? giftPromotion.getBuyMinQuantity() : 0;
+
+                        // Tính số lượng gift có thể nhận (phần vượt quá buyMinQuantity)
+                        int giftQty = calculateGiftQuantityForSameProduct(
+                                item.quantity(),
+                                buyMinQty,
+                                giftPromotion.getGiftQuantity(),
+                                giftPromotion.getGiftMaxQuantity()
+                        );
+
+                        if (giftQty > 0) {
+                            // Tính số lượng tối đa được áp dụng khuyến mãi
+                            int giftQtyPerSet = (giftPromotion.getGiftQuantity() != null && giftPromotion.getGiftQuantity() > 0)
+                                    ? giftPromotion.getGiftQuantity() : 1;
+
+                            // Tính số lượng tối đa có thể được giảm giá dựa trên giftMaxQuantity (số lần)
+                            // Ví dụ: Mua 5 tặng 2, tối đa 3 lần
+                            // → maxPromotionQuantity = (5 + 2) × 3 = 21 sản phẩm
+                            int maxSets = (giftPromotion.getGiftMaxQuantity() != null && giftPromotion.getGiftMaxQuantity() > 0)
+                                    ? giftPromotion.getGiftMaxQuantity()
+                                    : Integer.MAX_VALUE;
+
+                            int maxPromotionQuantity;
+                            if (maxSets == Integer.MAX_VALUE) {
+                                maxPromotionQuantity = Integer.MAX_VALUE;
+                            } else {
+                                maxPromotionQuantity = (buyMinQty + giftQtyPerSet) * maxSets;
+                            }
+
+                            int maxGiftQuantity = maxSets == Integer.MAX_VALUE ? Integer.MAX_VALUE : maxSets * giftQtyPerSet;
+
+                            // Kiểm tra xem có vượt quá giới hạn không
+                            if (item.quantity() > maxPromotionQuantity) {
+                                // VƯỢT QUÁ GIỚI HẠN: Tách thành 2 line items
+                                int promotionQuantity = maxPromotionQuantity;  // Số lượng được KM
+                                int excessQuantity = item.quantity() - maxPromotionQuantity;  // Số lượng vượt quá
+
+                                // Tính discount cho từng gift product
+                                BigDecimal discountAmount = calculateGiftDiscount(
+                                        giftPromotion.getGiftDiscountType(),
+                                        giftPromotion.getGiftDiscountValue(),
+                                        unitPrice
+                                );
+
+                                BigDecimal discountedPrice = unitPrice.subtract(discountAmount);
+                                if (discountedPrice.compareTo(BigDecimal.ZERO) < 0) {
+                                    discountedPrice = BigDecimal.ZERO;
+                                }
+
+                                // Line 1: Phần được khuyến mãi
+                                int buyQtyWithPromotion = promotionQuantity - maxGiftQuantity;
+                                BigDecimal buyTotal = unitPrice.multiply(BigDecimal.valueOf(buyQtyWithPromotion));
+                                BigDecimal giftTotal = discountedPrice.multiply(BigDecimal.valueOf(maxGiftQuantity));
+                                BigDecimal lineTotalWithPromotion = buyTotal.add(giftTotal);
+
+                                // Tính tổng discount amount cho display
+                                BigDecimal totalDiscountAmount = discountAmount.multiply(BigDecimal.valueOf(maxGiftQuantity));
+
+                                // Hiển thị discount value
+                                BigDecimal displayDiscountValue;
+                                if (giftPromotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+                                    displayDiscountValue = giftPromotion.getGiftDiscountValue();
+                                } else {
+                                    displayDiscountValue = totalDiscountAmount;
+                                }
+
+                                PromotionAppliedDTO promotionAppliedDTO = new PromotionAppliedDTO(
+                                        giftPromotion.getPromotionLine().getPromotionCode(),
+                                        giftPromotion.getPromotionLine().getDescription() != null
+                                            ? giftPromotion.getPromotionLine().getDescription()
+                                            : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
+                                              (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                        giftPromotion.getDetailId(),
+                                        buildBuyXGetYDiscountSummary(giftPromotion),
+                                        mapDiscountType(giftPromotion.getGiftDiscountType()),
+                                        displayDiscountValue,
+                                        sourceLineItemId
+                                );
+
+                                CartItemResponseDTO cartItemWithPromotion = new CartItemResponseDTO(
+                                        lineItemId++,
+                                        productUnit.getId(),
+                                        productUnit.getUnit().getName(),
+                                        productUnit.getProduct().getName(),
+                                        promotionQuantity,
+                                        unitPrice,
+                                        lineTotalWithPromotion,
+                                        true,
+                                        promotionAppliedDTO
+                                );
+                                resultItems.add(cartItemWithPromotion);
+
+                                // Line 2: Phần vượt quá không có khuyến mãi
+                                BigDecimal lineTotalExcess = unitPrice.multiply(BigDecimal.valueOf(excessQuantity));
+
+                                CartItemResponseDTO cartItemExcess = new CartItemResponseDTO(
+                                        lineItemId++,
+                                        productUnit.getId(),
+                                        productUnit.getUnit().getName(),
+                                        productUnit.getProduct().getName(),
+                                        excessQuantity,
+                                        unitPrice,
+                                        lineTotalExcess,
+                                        false,
+                                        null
+                                );
+                                resultItems.add(cartItemExcess);
+
+                                // Bỏ qua logic bên dưới vì đã xử lý xong - tiếp tục với item tiếp theo
+                                continue;
+                            } else {
+                                // KHÔNG VƯỢT QUÁ: Logic cũ
+                                // Tính discount cho từng gift product
+                                BigDecimal discountAmount = calculateGiftDiscount(
+                                        giftPromotion.getGiftDiscountType(),
+                                        giftPromotion.getGiftDiscountValue(),
+                                        unitPrice
+                                );
+
+                                BigDecimal discountedPrice = unitPrice.subtract(discountAmount);
+                                if (discountedPrice.compareTo(BigDecimal.ZERO) < 0) {
+                                    discountedPrice = BigDecimal.ZERO;
+                                }
+
+                                // Tính lineTotal: (buy quantity * unitPrice) + (gift quantity * discountedPrice)
+                                int buyQty = item.quantity() - giftQty;
+                                BigDecimal buyTotal = unitPrice.multiply(BigDecimal.valueOf(buyQty));
+                                BigDecimal giftTotal = discountedPrice.multiply(BigDecimal.valueOf(giftQty));
+                                lineTotal = buyTotal.add(giftTotal);
+
+                                // Tính tổng discount amount cho display
+                                BigDecimal totalDiscountAmount = discountAmount.multiply(BigDecimal.valueOf(giftQty));
+
+                                // Hiển thị discount value
+                                BigDecimal displayDiscountValue;
+                                if (giftPromotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+                                    displayDiscountValue = giftPromotion.getGiftDiscountValue();
+                                } else {
+                                    displayDiscountValue = totalDiscountAmount;
+                                }
+
+                                promotionApplied = new PromotionAppliedDTO(
+                                        giftPromotion.getPromotionLine().getPromotionCode(),
+                                        giftPromotion.getPromotionLine().getDescription() != null
+                                            ? giftPromotion.getPromotionLine().getDescription()
+                                            : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
+                                              (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                        giftPromotion.getDetailId(),
+                                        buildBuyXGetYDiscountSummary(giftPromotion),
+                                        mapDiscountType(giftPromotion.getGiftDiscountType()),
+                                        displayDiscountValue,
+                                        sourceLineItemId  // Gán sourceLineItemId cho gift product
+                                );
+                            }
+                        }
+                    } else {
+                        // Trường hợp bình thường: Gift product KHÁC buy product
+                        // Tính số lượng tối đa được áp dụng khuyến mãi
+                        int giftQtyPerSet = (giftPromotion.getGiftQuantity() != null && giftPromotion.getGiftQuantity() > 0)
+                                ? giftPromotion.getGiftQuantity() : 1;
+                        int maxGiftQuantity = (giftPromotion.getGiftMaxQuantity() != null && giftPromotion.getGiftMaxQuantity() > 0)
+                                ? giftPromotion.getGiftMaxQuantity() * giftQtyPerSet
+                                : Integer.MAX_VALUE;
+
+                        // Kiểm tra xem có vượt quá giới hạn không
+                        if (item.quantity() > maxGiftQuantity) {
+                            // VƯỢT QUÁ GIỚI HẠN: Tách thành 2 line items
+                            int promotionQuantity = maxGiftQuantity;  // Số lượng được KM
+                            int excessQuantity = item.quantity() - maxGiftQuantity;  // Số lượng vượt quá
+
+                            // Tính discount
+                            BigDecimal discountAmount = calculateGiftDiscount(
+                                    giftPromotion.getGiftDiscountType(),
+                                    giftPromotion.getGiftDiscountValue(),
+                                    unitPrice
+                            );
+
+                            BigDecimal discountedPrice = unitPrice.subtract(discountAmount);
+                            if (discountedPrice.compareTo(BigDecimal.ZERO) < 0) {
+                                discountedPrice = BigDecimal.ZERO;
+                            }
+
+                            // Line 1: Phần được khuyến mãi
+                            BigDecimal lineTotalWithPromotion = discountedPrice.multiply(BigDecimal.valueOf(promotionQuantity));
+
+                            // Hiển thị discount value
+                            BigDecimal displayDiscountValue;
+                            if (giftPromotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+                                displayDiscountValue = giftPromotion.getGiftDiscountValue();
+                            } else {
+                                displayDiscountValue = discountAmount.multiply(BigDecimal.valueOf(promotionQuantity));
+                            }
+
+                            PromotionAppliedDTO promotionAppliedDTO = new PromotionAppliedDTO(
+                                    giftPromotion.getPromotionLine().getPromotionCode(),
+                                    giftPromotion.getPromotionLine().getDescription() != null
+                                        ? giftPromotion.getPromotionLine().getDescription()
+                                        : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
+                                          (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                    giftPromotion.getDetailId(),
+                                    buildBuyXGetYDiscountSummary(giftPromotion),
+                                    mapDiscountType(giftPromotion.getGiftDiscountType()),
+                                    displayDiscountValue,
+                                    sourceLineItemId
+                            );
+
+                            CartItemResponseDTO cartItemWithPromotion = new CartItemResponseDTO(
+                                    lineItemId++,
+                                    productUnit.getId(),
+                                    productUnit.getUnit().getName(),
+                                    productUnit.getProduct().getName(),
+                                    promotionQuantity,
+                                    unitPrice,
+                                    lineTotalWithPromotion,
+                                    true,
+                                    promotionAppliedDTO
+                            );
+                            resultItems.add(cartItemWithPromotion);
+
+                            // Line 2: Phần vượt quá không có khuyến mãi
+                            BigDecimal lineTotalExcess = unitPrice.multiply(BigDecimal.valueOf(excessQuantity));
+
+                            CartItemResponseDTO cartItemExcess = new CartItemResponseDTO(
+                                    lineItemId++,
+                                    productUnit.getId(),
+                                    productUnit.getUnit().getName(),
+                                    productUnit.getProduct().getName(),
+                                    excessQuantity,
+                                    unitPrice,
+                                    lineTotalExcess,
+                                    false,
+                                    null
+                            );
+                            resultItems.add(cartItemExcess);
+
+                            // Bỏ qua logic bên dưới vì đã xử lý xong - tiếp tục với item tiếp theo
+                            continue;
+                        } else {
+                            // KHÔNG VƯỢT QUÁ: Áp dụng giảm giá cho TẤT CẢ quantity
+                            BigDecimal discountAmount = calculateGiftDiscount(
+                                    giftPromotion.getGiftDiscountType(),
+                                    giftPromotion.getGiftDiscountValue(),
+                                    unitPrice
+                            );
+
+                            BigDecimal discountedPrice = unitPrice.subtract(discountAmount);
+                            if (discountedPrice.compareTo(BigDecimal.ZERO) < 0) {
+                                discountedPrice = BigDecimal.ZERO;
+                            }
+
+                            lineTotal = discountedPrice.multiply(BigDecimal.valueOf(item.quantity()));
+
+                            // Hiển thị discount value
+                            BigDecimal displayDiscountValue;
+                            if (giftPromotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+                                displayDiscountValue = giftPromotion.getGiftDiscountValue();
+                            } else {
+                                displayDiscountValue = discountAmount.multiply(BigDecimal.valueOf(item.quantity()));
+                            }
+
+                            promotionApplied = new PromotionAppliedDTO(
+                                    giftPromotion.getPromotionLine().getPromotionCode(),
+                                    giftPromotion.getPromotionLine().getDescription() != null
+                                        ? giftPromotion.getPromotionLine().getDescription()
+                                        : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
+                                          (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                    giftPromotion.getDetailId(),
+                                    buildBuyXGetYDiscountSummary(giftPromotion),
+                                    mapDiscountType(giftPromotion.getGiftDiscountType()),
+                                    displayDiscountValue,
+                                    sourceLineItemId  // Gán sourceLineItemId cho gift product
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 3. Kiểm tra BUY_X_GET_Y (mua X tặng Y - CHỈ FREE GIFTS)
+            List<BuyXGetYDetail> applicableFreeGifts = findApplicableFreeGifts(
                     productUnit.getId(),
                     item.quantity()
             );
 
-            boolean hasBuyXGetYPromotion = !applicableBuyXGetY.isEmpty();
+            boolean hasFreeGiftPromotion = !applicableFreeGifts.isEmpty();
 
-            // Nếu có BUY_X_GET_Y, tính số lượng quà tặng
-            int actualBuyQuantity = item.quantity();
-            // Không thay đổi lineTotal của sản phẩm mua, giữ nguyên giá trị gốc
-            // lineTotal = unitPrice * quantity (giữ nguyên)
+            // hasPromotion = true nếu có FREE gift hoặc có gift discount promotion
+            boolean hasPromotion = hasFreeGiftPromotion || hasGiftDiscountPromotion;
 
             CartItemResponseDTO cartItem = new CartItemResponseDTO(
                     lineItemId++,
                     productUnit.getId(),
                     productUnit.getUnit().getName(),
                     productUnit.getProduct().getName(),
-                    actualBuyQuantity,
+                    item.quantity(),
                     unitPrice,
                     lineTotal,
-                    hasBuyXGetYPromotion,
-                    productDiscountApplied
+                    hasPromotion,
+                    promotionApplied
             );
             resultItems.add(cartItem);
 
-            // Thêm dòng quà tặng nếu có BUY_X_GET_Y
-            if (hasBuyXGetYPromotion) {
-                for (BuyXGetYDetail promotion : applicableBuyXGetY) {
+            // Thêm dòng quà tặng MIỄN PHÍ (tự động)
+            if (hasFreeGiftPromotion) {
+                for (BuyXGetYDetail promotion : applicableFreeGifts) {
                     CartItemResponseDTO giftItem = createGiftItem(
                             lineItemId++,
                             promotion,
@@ -188,17 +500,68 @@ public class PromotionCheckService {
     }
 
     /**
-     * Tìm các khuyến mãi Mua X Tặng Y áp dụng được cho sản phẩm
+     * Tính số lượng gift product khi gift product GIỐNG buy product
+     * Ví dụ: Mua 5 tặng 2, giftMaxQuantity = 3 (giới hạn 3 lần)
+     * - quantity = 5 → giftQty = 0 (chưa có gift)
+     * - quantity = 7 → giftQty = 2 (5 buy + 2 gift, 1 lần)
+     * - quantity = 14 → giftQty = 4 (10 buy + 4 gift, 2 lần)
+     * - quantity = 35 → giftQty = 6 (25 buy + 6 gift, giới hạn 3 lần × 2 = 6 sản phẩm)
+     *
+     * @param totalQuantity tổng số lượng sản phẩm trong giỏ
+     * @param buyMinQuantity số lượng tối thiểu phải mua
+     * @param giftQuantity số lượng gift nhận được mỗi lần
+     * @param giftMaxQuantity giới hạn SỐ LẦN áp dụng tối đa (null = không giới hạn)
+     * @return số lượng gift product
      */
-    private List<BuyXGetYDetail> findApplicableBuyXGetY(Long productUnitId, Integer quantity) {
-        LocalDateTime now = LocalDateTime.now();
+    private int calculateGiftQuantityForSameProduct(int totalQuantity, int buyMinQuantity,
+                                                     Integer giftQuantity, Integer giftMaxQuantity) {
+        if (buyMinQuantity <= 0) {
+            return 0;
+        }
+
+        int giftQty = (giftQuantity != null && giftQuantity > 0) ? giftQuantity : 1;
+
+        // Nếu tổng số lượng <= số lượng mua tối thiểu → chưa có gift
+        if (totalQuantity <= buyMinQuantity) {
+            return 0;
+        }
+
+        // Tính số lượng gift dựa trên phần vượt quá buyMinQuantity
+        // Công thức: số lần nhận gift = (totalQuantity) / (buyMinQuantity + giftQty)
+        int cycleSize = buyMinQuantity + giftQty;
+        int completeCycles = totalQuantity / cycleSize;
+        int remainder = totalQuantity % cycleSize;
+
+        // Tính số lần áp dụng
+        int eligibleSets = completeCycles;
+
+        // Nếu phần dư > buyMinQuantity → có thêm 1 lần áp dụng nữa
+        if (remainder > buyMinQuantity) {
+            eligibleSets++;
+        }
+
+        // Áp dụng giới hạn SỐ LẦN (giftMaxQuantity) nếu có
+        if (giftMaxQuantity != null && giftMaxQuantity > 0) {
+            eligibleSets = Math.min(eligibleSets, giftMaxQuantity);
+        }
+
+        // Tổng số lượng gift = số lần áp dụng × số lượng gift mỗi lần
+        return eligibleSets * giftQty;
+    }
+
+    /**
+     * Tìm các khuyến mãi Mua X Tặng Y (chỉ FREE gifts - tự động thêm vào giỏ)
+     * Chỉ trả về các promotion có giftDiscountType = FREE
+     */
+    private List<BuyXGetYDetail> findApplicableFreeGifts(Long productUnitId, Integer quantity) {
+        LocalDate now = LocalDate.now();
 
         List<PromotionLine> activeLines = promotionLineRepository.findAll().stream()
                 .filter(line -> line.getPromotionType() == PromotionType.BUY_X_GET_Y)
                 .filter(line -> line.getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getStartDate()) && !now.isAfter(line.getEndDate()))
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
-                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
+                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) &&
                                !now.isAfter(line.getHeader().getEndDate()))
                 .toList();
 
@@ -210,7 +573,9 @@ public class PromotionCheckService {
 
             for (PromotionDetail detail : details) {
                 if (detail instanceof BuyXGetYDetail buyXGetYDetail) {
-                    if (isBuyXGetYApplicable(buyXGetYDetail, productUnitId, quantity)) {
+                    // Chỉ lấy promotion có giftDiscountType = FREE (tự động tặng)
+                    if (buyXGetYDetail.getGiftDiscountType() == DiscountType.FREE &&
+                        isBuyXGetYApplicable(buyXGetYDetail, productUnitId, quantity)) {
                         applicablePromotions.add(buyXGetYDetail);
                     }
                 }
@@ -218,6 +583,134 @@ public class PromotionCheckService {
         }
 
         return applicablePromotions;
+    }
+
+    /**
+     * Tìm tất cả các khuyến mãi Mua X Tặng Y đang active (bao gồm cả FREE và DISCOUNTED)
+     * Dùng để kiểm tra xem item hiện tại có phải là gift product không
+     */
+    private List<BuyXGetYDetail> findAllActiveBuyXGetYPromotions() {
+        LocalDate now = LocalDate.now();
+
+        List<PromotionLine> activeLines = promotionLineRepository.findAll().stream()
+                .filter(line -> line.getPromotionType() == PromotionType.BUY_X_GET_Y)
+                .filter(line -> line.getStatus() == PromotionStatus.ACTIVE)
+                .filter(line -> !now.isBefore(line.getStartDate()) && !now.isAfter(line.getEndDate()))
+                .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
+                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) &&
+                               !now.isAfter(line.getHeader().getEndDate()))
+                .toList();
+
+        List<BuyXGetYDetail> allPromotions = new ArrayList<>();
+
+        for (PromotionLine line : activeLines) {
+            List<PromotionDetail> details = promotionDetailRepository
+                    .findByPromotionLine_PromotionLineId(line.getPromotionLineId());
+
+            for (PromotionDetail detail : details) {
+                if (detail instanceof BuyXGetYDetail buyXGetYDetail) {
+                    allPromotions.add(buyXGetYDetail);
+                }
+            }
+        }
+
+        return allPromotions;
+    }
+
+    /**
+     * Tìm promotion giảm giá áp dụng cho gift product (khi khách tự thêm vào giỏ)
+     * Chỉ áp dụng cho promotion có giftDiscountType != FREE (PERCENTAGE/FIXED_AMOUNT)
+     *
+     * @param allPromotions danh sách tất cả promotion BuyXGetY đang active
+     * @param currentProductUnitId ID của sản phẩm hiện tại (có thể là gift product)
+     * @param currentQuantity số lượng sản phẩm hiện tại
+     * @param allItems tất cả items trong giỏ hàng
+     * @param productUnitMap map chứa thông tin ProductUnit
+     * @return promotion tốt nhất hoặc null
+     */
+    private BuyXGetYDetail findApplicableGiftDiscount(
+            List<BuyXGetYDetail> allPromotions,
+            Long currentProductUnitId,
+            Integer currentQuantity,
+            List<CartItemRequestDTO> allItems,
+            Map<Long, ProductUnit> productUnitMap
+    ) {
+        BuyXGetYDetail bestPromotion = null;
+        BigDecimal maxDiscountAmount = BigDecimal.ZERO;
+
+        for (BuyXGetYDetail promotion : allPromotions) {
+            // Chỉ xét promotion có giảm giá (không phải FREE)
+            if (promotion.getGiftDiscountType() == DiscountType.FREE) {
+                continue;
+            }
+
+            // Kiểm tra xem currentProductUnitId có phải là giftProduct không
+            if (promotion.getGiftProduct() == null ||
+                !promotion.getGiftProduct().getId().equals(currentProductUnitId)) {
+                continue;
+            }
+
+            Long buyProductId = promotion.getBuyProduct().getId();
+            Integer buyMinQuantity = promotion.getBuyMinQuantity() != null ? promotion.getBuyMinQuantity() : 0;
+
+            // Kiểm tra xem gift product có GIỐNG buy product không
+            boolean isSameProduct = buyProductId.equals(currentProductUnitId);
+
+            boolean hasValidPromotion = false;
+
+            if (isSameProduct) {
+                // Trường hợp ĐẶC BIỆT: Gift product GIỐNG buy product
+                // Chỉ áp dụng khi currentQuantity > buyMinQuantity
+                // Ví dụ: Mua 5 tặng 1 giảm 10%
+                // - quantity = 5 → KHÔNG áp dụng (chỉ có buy, chưa có gift)
+                // - quantity = 6 → ÁP DỤNG (5 buy + 1 gift)
+                if (currentQuantity > buyMinQuantity) {
+                    hasValidPromotion = true;
+                }
+            } else {
+                // Trường hợp BÌNH THƯỜNG: Gift product KHÁC buy product
+                // Kiểm tra trong giỏ hàng có buyProduct đủ số lượng không
+                boolean hasSufficientBuyProduct = allItems.stream()
+                        .anyMatch(item ->
+                                item.productUnitId().equals(buyProductId) &&
+                                item.quantity() >= buyMinQuantity
+                        );
+
+                if (hasSufficientBuyProduct) {
+                    hasValidPromotion = true;
+                }
+            }
+
+            if (!hasValidPromotion) {
+                continue;
+            }
+
+            // Tính discount amount để so sánh
+            // Tải giá của gift product
+            List<PriceDetail> priceDetails = priceDetailRepository.findByProductUnitIdAndPriceStatus(
+                    currentProductUnitId, iuh.fit.supermarket.enums.PriceType.ACTIVE);
+
+            if (!priceDetails.isEmpty()) {
+                BigDecimal giftPrice = priceDetails.stream()
+                        .max((pd1, pd2) -> pd1.getPrice().getCreatedAt().compareTo(pd2.getPrice().getCreatedAt()))
+                        .orElse(priceDetails.get(0))
+                        .getSalePrice();
+
+                BigDecimal discountAmount = calculateGiftDiscount(
+                        promotion.getGiftDiscountType(),
+                        promotion.getGiftDiscountValue(),
+                        giftPrice
+                );
+
+                // Chọn promotion có discount lớn nhất
+                if (discountAmount.compareTo(maxDiscountAmount) > 0) {
+                    maxDiscountAmount = discountAmount;
+                    bestPromotion = promotion;
+                }
+            }
+        }
+
+        return bestPromotion;
     }
 
 
@@ -332,15 +825,12 @@ public class PromotionCheckService {
     }
 
     /**
-     * Tính số lượng quà tặng
-     * Logic mới: quantity truyền vào là số lượng mua thực tế, không bao gồm quà tặng
-     * Công thức: MIN((buyQuantity / buyMinQuantity) × giftQuantity, giới hạn tối đa)
-     * 
-     * Ví dụ: Mua 5 tặng 1, user truyền quantity=5
-     * - buyMinQuantity = 5
-     * - eligibleSets = 5 / 5 = 1
-     * - giftQuantity = 1 × 1 = 1
-     * 
+     * Tính số lượng gift product cho FREE gifts (tự động thêm)
+     * Ví dụ: Mua 5 tặng 2, giftMaxQuantity = 3 (giới hạn 3 lần)
+     * - Mua 5 → Tặng 2 (1 lần)
+     * - Mua 10 → Tặng 4 (2 lần)
+     * - Mua 20 → Tặng 6 (giới hạn 3 lần × 2 = 6 sản phẩm)
+     *
      * @param promotion chi tiết khuyến mãi
      * @param buyQuantity số lượng sản phẩm khách mua (không bao gồm quà tặng)
      * @return tổng số lượng sản phẩm tặng
@@ -348,7 +838,13 @@ public class PromotionCheckService {
     private int calculateGiftQuantity(BuyXGetYDetail promotion, Integer buyQuantity) {
         if (promotion.getBuyMinQuantity() == null) {
             // Nếu không có điều kiện số lượng tối thiểu, trả về số lượng tặng mặc định
-            return promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1;
+            int defaultQty = promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1;
+            // Áp dụng giới hạn nếu có (trong trường hợp này giftMaxQuantity = số lần = 1)
+            if (promotion.getGiftMaxQuantity() != null && promotion.getGiftMaxQuantity() > 0) {
+                // Nếu giftMaxQuantity = 0 thì không tặng
+                return promotion.getGiftMaxQuantity() >= 1 ? defaultQty : 0;
+            }
+            return defaultQty;
         }
 
         // Số lượng tặng cho mỗi lần đủ điều kiện (mặc định là 1)
@@ -357,8 +853,8 @@ public class PromotionCheckService {
         // Tính số lần mua đủ điều kiện dựa trên số lượng mua thực tế
         int eligibleSets = buyQuantity / promotion.getBuyMinQuantity();
 
-        // Giới hạn số lần áp dụng (nếu có cấu hình)
-        if (promotion.getGiftMaxQuantity() != null) {
+        // Áp dụng giới hạn SỐ LẦN (giftMaxQuantity) nếu có
+        if (promotion.getGiftMaxQuantity() != null && promotion.getGiftMaxQuantity() > 0) {
             eligibleSets = Math.min(eligibleSets, promotion.getGiftMaxQuantity());
         }
 
@@ -501,14 +997,14 @@ public class PromotionCheckService {
      * Tìm tất cả các khuyến mãi giảm giá sản phẩm đang active
      */
     private List<ProductDiscountDetail> findApplicableProductDiscounts() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         List<PromotionLine> activeLines = promotionLineRepository.findAll().stream()
                 .filter(line -> line.getPromotionType() == PromotionType.PRODUCT_DISCOUNT)
                 .filter(line -> line.getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getStartDate()) && !now.isAfter(line.getEndDate()))
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
-                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
+                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) &&
                                !now.isAfter(line.getHeader().getEndDate()))
                 .toList();
 
@@ -636,14 +1132,14 @@ public class PromotionCheckService {
             BigDecimal totalAfterLineDiscount,
             Integer totalQuantity
     ) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         List<PromotionLine> activeLines = promotionLineRepository.findAll().stream()
                 .filter(line -> line.getPromotionType() == PromotionType.ORDER_DISCOUNT)
                 .filter(line -> line.getStatus() == PromotionStatus.ACTIVE)
                 .filter(line -> !now.isBefore(line.getStartDate()) && !now.isAfter(line.getEndDate()))
                 .filter(line -> line.getHeader().getStatus() == PromotionStatus.ACTIVE)
-                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) && 
+                .filter(line -> !now.isBefore(line.getHeader().getStartDate()) &&
                                !now.isAfter(line.getHeader().getEndDate()))
                 .toList();
 
@@ -773,14 +1269,14 @@ public class PromotionCheckService {
 
     /**
      * Tạo thông tin tóm tắt cho BUY_X_GET_Y
-     * 
+     *
      * @param promotion chi tiết khuyến mãi mua X tặng Y
      * @param actualGiftQuantity số lượng quà tặng thực tế được áp dụng
      * @return thông tin tóm tắt chi tiết
      */
     private String buildBuyXGetYSummary(BuyXGetYDetail promotion, int actualGiftQuantity) {
         StringBuilder summary = new StringBuilder();
-        
+
         // Điều kiện mua
         summary.append("Mua ");
         if (promotion.getBuyMinQuantity() != null) {
@@ -789,7 +1285,7 @@ public class PromotionCheckService {
         if (promotion.getBuyProduct() != null) {
             summary.append(promotion.getBuyProduct().getProduct().getName());
         }
-        
+
         // Quà tặng - hiển thị số lượng theo cấu hình
         summary.append(" tặng ");
         if (promotion.getGiftQuantity() != null && promotion.getGiftQuantity() > 1) {
@@ -799,12 +1295,12 @@ public class PromotionCheckService {
         if (promotion.getGiftProduct() != null) {
             summary.append(promotion.getGiftProduct().getProduct().getName());
         }
-        
+
         // Hiển thị số lượng thực tế nếu khác với cấu hình cơ bản
         if (actualGiftQuantity != promotion.getGiftQuantity()) {
             summary.append(" (").append(actualGiftQuantity).append(" sản phẩm)");
         }
-        
+
         // Loại giảm giá quà tặng
         if (promotion.getGiftDiscountType() == DiscountType.FREE) {
             summary.append(" (miễn phí)");
@@ -813,7 +1309,35 @@ public class PromotionCheckService {
         } else if (promotion.getGiftDiscountType() == DiscountType.FIXED_AMOUNT) {
             summary.append(" (giảm ").append(String.format("%,.0f", promotion.getGiftDiscountValue())).append("đ)");
         }
-        
+
+        return summary.toString();
+    }
+
+    /**
+     * Tạo thông tin tóm tắt cho BUY_X_GET_Y Discount (khi khách tự thêm gift product)
+     *
+     * @param promotion chi tiết khuyến mãi mua X tặng Y
+     * @return thông tin tóm tắt chi tiết
+     */
+    private String buildBuyXGetYDiscountSummary(BuyXGetYDetail promotion) {
+        StringBuilder summary = new StringBuilder();
+
+        // Loại giảm giá
+        if (promotion.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append("Giảm ").append(promotion.getGiftDiscountValue()).append("%");
+        } else if (promotion.getGiftDiscountType() == DiscountType.FIXED_AMOUNT) {
+            summary.append("Giảm ").append(String.format("%,.0f", promotion.getGiftDiscountValue())).append("đ");
+        }
+
+        // Điều kiện
+        summary.append(" khi mua ");
+        if (promotion.getBuyMinQuantity() != null) {
+            summary.append(promotion.getBuyMinQuantity()).append(" ");
+        }
+        if (promotion.getBuyProduct() != null) {
+            summary.append(promotion.getBuyProduct().getProduct().getName());
+        }
+
         return summary.toString();
     }
 

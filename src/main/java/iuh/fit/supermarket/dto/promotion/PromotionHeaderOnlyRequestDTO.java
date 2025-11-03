@@ -6,7 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -35,21 +35,17 @@ public class PromotionHeaderOnlyRequestDTO {
 
     /**
      * Ngày bắt đầu chương trình
-     * Bắt buộc và phải là thời điểm trong tương lai
+     * Bắt buộc
      */
     @NotNull(message = "Ngày bắt đầu không được để trống")
-    @Future(message = "Ngày bắt đầu phải là thời điểm trong tương lai")
-
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc chương trình
      * Bắt buộc và phải sau ngày bắt đầu
      */
     @NotNull(message = "Ngày kết thúc không được để trống")
-    @Future(message = "Ngày kết thúc phải là thời điểm trong tương lai")
-
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Trạng thái chương trình khuyến mãi
@@ -71,14 +67,14 @@ public class PromotionHeaderOnlyRequestDTO {
     }
 
     /**
-     * Validation để đảm bảo khoảng thời gian hợp lý (ít nhất 1 giờ)
+     * Validation để đảm bảo khoảng thời gian hợp lý (ít nhất 1 ngày)
      */
-    @AssertTrue(message = "Chương trình khuyến mãi phải có thời gian tối thiểu 1 giờ")
+    @AssertTrue(message = "Chương trình khuyến mãi phải có thời gian tối thiểu 1 ngày")
     @JsonIgnore
     public boolean isValidDuration() {
         if (startDate == null || endDate == null) {
             return true;
         }
-        return startDate.plusHours(1).isBefore(endDate) || startDate.plusHours(1).isEqual(endDate);
+        return startDate.plusDays(1).isBefore(endDate) || startDate.plusDays(1).isEqual(endDate);
     }
 }

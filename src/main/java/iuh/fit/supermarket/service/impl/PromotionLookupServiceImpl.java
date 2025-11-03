@@ -7,7 +7,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -33,7 +33,7 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
     @Override
     public String getActivePromotions(int limit) {
         List<PromotionHeader> promotions = promotionRepository
-                .findActivePromotions(LocalDateTime.now(), PageRequest.of(0, limit))
+                .findActivePromotions(LocalDate.now(), PageRequest.of(0, limit))
                 .getContent();
 
         if (promotions.isEmpty()) {

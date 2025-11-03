@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 /**
  * DTO cho tìm kiếm và lọc chương trình khuyến mãi
@@ -36,26 +36,26 @@ public class PromotionSearchDTO {
     /**
      * Ngày bắt đầu tìm kiếm (từ ngày này)
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime startDateFrom;
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private LocalDate startDateFrom;
 
     /**
      * Ngày bắt đầu tìm kiếm (đến ngày này)
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime startDateTo;
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private LocalDate startDateTo;
 
     /**
      * Ngày kết thúc tìm kiếm (từ ngày này)
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime endDateFrom;
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private LocalDate endDateFrom;
 
     /**
      * Ngày kết thúc tìm kiếm (đến ngày này)
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    private LocalDateTime endDateTo;
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private LocalDate endDateTo;
 
     /**
      * Chỉ lấy các chương trình đang hoạt động

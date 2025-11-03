@@ -486,13 +486,13 @@ public class PromotionController {
 
             @Parameter(description = "Loại khuyến mãi để lọc") @RequestParam(required = false) String promotionType,
 
-            @Parameter(description = "Ngày bắt đầu từ (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String startDateFrom,
+            @Parameter(description = "Ngày bắt đầu từ (yyyy-MM-dd)") @RequestParam(required = false) String startDateFrom,
 
-            @Parameter(description = "Ngày bắt đầu đến (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String startDateTo,
+            @Parameter(description = "Ngày bắt đầu đến (yyyy-MM-dd)") @RequestParam(required = false) String startDateTo,
 
-            @Parameter(description = "Ngày kết thúc từ (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String endDateFrom,
+            @Parameter(description = "Ngày kết thúc từ (yyyy-MM-dd)") @RequestParam(required = false) String endDateFrom,
 
-            @Parameter(description = "Ngày kết thúc đến (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String endDateTo) {
+            @Parameter(description = "Ngày kết thúc đến (yyyy-MM-dd)") @RequestParam(required = false) String endDateTo) {
 
         log.debug("API: Lấy danh sách promotion lines cho header ID: {}", promotionId);
 
@@ -507,10 +507,10 @@ public class PromotionController {
         }
 
         // Parse dates
-        java.time.LocalDateTime startFrom = parseDateTime(startDateFrom);
-        java.time.LocalDateTime startTo = parseDateTime(startDateTo);
-        java.time.LocalDateTime endFrom = parseDateTime(endDateFrom);
-        java.time.LocalDateTime endTo = parseDateTime(endDateTo);
+        java.time.LocalDate startFrom = parseDate(startDateFrom);
+        java.time.LocalDate startTo = parseDate(startDateTo);
+        java.time.LocalDate endFrom = parseDate(endDateFrom);
+        java.time.LocalDate endTo = parseDate(endDateTo);
 
         List<PromotionLineResponseDTO> lines = promotionService.getPromotionLinesByHeaderId(
                 promotionId, type, startFrom, startTo, endFrom, endTo);
@@ -540,13 +540,13 @@ public class PromotionController {
 
             @Parameter(description = "Loại khuyến mãi") @RequestParam(required = false) String promotionType,
 
-            @Parameter(description = "Ngày bắt đầu từ (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String startDateFrom,
+            @Parameter(description = "Ngày bắt đầu từ (yyyy-MM-dd)") @RequestParam(required = false) String startDateFrom,
 
-            @Parameter(description = "Ngày bắt đầu đến (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String startDateTo,
+            @Parameter(description = "Ngày bắt đầu đến (yyyy-MM-dd)") @RequestParam(required = false) String startDateTo,
 
-            @Parameter(description = "Ngày kết thúc từ (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String endDateFrom,
+            @Parameter(description = "Ngày kết thúc từ (yyyy-MM-dd)") @RequestParam(required = false) String endDateFrom,
 
-            @Parameter(description = "Ngày kết thúc đến (yyyy-MM-dd HH:mm:ss)") @RequestParam(required = false) String endDateTo,
+            @Parameter(description = "Ngày kết thúc đến (yyyy-MM-dd)") @RequestParam(required = false) String endDateTo,
 
             @Parameter(description = "Chỉ lấy chương trình đang hoạt động") @RequestParam(required = false) Boolean activeOnly,
 
@@ -608,10 +608,10 @@ public class PromotionController {
         }
 
         // Parse date values
-        searchDTO.setStartDateFrom(parseDateTime(startDateFrom));
-        searchDTO.setStartDateTo(parseDateTime(startDateTo));
-        searchDTO.setEndDateFrom(parseDateTime(endDateFrom));
-        searchDTO.setEndDateTo(parseDateTime(endDateTo));
+        searchDTO.setStartDateFrom(parseDate(startDateFrom));
+        searchDTO.setStartDateTo(parseDate(startDateTo));
+        searchDTO.setEndDateFrom(parseDate(endDateFrom));
+        searchDTO.setEndDateTo(parseDate(endDateTo));
 
         // Thiết lập các flag đặc biệt
         searchDTO.setActiveOnly(activeOnly);
@@ -628,18 +628,18 @@ public class PromotionController {
     }
 
     /**
-     * Parse chuỗi thời gian thành LocalDateTime
+     * Parse chuỗi ngày thành LocalDate
      */
-    private java.time.LocalDateTime parseDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.trim().isEmpty()) {
+    private java.time.LocalDate parseDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
             return null;
         }
 
         try {
-            return java.time.LocalDateTime.parse(dateTimeStr,
-                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            return java.time.LocalDate.parse(dateStr,
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"));
         } catch (Exception e) {
-            log.warn("Không thể parse thời gian: {}", dateTimeStr);
+            log.warn("Không thể parse ngày: {}", dateStr);
             return null;
         }
     }

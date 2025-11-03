@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +78,7 @@ public class PromotionService {
      * Note: Để sử dụng API này, cần thêm trường promotionHeaderId vào
      * PromotionLineRequestDTO
      * Hoặc tạo một DTO riêng. Hiện tại method này chưa được sử dụng.
-     * 
+     *
      * @param requestDTO    thông tin line cần tạo (bao gồm cả detail)
      * @param headerIdthông tin line cần tạo (bao gồm cả detail)
      * @return PromotionLineResponseDTO chứa thông tin line đã tạo
@@ -95,6 +96,9 @@ public class PromotionService {
 
         // Validation
         validatePromotionLineRequest(requestDTO);
+
+        // Validation ngày tháng của line phải nằm trong khoảng của header
+        validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), header);
 
         // Kiểm tra trùng mã
         if (promotionLineRepository.existsByPromotionCodeIgnoreCase(requestDTO.getPromotionCode())) {
@@ -132,7 +136,7 @@ public class PromotionService {
     /**
      * Tạo mới promotion line (không bao gồm detail)
      * Detail phải được tạo riêng thông qua endpoint POST /lines/{lineId}/details
-     * 
+     *
      * @param headerId   ID của header (từ URL path)
      * @param requestDTO thông tin line cần tạo (không bao gồm detail)
      * @return PromotionLineResponseDTO chứa thông tin line đã tạo
@@ -150,6 +154,9 @@ public class PromotionService {
 
         // Validation cơ bản
         validatePromotionLineOnlyRequest(requestDTO);
+
+        // Validation ngày tháng của line phải nằm trong khoảng của header
+        validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), header);
 
         // Kiểm tra trùng mã
         if (promotionLineRepository.existsByPromotionCodeIgnoreCase(requestDTO.getPromotionCode())) {
@@ -469,12 +476,12 @@ public class PromotionService {
 
     /**
      * Kiểm tra xem promotion line có thể xóa không
-     * 
+     *
      * @param line promotion line cần kiểm tra
      * @throws PromotionValidationException nếu không thể xóa
      */
     private void validatePromotionLineCanBeDeleted(PromotionLine line) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         // Không cho phép xóa nếu line đang hoạt động
         if (line.getStatus() == PromotionStatus.ACTIVE &&
@@ -489,7 +496,7 @@ public class PromotionService {
 
     /**
      * Lấy danh sách promotion lines theo header ID với lọc
-     * 
+     *
      * @param promotionId   ID của promotion header
      * @param promotionType Loại khuyến mãi để lọc (optional)
      * @param startDateFrom Ngày bắt đầu từ (optional)
@@ -503,10 +510,10 @@ public class PromotionService {
     public List<PromotionLineResponseDTO> getPromotionLinesByHeaderId(
             Long promotionId,
             PromotionType promotionType,
-            LocalDateTime startDateFrom,
-            LocalDateTime startDateTo,
-            LocalDateTime endDateFrom,
-            LocalDateTime endDateTo) {
+            LocalDate startDateFrom,
+            LocalDate startDateTo,
+            LocalDate endDateFrom,
+            LocalDate endDateTo) {
 
         log.debug("Lấy danh sách promotion lines cho header ID: {} với bộ lọc", promotionId);
 
@@ -577,7 +584,7 @@ public class PromotionService {
         Page<PromotionHeader> headerPage;
 
         // Xử lý các trường hợp tìm kiếm đặc biệt
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         if (Boolean.TRUE.equals(searchDTO.getActiveOnly())) {
             headerPage = promotionHeaderRepository.findActivePromotions(now, pageable);
@@ -615,7 +622,7 @@ public class PromotionService {
             throw new PromotionValidationException("Ngày bắt đầu phải trước ngày kết thúc");
         }
 
-        if (requestDTO.getStartDate().isBefore(LocalDateTime.now().minusMinutes(5))) {
+        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
             throw new PromotionValidationException("Ngày bắt đầu không được là thời điểm trong quá khứ");
         }
     }
@@ -628,8 +635,30 @@ public class PromotionService {
             throw new PromotionValidationException("Ngày bắt đầu line phải trước ngày kết thúc line");
         }
 
-        if (requestDTO.getStartDate().isBefore(LocalDateTime.now().minusMinutes(5))) {
+        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
             throw new PromotionValidationException("Ngày bắt đầu line không được là thời điểm trong quá khứ");
+        }
+    }
+
+    /**
+     * Validation ngày tháng của line phải nằm trong khoảng của header
+     *
+     * @param lineStartDate ngày bắt đầu của line
+     * @param lineEndDate   ngày kết thúc của line
+     * @param header        promotion header cha
+     * @throws PromotionValidationException nếu ngày tháng của line nằm ngoài khoảng của header
+     */
+    private void validatePromotionLineDateRangeWithinHeader(LocalDate lineStartDate, LocalDate lineEndDate, PromotionHeader header) {
+        if (lineStartDate.isBefore(header.getStartDate())) {
+            throw new PromotionValidationException(
+                    String.format("Ngày bắt đầu của line (%s) phải lớn hơn hoặc bằng ngày bắt đầu của chương trình khuyến mãi (%s)",
+                            lineStartDate, header.getStartDate()));
+        }
+
+        if (lineEndDate.isAfter(header.getEndDate())) {
+            throw new PromotionValidationException(
+                    String.format("Ngày kết thúc của line (%s) phải nhỏ hơn hoặc bằng ngày kết thúc của chương trình khuyến mãi (%s)",
+                            lineEndDate, header.getEndDate()));
         }
     }
 
@@ -641,7 +670,7 @@ public class PromotionService {
             throw new PromotionValidationException("Ngày bắt đầu phải trước ngày kết thúc");
         }
 
-        if (requestDTO.getStartDate().isBefore(LocalDateTime.now().minusMinutes(5))) {
+        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
             throw new PromotionValidationException("Ngày bắt đầu không được là thời điểm trong quá khứ");
         }
 
@@ -652,6 +681,19 @@ public class PromotionService {
         // Validate từng line
         for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
             validatePromotionLineRequest(lineDTO);
+
+            // Validate ngày tháng của line phải nằm trong khoảng của header
+            if (lineDTO.getStartDate().isBefore(requestDTO.getStartDate())) {
+                throw new PromotionValidationException(
+                        String.format("Ngày bắt đầu của line (%s) phải lớn hơn hoặc bằng ngày bắt đầu của chương trình khuyến mãi (%s)",
+                                lineDTO.getStartDate(), requestDTO.getStartDate()));
+            }
+
+            if (lineDTO.getEndDate().isAfter(requestDTO.getEndDate())) {
+                throw new PromotionValidationException(
+                        String.format("Ngày kết thúc của line (%s) phải nhỏ hơn hoặc bằng ngày kết thúc của chương trình khuyến mãi (%s)",
+                                lineDTO.getEndDate(), requestDTO.getEndDate()));
+            }
         }
     }
 
@@ -798,7 +840,7 @@ public class PromotionService {
      * Kiểm tra xem chương trình có thể cập nhật không
      */
     private void validatePromotionCanBeUpdated(PromotionHeader header) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         if (header.getStatus() == PromotionStatus.ACTIVE && now.isAfter(header.getStartDate())) {
             throw new PromotionValidationException("Không thể cập nhật chương trình khuyến mãi đang hoạt động");
@@ -817,7 +859,7 @@ public class PromotionService {
      * Kiểm tra xem chương trình có thể xóa không
      */
     private void validatePromotionCanBeDeleted(PromotionHeader header) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         if (header.getStatus() == PromotionStatus.ACTIVE) {
             throw new PromotionValidationException("Không thể xóa chương trình khuyến mãi đang hoạt động");
@@ -1074,7 +1116,7 @@ public class PromotionService {
     /**
      * Cập nhật promotion line (không bao gồm detail)
      * Detail phải được cập nhật riêng thông qua endpoint PUT /details/{detailId}
-     * 
+     *
      * @param lineId     ID của promotion line cần cập nhật
      * @param requestDTO thông tin cập nhật (không bao gồm detail)
      * @return PromotionLineResponseDTO chứa thông tin đã cập nhật
@@ -1092,6 +1134,9 @@ public class PromotionService {
 
         // Validation cơ bản
         validatePromotionLineOnlyRequest(requestDTO);
+
+        // Validation ngày tháng của line phải nằm trong khoảng của header
+        validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), existingLine.getHeader());
 
         // Kiểm tra trùng mã (trừ line hiện tại)
         if (promotionLineRepository.existsByPromotionCodeIgnoreCaseAndPromotionLineIdNot(
