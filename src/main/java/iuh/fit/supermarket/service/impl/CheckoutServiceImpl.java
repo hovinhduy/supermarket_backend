@@ -13,6 +13,7 @@ import iuh.fit.supermarket.service.CheckoutService;
 import iuh.fit.supermarket.service.PromotionCheckService;
 import iuh.fit.supermarket.service.SaleService;
 import iuh.fit.supermarket.exception.UnauthorizedException;
+import iuh.fit.supermarket.validator.OrderStatusTransitionValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,12 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final PromotionCheckService promotionCheckService;
     private final ObjectMapper objectMapper;
     private final iuh.fit.supermarket.service.PaymentService paymentService;
+    private final OrderStatusTransitionValidator statusTransitionValidator;
+    private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
+    private final SaleInvoiceDetailRepository saleInvoiceDetailRepository;
+    private final AppliedPromotionRepository appliedPromotionRepository;
+    private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
+    private final iuh.fit.supermarket.service.WarehouseService warehouseService;
 
     /**
      * Thực hiện checkout giỏ hàng cho khách hàng
@@ -304,19 +311,47 @@ public class CheckoutServiceImpl implements CheckoutService {
     public CheckoutResponseDTO updateOrderStatus(Long orderId, OrderStatus newStatus) {
         log.info("Cập nhật trạng thái đơn hàng {} sang {}", orderId, newStatus);
 
+        // Ngăn chặn việc cập nhật thủ công sang COMPLETED
+        if (newStatus == OrderStatus.COMPLETED) {
+            throw new BadRequestException(
+                "Không thể cập nhật thủ công sang trạng thái COMPLETED. " +
+                "Đơn hàng sẽ tự động hoàn thành sau khi được giao (DELIVERED)."
+            );
+        }
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng"));
 
         OrderStatus currentStatus = order.getStatus();
+        DeliveryType deliveryType = order.getDeliveryType();
 
-        // Validate chuyển trạng thái hợp lệ
-        validateStatusTransition(currentStatus, newStatus);
+        // Validate chuyển trạng thái hợp lệ với loại giao hàng
+        if (!statusTransitionValidator.isValidTransition(currentStatus, newStatus, deliveryType)) {
+            String errorMessage = statusTransitionValidator.getTransitionErrorMessage(
+                currentStatus, newStatus, deliveryType);
+            throw new BadRequestException(errorMessage);
+        }
+
+        // Kiểm tra trạng thái có phù hợp với loại giao hàng không
+        if (!statusTransitionValidator.isStatusValidForDeliveryType(newStatus, deliveryType)) {
+            throw new BadRequestException(
+                String.format("Trạng thái %s không phù hợp với loại giao hàng %s",
+                    newStatus, deliveryType));
+        }
 
         order.setStatus(newStatus);
 
-        // Nếu chuyển sang DELIVERED -> Tạo hóa đơn bán hàng
+        // Nếu chuyển sang DELIVERED -> Tạo hóa đơn bán hàng và tự động hoàn thành
         if (newStatus == OrderStatus.DELIVERED) {
             createSalesInvoice(order);
+
+            // Tự động chuyển sang trạng thái COMPLETED
+            log.info("Tự động chuyển đơn hàng {} từ DELIVERED sang COMPLETED", orderId);
+            order.setStatus(OrderStatus.COMPLETED);
+            order = orderRepository.save(order);
+
+            log.info("Đơn hàng {} đã được tự động hoàn thành", orderId);
+            return buildCheckoutResponse(order, order.getOrderDetails());
         }
 
         // Nếu chuyển sang CANCELLED -> Hoàn lại tồn kho
@@ -325,6 +360,9 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
 
         order = orderRepository.save(order);
+
+        log.info("Đã cập nhật trạng thái đơn hàng {} từ {} sang {}",
+            orderId, currentStatus, newStatus);
 
         return buildCheckoutResponse(order, order.getOrderDetails());
     }
@@ -507,83 +545,85 @@ public class CheckoutServiceImpl implements CheckoutService {
         return username;
     }
 
-    /**
-     * Validate chuyển trạng thái đơn hàng
-     */
-    private void validateStatusTransition(OrderStatus currentStatus, OrderStatus newStatus) {
-        boolean isValid = false;
-
-        switch (currentStatus) {
-            case PENDING:
-                isValid = (newStatus == OrderStatus.PREPARED ||
-                          newStatus == OrderStatus.CANCELLED);
-                break;
-            case PREPARED:
-                isValid = (newStatus == OrderStatus.SHIPPING ||
-                          newStatus == OrderStatus.DELIVERED ||  // Nhận tại cửa hàng
-                          newStatus == OrderStatus.CANCELLED);
-                break;
-            case SHIPPING:
-                isValid = (newStatus == OrderStatus.DELIVERED);
-                break;
-            case DELIVERED:
-                isValid = (newStatus == OrderStatus.COMPLETED);
-                break;
-            default:
-                isValid = false;
-        }
-
-        if (!isValid) {
-            throw new BadRequestException(
-                String.format("Không thể chuyển từ trạng thái %s sang %s",
-                currentStatus, newStatus)
-            );
-        }
-    }
 
     /**
      * Cập nhật tồn kho sau khi đặt hàng
+     * Sử dụng WarehouseService để trừ kho và ghi lại lịch sử giao dịch
      */
     private void updateInventory(List<OrderDetail> orderDetails) {
+        Long orderId = orderDetails.isEmpty() ? null : orderDetails.get(0).getOrder().getOrderId();
+        String referenceId = orderId != null ? "ORDER-" + orderId : null;
+
         for (OrderDetail detail : orderDetails) {
             ProductUnit productUnit = detail.getProductUnit();
 
-            Warehouse warehouse = warehouseRepository.findByProductUnit(productUnit)
-                    .orElseThrow(() -> new NotFoundException(
-                        String.format("Không tìm thấy thông tin kho cho sản phẩm: %s",
+            try {
+                // Sử dụng WarehouseService để xuất kho và ghi lại lịch sử
+                // quantityChange = -detail.getQuantity() (số âm để xuất kho)
+                warehouseService.stockOut(
+                    productUnit.getId(),
+                    detail.getQuantity(),
+                    referenceId,
+                    String.format("Xuất kho cho đơn hàng #%s - %s",
+                        orderId,
                         productUnit.getProduct().getName())
-                    ));
+                );
 
-            int newQuantity = warehouse.getQuantityOnHand() - detail.getQuantity();
+                log.info("Đã trừ {} {} {} khỏi kho cho đơn hàng #{}",
+                    detail.getQuantity(),
+                    productUnit.getUnit().getName(),
+                    productUnit.getProduct().getName(),
+                    orderId);
 
-            if (newQuantity < 0) {
+            } catch (Exception e) {
+                log.error("Lỗi khi trừ kho cho sản phẩm {}: {}",
+                    productUnit.getProduct().getName(), e.getMessage());
                 throw new BadRequestException(
-                    String.format("Không đủ hàng cho sản phẩm: %s",
-                    productUnit.getProduct().getName())
+                    String.format("Không thể trừ kho cho sản phẩm %s: %s",
+                        productUnit.getProduct().getName(), e.getMessage())
                 );
             }
-
-            warehouse.setQuantityOnHand(newQuantity);
-            warehouseRepository.save(warehouse);
         }
     }
 
     /**
      * Hoàn lại tồn kho khi hủy đơn hàng
+     * Sử dụng WarehouseService để hoàn kho và ghi lại lịch sử giao dịch với TransactionType.RETURN
      */
     private void restoreInventory(List<OrderDetail> orderDetails) {
+        Long orderId = orderDetails.isEmpty() ? null : orderDetails.get(0).getOrder().getOrderId();
+        String referenceId = orderId != null ? "ORDER-" + orderId : null;
+
         for (OrderDetail detail : orderDetails) {
             ProductUnit productUnit = detail.getProductUnit();
 
-            Warehouse warehouse = warehouseRepository.findByProductUnit(productUnit)
-                    .orElseThrow(() -> new NotFoundException(
-                        String.format("Không tìm thấy thông tin kho cho sản phẩm: %s",
+            try {
+                // Sử dụng WarehouseService.updateStock với TransactionType.RETURN để hoàn kho
+                // (không dùng stockIn vì nó tạo transaction với type STOCK_IN)
+                warehouseService.updateStock(
+                    productUnit.getId(),
+                    detail.getQuantity(), // số dương để tăng tồn kho
+                    WarehouseTransaction.TransactionType.RETURN,
+                    referenceId,
+                    String.format("Hoàn kho từ đơn hàng hủy #%s - %s",
+                        orderId,
                         productUnit.getProduct().getName())
-                    ));
+                );
 
-            int newQuantity = warehouse.getQuantityOnHand() + detail.getQuantity();
-            warehouse.setQuantityOnHand(newQuantity);
-            warehouseRepository.save(warehouse);
+                log.info("Đã hoàn {} {} {} vào kho từ đơn hàng hủy #{}",
+                    detail.getQuantity(),
+                    productUnit.getUnit().getName(),
+                    productUnit.getProduct().getName(),
+                    orderId);
+
+            } catch (Exception e) {
+                log.error("Lỗi khi hoàn kho cho sản phẩm {}: {}",
+                    productUnit.getProduct().getName(), e.getMessage());
+                throw new BadRequestException(
+                    String.format("Không thể hoàn kho cho sản phẩm %s: %s",
+                        productUnit.getProduct().getName(), e.getMessage())
+                );
+            }
         }
     }
 
@@ -591,8 +631,179 @@ public class CheckoutServiceImpl implements CheckoutService {
      * Tạo hóa đơn bán hàng khi đơn hàng được giao
      */
     private void createSalesInvoice(Order order) {
-        // TODO: Tích hợp với SaleService để tạo hóa đơn
-        log.info("Tạo hóa đơn bán hàng cho đơn hàng ID: {}", order.getOrderId());
+        log.info("Bắt đầu tạo hóa đơn bán hàng cho đơn hàng ID: {}", order.getOrderId());
+
+        // Kiểm tra xem đơn hàng đã có hóa đơn chưa
+        if (saleInvoiceHeaderRepository.existsByOrderId(order.getOrderId())) {
+            log.warn("Đơn hàng {} đã có hóa đơn, bỏ qua việc tạo hóa đơn mới", order.getOrderId());
+            return;
+        }
+
+        // Tạo SaleInvoiceHeader
+        SaleInvoiceHeader invoice = new SaleInvoiceHeader();
+
+        // Tạo số hóa đơn tự động
+        String invoiceNumber = generateInvoiceNumber();
+        invoice.setInvoiceNumber(invoiceNumber);
+
+        // Set thông tin cơ bản
+        invoice.setInvoiceDate(LocalDateTime.now());
+        invoice.setOrder(order);
+        invoice.setCustomer(order.getCustomer());
+
+        // Set nhân viên - nếu đơn hàng không có nhân viên thì lấy nhân viên hệ thống (ID = 1)
+        if (order.getEmployee() != null) {
+            invoice.setEmployee(order.getEmployee());
+        } else {
+            // Lấy nhân viên hệ thống mặc định (thường là admin với ID = 1)
+            Employee systemEmployee = employeeRepository.findById(1)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy nhân viên hệ thống"));
+            invoice.setEmployee(systemEmployee);
+        }
+
+        // Set thông tin thanh toán
+        invoice.setPaymentMethod(order.getPaymentMethod());
+
+        // Tính toán tổng tiền
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
+        BigDecimal totalTax = BigDecimal.ZERO;
+
+        // Tạo danh sách chi tiết hóa đơn
+        List<SaleInvoiceDetail> invoiceDetails = new ArrayList<>();
+
+        for (OrderDetail orderDetail : order.getOrderDetails()) {
+            SaleInvoiceDetail detail = new SaleInvoiceDetail();
+            detail.setInvoice(invoice);
+            detail.setProductUnit(orderDetail.getProductUnit());
+            detail.setQuantity(orderDetail.getQuantity());
+            detail.setUnitPrice(orderDetail.getPriceAtPurchase());
+            detail.setDiscountAmount(orderDetail.getDiscount());
+
+            // Tính thành tiền trước thuế
+            BigDecimal lineTotal = orderDetail.getPriceAtPurchase()
+                .multiply(BigDecimal.valueOf(orderDetail.getQuantity()))
+                .subtract(orderDetail.getDiscount());
+            detail.setLineTotal(lineTotal);
+
+            // Tính thuế (mặc định VAT 10%)
+            BigDecimal taxAmount = lineTotal.multiply(BigDecimal.valueOf(0.10));
+            detail.setTaxType(TaxType.VAT_10);
+            detail.setTaxAmount(taxAmount);
+
+            // Thành tiền sau thuế
+            BigDecimal lineTotalWithTax = lineTotal.add(taxAmount);
+            detail.setLineTotalWithTax(lineTotalWithTax);
+
+            invoiceDetails.add(detail);
+
+            // Cộng dồn vào tổng
+            subtotal = subtotal.add(lineTotal);
+            totalDiscount = totalDiscount.add(orderDetail.getDiscount());
+            totalTax = totalTax.add(taxAmount);
+        }
+
+        // Set tổng tiền cho hóa đơn
+        invoice.setSubtotal(subtotal);
+        invoice.setTotalDiscount(totalDiscount);
+        invoice.setTotalTax(totalTax);
+
+        // Tổng tiền cuối cùng
+        BigDecimal totalAmount = subtotal.add(totalTax);
+        invoice.setTotalAmount(totalAmount);
+
+        // Set trạng thái thanh toán
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            invoice.setStatus(InvoiceStatus.PAID);
+            invoice.setPaidAmount(totalAmount);
+        } else {
+            invoice.setStatus(InvoiceStatus.UNPAID);
+            invoice.setPaidAmount(BigDecimal.ZERO);
+        }
+
+        // Lưu hóa đơn
+        invoice = saleInvoiceHeaderRepository.save(invoice);
+
+        // Lưu chi tiết hóa đơn và thông tin khuyến mãi
+        int detailIndex = 0;
+        for (SaleInvoiceDetail detail : invoiceDetails) {
+            detail.setInvoice(invoice);
+            SaleInvoiceDetail savedDetail = saleInvoiceDetailRepository.save(detail);
+
+            // Lưu thông tin khuyến mãi từ OrderDetail (nếu có)
+            if (detailIndex < order.getOrderDetails().size()) {
+                OrderDetail orderDetail = order.getOrderDetails().get(detailIndex);
+
+                if (orderDetail.getPromotionId() != null) {
+                    AppliedPromotion appliedPromotion = new AppliedPromotion();
+                    appliedPromotion.setInvoiceDetail(savedDetail);
+                    appliedPromotion.setPromotionId(orderDetail.getPromotionId());
+                    appliedPromotion.setPromotionName(orderDetail.getPromotionName());
+                    appliedPromotion.setPromotionDetailId(orderDetail.getPromotionDetailId());
+                    appliedPromotion.setPromotionSummary(orderDetail.getPromotionSummary());
+                    appliedPromotion.setDiscountType(orderDetail.getDiscountType());
+                    appliedPromotion.setDiscountValue(orderDetail.getDiscountValue());
+
+                    appliedPromotionRepository.save(appliedPromotion);
+                    log.debug("Đã lưu thông tin khuyến mãi {} cho chi tiết hóa đơn",
+                        orderDetail.getPromotionName());
+                }
+            }
+            detailIndex++;
+        }
+
+        // Lưu thông tin khuyến mãi toàn đơn từ Order (nếu có)
+        if (order.getAppliedOrderPromotionsJson() != null && !order.getAppliedOrderPromotionsJson().isEmpty()) {
+            try {
+                // Parse JSON thành danh sách OrderPromotionDTO
+                List<OrderPromotionDTO> orderPromotions = objectMapper.readValue(
+                    order.getAppliedOrderPromotionsJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, OrderPromotionDTO.class)
+                );
+
+                for (OrderPromotionDTO promotionDTO : orderPromotions) {
+                    AppliedOrderPromotion appliedOrderPromotion = new AppliedOrderPromotion();
+                    appliedOrderPromotion.setInvoice(invoice);
+                    appliedOrderPromotion.setPromotionId(promotionDTO.promotionId());
+                    appliedOrderPromotion.setPromotionName(promotionDTO.promotionName());
+                    appliedOrderPromotion.setPromotionDetailId(promotionDTO.promotionDetailId());
+                    appliedOrderPromotion.setPromotionSummary(promotionDTO.promotionSummary());
+                    appliedOrderPromotion.setDiscountType(promotionDTO.discountType());
+                    appliedOrderPromotion.setDiscountValue(promotionDTO.discountValue());
+
+                    appliedOrderPromotionRepository.save(appliedOrderPromotion);
+                    log.debug("Đã lưu khuyến mãi toàn đơn: {}", promotionDTO.promotionName());
+                }
+            } catch (Exception e) {
+                log.error("Lỗi khi parse thông tin khuyến mãi toàn đơn: {}", e.getMessage());
+            }
+        }
+
+        log.info("Đã tạo hóa đơn số {} cho đơn hàng {}, tổng tiền: {}",
+            invoiceNumber, order.getOrderId(), totalAmount);
+    }
+
+    /**
+     * Tạo số hóa đơn tự động
+     * Format: INV + năm + tháng + số thứ tự (5 chữ số)
+     * Ví dụ: INV20251100001
+     */
+    private String generateInvoiceNumber() {
+        String yearMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+
+        // Tìm số hóa đơn cuối cùng trong tháng
+        List<String> lastInvoiceNumbers = saleInvoiceHeaderRepository
+            .findLastInvoiceNumberByMonth(yearMonth);
+
+        int nextNumber = 1;
+        if (!lastInvoiceNumbers.isEmpty()) {
+            String lastInvoiceNumber = lastInvoiceNumbers.get(0);
+            // Lấy 5 chữ số cuối
+            String lastNumberStr = lastInvoiceNumber.substring(lastInvoiceNumber.length() - 5);
+            nextNumber = Integer.parseInt(lastNumberStr) + 1;
+        }
+
+        return String.format("INV%s%05d", yearMonth, nextNumber);
     }
 
     /**
@@ -776,6 +987,39 @@ public class CheckoutServiceImpl implements CheckoutService {
         } else {
             orderPage = orderRepository.findByCustomerUsernameAndStatus(actualUsername, status, pageable);
         }
+
+        // Convert sang DTO
+        return orderPage.map(order -> {
+            List<OrderDetail> orderDetails = orderDetailRepository.findByOrder_OrderId(order.getOrderId());
+            return buildCheckoutResponse(order, orderDetails);
+        });
+    }
+
+    /**
+     * Lấy danh sách tất cả đơn hàng trong hệ thống (dành cho Admin)
+     * Có khả năng lọc theo trạng thái và phân trang
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
+            OrderStatus status,
+            org.springframework.data.domain.Pageable pageable) {
+
+        log.info("Admin lấy danh sách tất cả đơn hàng, trạng thái: {}, page: {}, size: {}",
+                status, pageable.getPageNumber(), pageable.getPageSize());
+
+        // Lấy danh sách tất cả đơn hàng với phân trang
+        org.springframework.data.domain.Page<Order> orderPage;
+        if (status == null) {
+            // Lấy tất cả đơn hàng
+            orderPage = orderRepository.findAll(pageable);
+        } else {
+            // Lấy đơn hàng theo trạng thái
+            orderPage = orderRepository.findByStatus(status, pageable);
+        }
+
+        log.info("Tìm thấy {} đơn hàng, tổng số trang: {}",
+                orderPage.getNumberOfElements(), orderPage.getTotalPages());
 
         // Convert sang DTO
         return orderPage.map(order -> {

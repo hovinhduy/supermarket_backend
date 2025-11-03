@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -31,6 +32,20 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
      * Tìm danh sách hóa đơn theo order ID
      */
     List<SaleInvoiceHeader> findByOrder_OrderId(Long orderId);
+
+    /**
+     * Kiểm tra xem đơn hàng đã có hóa đơn chưa
+     */
+    @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM SaleInvoiceHeader s WHERE s.order.orderId = :orderId")
+    boolean existsByOrderId(@Param("orderId") Long orderId);
+
+    /**
+     * Lấy số hóa đơn cuối cùng trong tháng
+     * @param yearMonth chuỗi năm tháng format yyyyMM
+     * @return danh sách số hóa đơn sắp xếp giảm dần
+     */
+    @Query("SELECT s.invoiceNumber FROM SaleInvoiceHeader s WHERE s.invoiceNumber LIKE CONCAT('INV', :yearMonth, '%') ORDER BY s.invoiceNumber DESC")
+    List<String> findLastInvoiceNumberByMonth(@Param("yearMonth") String yearMonth);
 
     /**
      * Tìm kiếm và lọc hoá đơn theo các tiêu chí:

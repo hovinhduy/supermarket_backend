@@ -35,4 +35,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query("SELECT o FROM Order o WHERE (o.customer.user.email = :username OR o.customer.user.phone = :username) AND o.status = :status")
     Page<Order> findByCustomerUsernameAndStatus(@Param("username") String username, @Param("status") OrderStatus status, Pageable pageable);
+
+    /**
+     * Lấy danh sách đơn hàng theo trạng thái với phân trang
+     *
+     * @param status trạng thái đơn hàng
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng theo trạng thái có phân trang
+     */
+    Page<Order> findByStatus(OrderStatus status, Pageable pageable);
 }

@@ -98,7 +98,19 @@ public interface CheckoutService {
      * @return danh sách đơn hàng có phân trang
      */
     org.springframework.data.domain.Page<CheckoutResponseDTO> getCustomerOrders(
-            String username, 
-            OrderStatus status, 
+            String username,
+            OrderStatus status,
+            org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Lấy danh sách tất cả đơn hàng trong hệ thống (dành cho Admin)
+     * Có khả năng lọc theo trạng thái và phân trang
+     *
+     * @param status trạng thái cần lọc (null để lấy tất cả)
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách tất cả đơn hàng có phân trang
+     */
+    org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
+            OrderStatus status,
             org.springframework.data.domain.Pageable pageable);
 }
