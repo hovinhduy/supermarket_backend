@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * DTO cho thông tin chi tiết đầy đủ của ProductUnit
@@ -108,6 +109,12 @@ public class ProductUnitDetailResponse {
      */
     @Schema(description = "Tên bảng giá hiện tại", example = "Bảng giá tháng 1/2024")
     private String priceName;
+
+    /**
+     * Danh sách hình ảnh của đơn vị sản phẩm
+     */
+    @Schema(description = "Danh sách hình ảnh của đơn vị sản phẩm")
+    private List<ProductUnitImageDto> images;
 
     /**
      * Có tồn kho không

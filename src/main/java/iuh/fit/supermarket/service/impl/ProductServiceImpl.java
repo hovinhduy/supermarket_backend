@@ -45,6 +45,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductUnitRepository productUnitRepository;
     private final iuh.fit.supermarket.repository.WarehouseRepository warehouseRepository;
     private final iuh.fit.supermarket.service.PriceService priceService;
+    private final iuh.fit.supermarket.repository.ProductUnitImageRepository productUnitImageRepository;
 
     /**
      * Tạo sản phẩm mới
@@ -1117,6 +1118,24 @@ public class ProductServiceImpl implements ProductService {
             }
         } catch (Exception e) {
             log.warn("Lỗi khi lấy giá hiện tại cho ProductUnit ID {}: {}", productUnitId, e.getMessage());
+        }
+
+        // Lấy danh sách hình ảnh của ProductUnit
+        try {
+            List<ProductUnitImage> productUnitImages = productUnitImageRepository
+                    .findByProductUnitIdOrderByDisplayOrder(productUnitId);
+
+            if (!productUnitImages.isEmpty()) {
+                List<ProductUnitImageDto> imageDtos = productUnitImages.stream()
+                        .map(this::mapToProductUnitImageDto)
+                        .collect(Collectors.toList());
+                builder.images(imageDtos);
+                log.info("Đã load {} hình ảnh cho ProductUnit ID: {}", imageDtos.size(), productUnitId);
+            } else {
+                log.info("ProductUnit ID {} không có hình ảnh", productUnitId);
+            }
+        } catch (Exception e) {
+            log.warn("Lỗi khi lấy hình ảnh cho ProductUnit ID {}: {}", productUnitId, e.getMessage());
         }
 
         ProductUnitDetailResponse response = builder.build();

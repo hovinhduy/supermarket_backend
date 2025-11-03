@@ -30,7 +30,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Shopping Cart", description = "API quản lý giỏ hàng")
-@SecurityRequirement(name = "bearerAuth")
 public class ShoppingCartController {
 
     private final ShoppingCartService shoppingCartService;
@@ -179,13 +178,23 @@ public class ShoppingCartController {
         }
 
         UserDetails userDetails = (UserDetails) principal;
-        String email = userDetails.getUsername();
+        String username = userDetails.getUsername();
 
-        log.debug("Lấy thông tin customer với email: {}", email);
+        log.debug("Lấy thông tin customer với username: {}", username);
 
-        // Tìm User từ email
-        User user = userRepository.findByEmailAndIsDeletedFalse(email)
-                .orElseThrow(() -> new IllegalStateException("Không tìm thấy user với email: " + email));
+        // Loại bỏ prefix "CUSTOMER:" nếu có
+        final String emailOrPhone = username.startsWith("CUSTOMER:")
+                ? username.substring(9)  // Bỏ "CUSTOMER:" prefix
+                : username;
+
+        if (username.startsWith("CUSTOMER:")) {
+            log.debug("Đã loại bỏ prefix, email/phone: {}", emailOrPhone);
+        }
+
+        // Tìm User từ email hoặc phone
+        User user = userRepository.findByEmailAndIsDeletedFalse(emailOrPhone)
+                .or(() -> userRepository.findByPhoneAndIsDeletedFalse(emailOrPhone))
+                .orElseThrow(() -> new IllegalStateException("Không tìm thấy user với email/phone: " + emailOrPhone));
 
         // Tìm Customer từ user_id
         Customer customer = customerRepository.findByUser_UserId(user.getUserId())
