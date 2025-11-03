@@ -2,6 +2,8 @@ package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.enums.PaymentMethod;
+import iuh.fit.supermarket.enums.PaymentStatus;
+import iuh.fit.supermarket.enums.DeliveryType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -70,10 +72,79 @@ public class Order {
     private PaymentMethod paymentMethod;
 
     /**
+     * Trạng thái thanh toán
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status")
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    /**
+     * Mã giao dịch thanh toán (từ payment gateway)
+     */
+    @Column(name = "transaction_id", length = 100)
+    private String transactionId;
+
+    /**
      * Ghi chú đơn hàng
      */
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
+
+    /**
+     * Loại hình nhận hàng
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_type")
+    private DeliveryType deliveryType;
+
+    /**
+     * Địa chỉ giao hàng (nếu giao hàng tận nơi)
+     */
+    @Column(name = "delivery_address", columnDefinition = "TEXT")
+    private String deliveryAddress;
+
+    /**
+     * Số điện thoại nhận hàng
+     */
+    @Column(name = "delivery_phone", length = 20)
+    private String deliveryPhone;
+
+    /**
+     * Tên người nhận hàng
+     */
+    @Column(name = "recipient_name", length = 255)
+    private String recipientName;
+
+    /**
+     * Ghi chú giao hàng
+     */
+    @Column(name = "delivery_note", columnDefinition = "TEXT")
+    private String deliveryNote;
+
+    /**
+     * Phí vận chuyển
+     */
+    @Column(name = "shipping_fee", precision = 10, scale = 2)
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
+    /**
+     * Giảm giá toàn đơn (ORDER_DISCOUNT)
+     */
+    @Column(name = "order_discount", precision = 12, scale = 2)
+    private BigDecimal orderDiscount = BigDecimal.ZERO;
+
+    /**
+     * Giảm giá dòng sản phẩm (PRODUCT_DISCOUNT + BUY_X_GET_Y)
+     */
+    @Column(name = "line_item_discount", precision = 12, scale = 2)
+    private BigDecimal lineItemDiscount = BigDecimal.ZERO;
+
+    /**
+     * JSON string lưu danh sách khuyến mãi toàn đơn đã áp dụng
+     * Format: List<OrderPromotionDTO>
+     */
+    @Column(name = "applied_order_promotions_json", columnDefinition = "TEXT")
+    private String appliedOrderPromotionsJson;
 
     /**
      * Thời gian tạo

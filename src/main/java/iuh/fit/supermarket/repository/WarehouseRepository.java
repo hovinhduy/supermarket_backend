@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.Warehouse;
+import iuh.fit.supermarket.entity.ProductUnit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,14 @@ import java.util.Optional;
  */
 @Repository
 public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
+
+    /**
+     * Tìm tồn kho theo ProductUnit
+     *
+     * @param productUnit đơn vị sản phẩm
+     * @return Optional<Warehouse>
+     */
+    Optional<Warehouse> findByProductUnit(ProductUnit productUnit);
 
     /**
      * Tìm tồn kho theo đơn vị sản phẩm

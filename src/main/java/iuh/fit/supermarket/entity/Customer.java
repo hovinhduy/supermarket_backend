@@ -4,6 +4,7 @@ import iuh.fit.supermarket.enums.CustomerType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.List;
 @Entity
 @Table(name = "customers")
 @Data
+@EqualsAndHashCode(exclude = {"user", "orders", "shoppingCart", "loyaltyPoints", "notifications"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Customer {

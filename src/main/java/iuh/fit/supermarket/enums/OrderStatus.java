@@ -9,12 +9,27 @@ public enum OrderStatus {
      * Đơn hàng đang chờ xử lý
      */
     PENDING("Pending"),
-    
+
+    /**
+     * Đơn hàng đã chuẩn bị xong
+     */
+    PREPARED("Prepared"),
+
+    /**
+     * Đơn hàng đang giao hàng
+     */
+    SHIPPING("Shipping"),
+
+    /**
+     * Đơn hàng đã giao
+     */
+    DELIVERED("Delivered"),
+
     /**
      * Đơn hàng đã hoàn thành
      */
     COMPLETED("Completed"),
-    
+
     /**
      * Đơn hàng đã bị hủy
      */

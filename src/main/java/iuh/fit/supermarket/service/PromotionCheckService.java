@@ -904,7 +904,8 @@ public class PromotionCheckService {
     private SummaryResult calculateSummaryWithOrderDiscount(List<CartItemResponseDTO> items) {
         // Bước 1: Tính tổng và giảm giá từ PRODUCT_DISCOUNT + BUY_X_GET_Y
         BigDecimal subTotal = BigDecimal.ZERO;
-        BigDecimal lineItemDiscount = BigDecimal.ZERO;
+        BigDecimal productDiscountAmount = BigDecimal.ZERO;  // Giảm giá từ PRODUCT_DISCOUNT
+        BigDecimal giftDiscountAmount = BigDecimal.ZERO;     // Giảm giá từ BUY_X_GET_Y gifts
         int totalQuantity = 0;
 
         for (CartItemResponseDTO item : items) {
@@ -919,13 +920,13 @@ public class PromotionCheckService {
                 // PRODUCT_DISCOUNT: giảm giá trên dòng gốc
                 BigDecimal originalPrice = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
                 BigDecimal discountAmount = originalPrice.subtract(item.lineTotal());
-                lineItemDiscount = lineItemDiscount.add(discountAmount);
+                productDiscountAmount = productDiscountAmount.add(discountAmount);
                 subTotal = subTotal.add(originalPrice);
             } else if (item.promotionApplied() != null && item.promotionApplied().sourceLineItemId() != null) {
-                // BUY_X_GET_Y: dòng quà tặng - chỉ tính vào giảm giá, không tính vào subTotal
+                // BUY_X_GET_Y: dòng quà tặng - chỉ tính vào giảm giá để hiển thị, không tính vào subTotal
                 BigDecimal originalPrice = item.unitPrice().multiply(BigDecimal.valueOf(item.quantity()));
                 BigDecimal discountAmount = originalPrice.subtract(item.lineTotal());
-                lineItemDiscount = lineItemDiscount.add(discountAmount);
+                giftDiscountAmount = giftDiscountAmount.add(discountAmount);
                 // Không cộng vào subTotal vì quà tặng không phải là sản phẩm mua
             } else {
                 // Không có KM
@@ -933,8 +934,12 @@ public class PromotionCheckService {
             }
         }
 
-        // Tổng sau khi trừ giảm giá dòng sản phẩm (PRODUCT_DISCOUNT + BUY_X_GET_Y)
-        BigDecimal totalAfterLineDiscount = subTotal.subtract(lineItemDiscount);
+        // Tổng giảm giá line items (để hiển thị)
+        BigDecimal lineItemDiscount = productDiscountAmount.add(giftDiscountAmount);
+
+        // Tổng sau khi trừ giảm giá dòng sản phẩm
+        // CHỈ TRỪ productDiscount vì gift items không được tính trong subTotal
+        BigDecimal totalAfterLineDiscount = subTotal.subtract(productDiscountAmount);
 
         // Bước 2: Tìm và áp dụng ORDER_DISCOUNT (giảm giá toàn đơn)
         BigDecimal orderDiscount = BigDecimal.ZERO;

@@ -26,6 +26,32 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
         /**
+         * Xử lý ngoại lệ NotFoundException chung
+         */
+        @ExceptionHandler(NotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handleNotFoundException(
+                        NotFoundException ex) {
+
+                log.warn("Not found exception: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ BadRequestException chung
+         */
+        @ExceptionHandler(BadRequestException.class)
+        public ResponseEntity<ApiResponse<String>> handleBadRequestException(
+                        BadRequestException ex) {
+
+                log.warn("Bad request exception: {}", ex.getMessage());
+
+                return ResponseEntity.badRequest()
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
          * Xử lý ngoại lệ liên quan đến danh mục
          */
         @ExceptionHandler(CategoryException.class)

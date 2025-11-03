@@ -23,11 +23,12 @@ public interface PaymentService {
                                                 List<PaymentItemData> items);
 
     /**
-     * Xử lý thanh toán thành công từ webhook
+     * Xử lý webhook từ PayOS - tự động phân biệt Invoice hoặc Order
      *
-     * @param orderCode Mã đơn hàng
+     * @param orderCode Mã đơn hàng từ PayOS (có thể là invoiceId hoặc orderId)
+     * @param transactionId Mã giao dịch từ payment gateway
      */
-    void handlePaymentSuccess(Long orderCode);
+    void handlePaymentWebhook(Long orderCode, String transactionId);
 
     /**
      * Data class cho item trong payment

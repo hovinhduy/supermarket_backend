@@ -4,6 +4,7 @@ import iuh.fit.supermarket.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -16,6 +17,7 @@ import java.util.List;
 @Entity
 @Table(name = "employees")
 @Data
+@EqualsAndHashCode(exclude = {"user", "orders", "imports", "saleInvoices", "returnInvoices", "createdStocktakes", "completedStocktakes", "createdPrices", "updatedPrices"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Employee {

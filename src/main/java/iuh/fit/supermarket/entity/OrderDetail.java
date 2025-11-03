@@ -46,6 +46,48 @@ public class OrderDetail {
     private BigDecimal discount = BigDecimal.ZERO;
 
     /**
+     * Mã khuyến mãi được áp dụng
+     */
+    @Column(name = "promotion_id", length = 50)
+    private String promotionId;
+
+    /**
+     * Tên khuyến mãi
+     */
+    @Column(name = "promotion_name", length = 255)
+    private String promotionName;
+
+    /**
+     * ID chi tiết khuyến mãi (promotion_detail_id)
+     */
+    @Column(name = "promotion_detail_id")
+    private Long promotionDetailId;
+
+    /**
+     * Mô tả chi tiết khuyến mãi
+     */
+    @Column(name = "promotion_summary", columnDefinition = "TEXT")
+    private String promotionSummary;
+
+    /**
+     * Loại giảm giá (percentage, fixed)
+     */
+    @Column(name = "discount_type", length = 50)
+    private String discountType;
+
+    /**
+     * Giá trị giảm giá
+     */
+    @Column(name = "discount_value", precision = 12, scale = 2)
+    private BigDecimal discountValue;
+
+    /**
+     * ID dòng sản phẩm gốc (cho trường hợp item tặng, trỏ về buy product)
+     */
+    @Column(name = "source_line_item_id")
+    private Long sourceLineItemId;
+
+    /**
      * Thời gian tạo
      */
     @CreationTimestamp

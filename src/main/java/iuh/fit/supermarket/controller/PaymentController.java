@@ -25,22 +25,31 @@ public class PaymentController {
     private final PaymentService paymentService;
 
     /**
-     * Webhook endpoint nhận thông báo từ PayOS khi thanh toán thành công
+     * Webhook endpoint duy nhất nhận thông báo từ PayOS
+     * Tự động phân biệt và xử lý cho cả Invoice và Order
      */
     @PostMapping("/payos_transfer_handler")
-    public ResponseEntity<ApiResponse<WebhookData>> payosTransferHandler(@RequestBody Object body)
+    public ResponseEntity<ApiResponse<WebhookData>> payosWebhookHandler(@RequestBody Object body)
             throws JsonProcessingException {
         try {
             WebhookData data = payOS.webhooks().verify(body);
             log.info("Nhận webhook từ PayOS cho order code: {}", data.getOrderCode());
 
             if ("00".equals(data.getCode())) {
-                paymentService.handlePaymentSuccess(data.getOrderCode());
-                log.info("Xử lý thanh toán thành công cho order code: {}", data.getOrderCode());
+                // Tạo transaction ID từ webhook data
+                String transactionId = data.getTransactionDateTime() != null
+                        ? String.valueOf(data.getTransactionDateTime())
+                        : "PAYOS_" + data.getOrderCode();
+
+                // Gọi PaymentService để xử lý - service sẽ tự động phân biệt Invoice hay Order
+                paymentService.handlePaymentWebhook(data.getOrderCode(), transactionId);
+
+                log.info("Xử lý thanh toán thành công cho order code: {}, transaction: {}",
+                        data.getOrderCode(), transactionId);
 
                 return ResponseEntity.ok(ApiResponse.<WebhookData>builder()
                         .success(true)
-                        .message("Webhook xử lý thành công")
+                        .message("Webhook xử lý thanh toán thành công")
                         .data(data)
                         .timestamp(LocalDateTime.now())
                         .build());
