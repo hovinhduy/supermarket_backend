@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -28,12 +28,12 @@ public class PriceUpdateRequest {
     /**
      * Ngày bắt đầu hiệu lực (chỉ cho phép cập nhật nếu bảng giá chưa active)
      */
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc hiệu lực
      */
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Mô tả bảng giá
@@ -86,13 +86,13 @@ public class PriceUpdateRequest {
     }
 
     /**
-     * Validation tùy chỉnh cho ngày kết thúc
+     * Validation tùy chỉnh cho ngày kết thúc phải lớn hơn ngày hiện tại ít nhất 1 ngày
      */
-    @AssertTrue(message = "Ngày kết thúc phải lớn hơn ngày bắt đầu ít nhất 1 ngày")
+    @AssertTrue(message = "Ngày kết thúc phải lớn hơn ngày hiện tại ít nhất 1 ngày")
     public boolean isEndDateValid() {
-        if (endDate == null || startDate == null) {
+        if (endDate == null) {
             return true;
         }
-        return endDate.isAfter(startDate.plusDays(1));
+        return endDate.isAfter(LocalDate.now().plusDays(1));
     }
 }

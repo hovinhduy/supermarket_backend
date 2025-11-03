@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -39,13 +39,12 @@ public class PriceCreateRequest {
      * Ngày bắt đầu hiệu lực
      */
     @NotNull(message = "Ngày bắt đầu không được để trống")
-    @Future(message = "Ngày bắt đầu phải lớn hơn thời gian hiện tại")
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc hiệu lực (có thể null)
      */
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Mô tả bảng giá

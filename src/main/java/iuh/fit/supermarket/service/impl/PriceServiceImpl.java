@@ -23,6 +23,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -310,7 +311,7 @@ public class PriceServiceImpl implements PriceService {
         }
 
         // Kiểm tra thời gian bắt đầu
-        if (price.getStartDate().isAfter(LocalDateTime.now())) {
+        if (price.getStartDate().isAfter(LocalDate.now())) {
             throw new PriceValidationException("Chưa đến thời gian bắt đầu của bảng giá");
         }
 
@@ -390,7 +391,7 @@ public class PriceServiceImpl implements PriceService {
     public void autoUpdatePriceStatus() {
         log.info("Bắt đầu tự động cập nhật trạng thái bảng giá");
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate now = LocalDate.now();
 
         // Chuyển ACTIVE sang EXPIRED
         List<Price> pricesToExpire = priceRepository.findPricesToExpire(PriceType.ACTIVE, now);
@@ -560,18 +561,18 @@ public class PriceServiceImpl implements PriceService {
     /**
      * Validate ngày bắt đầu
      */
-    private void validateStartDate(LocalDateTime startDate) {
+    private void validateStartDate(LocalDate startDate) {
         if (startDate == null) {
             throw new PriceValidationException("Ngày bắt đầu không được để trống");
         }
     }
 
     /**
-     * Validate ngày kết thúc
+     * Validate ngày kết thúc phải lớn hơn ngày hiện tại ít nhất 1 ngày
      */
-    private void validateEndDate(LocalDateTime startDate, LocalDateTime endDate) {
-        if (endDate != null && !endDate.isAfter(startDate.plusDays(1))) {
-            throw new PriceValidationException("Ngày kết thúc phải lớn hơn ngày bắt đầu ít nhất 1 ngày");
+    private void validateEndDate(LocalDate startDate, LocalDate endDate) {
+        if (endDate != null && !endDate.isAfter(LocalDate.now().plusDays(1))) {
+            throw new PriceValidationException("Ngày kết thúc phải lớn hơn ngày hiện tại ít nhất 1 ngày");
         }
     }
 

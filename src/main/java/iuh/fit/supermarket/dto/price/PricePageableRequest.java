@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -45,22 +46,22 @@ public class PricePageableRequest {
     /**
      * Lọc theo ngày bắt đầu từ
      */
-    private LocalDateTime startDateFrom;
+    private LocalDate startDateFrom;
 
     /**
      * Lọc theo ngày bắt đầu đến
      */
-    private LocalDateTime startDateTo;
+    private LocalDate startDateTo;
 
     /**
      * Lọc theo ngày kết thúc từ
      */
-    private LocalDateTime endDateFrom;
+    private LocalDate endDateFrom;
 
     /**
      * Lọc theo ngày kết thúc đến
      */
-    private LocalDateTime endDateTo;
+    private LocalDate endDateTo;
 
     /**
      * Sắp xếp theo trường nào

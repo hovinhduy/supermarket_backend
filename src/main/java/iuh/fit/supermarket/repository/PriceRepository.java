@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -48,15 +49,15 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
     /**
      * Tìm bảng giá cần chuyển từ UPCOMING sang CURRENT
      */
-    @Query("SELECT p FROM Price p WHERE p.status = :status AND p.startDate <= :currentTime")
+    @Query("SELECT p FROM Price p WHERE p.status = :status AND p.startDate <= :currentDate")
     List<Price> findPricesToActivate(@Param("status") PriceType status,
-            @Param("currentTime") LocalDateTime currentTime);
+            @Param("currentDate") LocalDate currentDate);
 
     /**
      * Tìm bảng giá cần chuyển từ CURRENT sang EXPIRED
      */
-    @Query("SELECT p FROM Price p WHERE p.status = :status AND p.endDate IS NOT NULL AND p.endDate <= :currentTime")
-    List<Price> findPricesToExpire(@Param("status") PriceType status, @Param("currentTime") LocalDateTime currentTime);
+    @Query("SELECT p FROM Price p WHERE p.status = :status AND p.endDate IS NOT NULL AND p.endDate <= :currentDate")
+    List<Price> findPricesToExpire(@Param("status") PriceType status, @Param("currentDate") LocalDate currentDate);
 
     /**
      * Tìm kiếm bảng giá với điều kiện phức tạp
@@ -76,10 +77,10 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
     Page<Price> findPricesAdvanced(
             @Param("searchTerm") String searchTerm,
             @Param("status") PriceType status,
-            @Param("startDateFrom") LocalDateTime startDateFrom,
-            @Param("startDateTo") LocalDateTime startDateTo,
-            @Param("endDateFrom") LocalDateTime endDateFrom,
-            @Param("endDateTo") LocalDateTime endDateTo,
+            @Param("startDateFrom") LocalDate startDateFrom,
+            @Param("startDateTo") LocalDate startDateTo,
+            @Param("endDateFrom") LocalDate endDateFrom,
+            @Param("endDateTo") LocalDate endDateTo,
             @Param("createdBy") Integer createdBy,
             @Param("createdFrom") LocalDateTime createdFrom,
             @Param("createdTo") LocalDateTime createdTo,
@@ -121,5 +122,5 @@ public interface PriceRepository extends JpaRepository<Price, Long> {
     /**
      * Tìm bảng giá có ngày bắt đầu trong khoảng thời gian
      */
-    List<Price> findByStartDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+    List<Price> findByStartDateBetween(LocalDate startDate, LocalDate endDate);
 }

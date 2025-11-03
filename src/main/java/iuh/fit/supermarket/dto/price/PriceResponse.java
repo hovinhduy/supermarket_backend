@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,12 +35,12 @@ public class PriceResponse {
     /**
      * Ngày bắt đầu hiệu lực
      */
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc hiệu lực
      */
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Mô tả bảng giá
@@ -111,7 +112,7 @@ public class PriceResponse {
      * Kiểm tra bảng giá có hết hạn không
      */
     public boolean isExpired() {
-        return status == PriceType.EXPIRED || 
-               (endDate != null && endDate.isBefore(LocalDateTime.now()));
+        return status == PriceType.EXPIRED ||
+               (endDate != null && endDate.isBefore(LocalDate.now()));
     }
 }

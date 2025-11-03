@@ -54,13 +54,13 @@ public class Price {
      * Ngày bắt đầu hiệu lực của bảng giá
      */
     @Column(name = "start_date", nullable = false)
-    private LocalDateTime startDate;
+    private LocalDate startDate;
 
     /**
      * Ngày kết thúc hiệu lực của bảng giá
      */
     @Column(name = "end_date", nullable = false)
-    private LocalDateTime endDate;
+    private LocalDate endDate;
 
     /**
      * Mô tả về bảng giá
