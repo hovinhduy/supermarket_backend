@@ -80,4 +80,38 @@ public interface SaleService {
      */
     String generateInvoiceHtml(Integer invoiceId);
 
+    /**
+     * Lấy danh sách hóa đơn của customer theo username
+     * - Customer chỉ có thể xem hóa đơn của chính mình
+     * - Có thể lọc theo trạng thái, khoảng ngày và phân trang
+     * - Mặc định lấy hóa đơn đã thanh toán (PAID)
+     * 
+     * @param username username của customer (email hoặc phone)
+     * @param fromDate từ ngày (null để không lọc)
+     * @param toDate đến ngày (null để không lọc)
+     * @param status trạng thái hóa đơn cần lọc (null thì mặc định PAID)
+     * @param pageNumber số trang (từ 0)
+     * @param pageSize kích thước trang
+     * @return danh sách hóa đơn của customer với chi tiết khuyến mãi
+     */
+    SaleInvoicesListResponseDTO getCustomerInvoices(
+            String username,
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            iuh.fit.supermarket.enums.InvoiceStatus status,
+            int pageNumber,
+            int pageSize
+    );
+
+    /**
+     * Lấy chi tiết hóa đơn của customer theo username và invoiceId
+     * - Customer chỉ có thể xem chi tiết hóa đơn của chính mình
+     * - Kiểm tra quyền sở hữu hóa đơn
+     * 
+     * @param username username của customer (email hoặc phone)
+     * @param invoiceId ID của hóa đơn
+     * @return chi tiết hóa đơn với đầy đủ thông tin khuyến mãi
+     */
+    SaleInvoiceFullDTO getCustomerInvoiceDetail(String username, Integer invoiceId);
+
 }

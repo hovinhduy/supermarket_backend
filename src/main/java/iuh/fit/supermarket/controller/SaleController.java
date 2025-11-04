@@ -7,6 +7,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -139,6 +141,79 @@ public class SaleController {
         SaleInvoiceFullDTO response = saleService.getInvoiceDetail(invoiceId);
         
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin hoá đơn thành công", response));
+    }
+
+    /**
+     * API lấy danh sách hóa đơn của customer đang đăng nhập
+     * - Customer chỉ có thể xem hóa đơn của chính mình
+     * - Có thể lọc theo trạng thái và khoảng ngày
+     * - Mặc định lấy hóa đơn đã thanh toán (PAID)
+     * - Hỗ trợ phân trang
+     * 
+     * @param authentication thông tin xác thực của user đang đăng nhập
+     * @param fromDate từ ngày (optional, format: yyyy-MM-dd)
+     * @param toDate đến ngày (optional, format: yyyy-MM-dd)
+     * @param status trạng thái hoá đơn (optional, mặc định PAID nếu không truyền)
+     * @param pageNumber số trang (mặc định 0)
+     * @param pageSize kích thước trang (mặc định 10)
+     * @return danh sách hóa đơn của customer
+     */
+    @GetMapping("/customer/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<SaleInvoicesListResponseDTO>> getMyInvoices(
+            Authentication authentication,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate fromDate,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate toDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int pageNumber,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        
+        String username = authentication.getName();
+        log.info("Customer {} lấy danh sách hóa đơn - FromDate: {}, ToDate: {}, Status: {}, Page: {}, Size: {}", 
+                username, fromDate, toDate, status, pageNumber, pageSize);
+
+        iuh.fit.supermarket.enums.InvoiceStatus invoiceStatus = null;
+        if (status != null && !status.isEmpty()) {
+            try {
+                invoiceStatus = iuh.fit.supermarket.enums.InvoiceStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                log.warn("Trạng thái hoá đơn không hợp lệ: {}", status);
+            }
+        }
+
+        SaleInvoicesListResponseDTO response = saleService.getCustomerInvoices(
+                username,
+                fromDate,
+                toDate,
+                invoiceStatus,
+                pageNumber,
+                pageSize
+        );
+        
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách hoá đơn thành công", response));
+    }
+
+    /**
+     * API lấy chi tiết hóa đơn của customer đang đăng nhập
+     * - Customer chỉ có thể xem chi tiết hóa đơn của chính mình
+     * - Kiểm tra quyền sở hữu hóa đơn
+     * 
+     * @param authentication thông tin xác thực của user đang đăng nhập
+     * @param invoiceId ID của hóa đơn
+     * @return chi tiết hóa đơn với đầy đủ thông tin items và khuyến mãi
+     */
+    @GetMapping("/customer/me/{invoiceId}")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<SaleInvoiceFullDTO>> getMyInvoiceDetail(
+            Authentication authentication,
+            @PathVariable Integer invoiceId) {
+        
+        String username = authentication.getName();
+        log.info("Customer {} lấy chi tiết hóa đơn ID: {}", username, invoiceId);
+
+        SaleInvoiceFullDTO response = saleService.getCustomerInvoiceDetail(username, invoiceId);
+        
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết hoá đơn thành công", response));
     }
 
     /**

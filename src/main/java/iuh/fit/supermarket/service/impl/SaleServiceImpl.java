@@ -42,6 +42,7 @@ public class SaleServiceImpl implements SaleService {
 
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
     private final ProductUnitRepository productUnitRepository;
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final SaleInvoiceDetailRepository saleInvoiceDetailRepository;
@@ -526,6 +527,85 @@ public class SaleServiceImpl implements SaleService {
             log.error("Lỗi khi tạo HTML hóa đơn: {}", e.getMessage(), e);
             throw new RuntimeException("Không thể tạo HTML hóa đơn", e);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaleInvoicesListResponseDTO getCustomerInvoices(
+            String username,
+            java.time.LocalDate fromDate,
+            java.time.LocalDate toDate,
+            iuh.fit.supermarket.enums.InvoiceStatus status,
+            int pageNumber,
+            int pageSize) {
+        log.info("Lấy danh sách hóa đơn cho customer: {}, FromDate: {}, ToDate: {}, Status: {}, Page: {}, Size: {}",
+                username, fromDate, toDate, status, pageNumber, pageSize);
+
+        // Tìm customer theo username (email hoặc phone)
+        User user = userRepository.findByEmailOrPhone(username, username)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy tài khoản khách hàng"));
+
+        if (!user.isCustomer()) {
+            throw new InvalidSaleDataException("Tài khoản không phải là khách hàng");
+        }
+
+        Customer customer = user.getCustomer();
+        if (customer == null) {
+            throw new InvalidSaleDataException("Không tìm thấy thông tin khách hàng");
+        }
+
+        // Mặc định lấy hóa đơn PAID nếu không truyền status
+        InvoiceStatus invoiceStatus = status != null ? status : InvoiceStatus.PAID;
+        log.info("Sử dụng status: {} (mặc định PAID nếu null)", invoiceStatus);
+
+        // Gọi method searchAndFilterSalesInvoices với customerId
+        return searchAndFilterSalesInvoices(
+                null, // searchKeyword
+                fromDate,
+                toDate,
+                invoiceStatus,
+                null, // employeeId
+                customer.getCustomerId(), // customerId
+                null, // productUnitId
+                pageNumber,
+                pageSize
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SaleInvoiceFullDTO getCustomerInvoiceDetail(String username, Integer invoiceId) {
+        log.info("Customer {} lấy chi tiết hóa đơn ID: {}", username, invoiceId);
+
+        // Tìm customer theo username (email hoặc phone)
+        User user = userRepository.findByEmailOrPhone(username, username)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy tài khoản khách hàng"));
+
+        if (!user.isCustomer()) {
+            throw new InvalidSaleDataException("Tài khoản không phải là khách hàng");
+        }
+
+        Customer customer = user.getCustomer();
+        if (customer == null) {
+            throw new InvalidSaleDataException("Không tìm thấy thông tin khách hàng");
+        }
+
+        // Lấy chi tiết hóa đơn
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByIdWithDetails(invoiceId)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy hóa đơn với ID: " + invoiceId));
+
+        // Kiểm tra quyền sở hữu: hóa đơn phải thuộc về customer này
+        if (invoice.getCustomer() == null || 
+            !invoice.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
+            log.warn("Customer {} cố gắng truy cập hóa đơn {} không thuộc về mình", 
+                    username, invoiceId);
+            throw new InvalidSaleDataException("Bạn không có quyền xem hóa đơn này");
+        }
+
+        log.info("Customer {} được phép xem hóa đơn {}", username, invoiceId);
+
+        // Chuyển đổi sang DTO
+        return convertToSaleInvoiceFullDTO(invoice);
     }
 
     private String getStatusText(InvoiceStatus status) {
