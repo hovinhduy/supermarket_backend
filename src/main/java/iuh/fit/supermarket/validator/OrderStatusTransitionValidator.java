@@ -23,7 +23,9 @@ public class OrderStatusTransitionValidator {
 
     static {
         // Khởi tạo luồng chuyển trạng thái cho PICKUP_AT_STORE
-        // PENDING → PREPARED → DELIVERED (tự động → COMPLETED)
+        // UNPAID → PENDING (sau thanh toán) → PREPARED → DELIVERED (tự động → COMPLETED)
+        PICKUP_TRANSITIONS.put(OrderStatus.UNPAID,
+            Set.of(OrderStatus.PENDING, OrderStatus.CANCELLED));
         PICKUP_TRANSITIONS.put(OrderStatus.PENDING,
             Set.of(OrderStatus.PREPARED, OrderStatus.CANCELLED));
         PICKUP_TRANSITIONS.put(OrderStatus.PREPARED,
@@ -36,7 +38,9 @@ public class OrderStatusTransitionValidator {
             Set.of()); // Không thể chuyển từ CANCELLED
 
         // Khởi tạo luồng chuyển trạng thái cho HOME_DELIVERY
-        // PENDING → PREPARED → SHIPPING → DELIVERED (tự động → COMPLETED)
+        // UNPAID → PENDING (sau thanh toán) → PREPARED → SHIPPING → DELIVERED (tự động → COMPLETED)
+        DELIVERY_TRANSITIONS.put(OrderStatus.UNPAID,
+            Set.of(OrderStatus.PENDING, OrderStatus.CANCELLED));
         DELIVERY_TRANSITIONS.put(OrderStatus.PENDING,
             Set.of(OrderStatus.PREPARED, OrderStatus.CANCELLED));
         DELIVERY_TRANSITIONS.put(OrderStatus.PREPARED,
@@ -136,6 +140,9 @@ public class OrderStatusTransitionValidator {
         if (validStatuses.isEmpty()) {
             if (currentStatus == OrderStatus.DELIVERED) {
                 return "Đơn hàng đã giao sẽ tự động hoàn thành. Không cần thao tác thêm.";
+            }
+            if (currentStatus == OrderStatus.UNPAID) {
+                return "Đơn hàng chưa thanh toán. Vui lòng thanh toán để tiếp tục.";
             }
             return String.format("Không thể chuyển từ trạng thái %s", currentStatus);
         }

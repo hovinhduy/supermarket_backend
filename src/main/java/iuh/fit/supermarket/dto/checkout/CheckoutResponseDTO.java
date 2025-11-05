@@ -3,7 +3,6 @@ package iuh.fit.supermarket.dto.checkout;
 import iuh.fit.supermarket.enums.DeliveryType;
 import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.enums.PaymentMethod;
-import iuh.fit.supermarket.enums.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,11 +35,6 @@ public record CheckoutResponseDTO(
          * Phương thức thanh toán
          */
         PaymentMethod paymentMethod,
-
-        /**
-         * Trạng thái thanh toán
-         */
-        PaymentStatus paymentStatus,
 
         /**
          * Mã giao dịch thanh toán

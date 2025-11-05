@@ -6,6 +6,11 @@ package iuh.fit.supermarket.enums;
  */
 public enum OrderStatus {
     /**
+     * Đơn hàng chưa thanh toán
+     */
+    UNPAID("Unpaid"),
+
+    /**
      * Đơn hàng đang chờ xử lý
      */
     PENDING("Pending"),

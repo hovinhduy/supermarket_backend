@@ -2,7 +2,6 @@ package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.enums.PaymentMethod;
-import iuh.fit.supermarket.enums.PaymentStatus;
 import iuh.fit.supermarket.enums.DeliveryType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -62,7 +61,7 @@ public class Order {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
-    private OrderStatus status = OrderStatus.PENDING;
+    private OrderStatus status = OrderStatus.UNPAID;
 
     /**
      * Phương thức thanh toán
@@ -70,13 +69,6 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method")
     private PaymentMethod paymentMethod;
-
-    /**
-     * Trạng thái thanh toán
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status")
-    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     /**
      * Mã giao dịch thanh toán (từ payment gateway)

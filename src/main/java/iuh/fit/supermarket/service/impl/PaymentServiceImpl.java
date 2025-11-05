@@ -4,7 +4,7 @@ import iuh.fit.supermarket.config.PayOSConfig;
 import iuh.fit.supermarket.entity.Order;
 import iuh.fit.supermarket.entity.SaleInvoiceHeader;
 import iuh.fit.supermarket.enums.InvoiceStatus;
-import iuh.fit.supermarket.enums.PaymentStatus;
+import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
 import iuh.fit.supermarket.exception.NotFoundException;
 import iuh.fit.supermarket.repository.OrderRepository;
@@ -174,33 +174,35 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Xử lý thanh toán cho Order
+     * Chuyển trạng thái từ UNPAID sang PENDING khi thanh toán thành công
      */
     private void handleOrderPayment(Long orderId, String transactionId) {
         log.info("Xử lý thanh toán cho đơn hàng Order ID: {}, Transaction ID: {}", orderId, transactionId);
-        
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + orderId));
 
-        // Kiểm tra đã thanh toán chưa
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            log.warn("Đơn hàng {} đã được thanh toán rồi", orderId);
+        // Kiểm tra đã thanh toán chưa (trạng thái không phải UNPAID)
+        if (order.getStatus() != OrderStatus.UNPAID) {
+            log.warn("Đơn hàng {} đã được xử lý (trạng thái hiện tại: {})", orderId, order.getStatus());
             return;
         }
 
-        // Cập nhật trạng thái thanh toán
-        order.setPaymentStatus(PaymentStatus.PAID);
+        // Cập nhật trạng thái từ UNPAID sang PENDING khi thanh toán thành công
+        order.setStatus(OrderStatus.PENDING);
         order.setTransactionId(transactionId);
         order.setAmountPaid(order.getTotalAmount());
-        
+
         // Thêm thông tin giao dịch vào note
         String currentNote = order.getNote() != null ? order.getNote() : "";
-        order.setNote(currentNote.isEmpty() ? 
-            "Transaction ID: " + transactionId : 
+        order.setNote(currentNote.isEmpty() ?
+            "Transaction ID: " + transactionId :
             currentNote + " | Transaction ID: " + transactionId);
 
         orderRepository.save(order);
-        
-        log.info("Đã xử lý thành công thanh toán cho đơn hàng {}, transactionId: {}", orderId, transactionId);
+
+        log.info("Đã xử lý thành công thanh toán cho đơn hàng {}, chuyển sang trạng thái PENDING, transactionId: {}",
+                orderId, transactionId);
     }
 
     /**

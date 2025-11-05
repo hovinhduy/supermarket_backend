@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.supermarket.dto.checkout.*;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.*;
-import iuh.fit.supermarket.enums.PaymentStatus;
 import iuh.fit.supermarket.exception.BadRequestException;
 import iuh.fit.supermarket.exception.NotFoundException;
 import iuh.fit.supermarket.repository.*;
@@ -96,15 +95,10 @@ public class CheckoutServiceImpl implements CheckoutService {
         order.setOrderDate(LocalDateTime.now());
         order.setCustomer(customer);
         order.setEmployee(null); // Không có nhân viên vì khách hàng tự checkout
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.UNPAID); // Khởi tạo với trạng thái UNPAID
         order.setDeliveryType(request.deliveryType());
         order.setPaymentMethod(request.paymentMethod());
         order.setNote(request.orderNote());
-        
-        // Set trạng thái thanh toán
-        // - CASH: mặc định UNPAID, sẽ chuyển thành PAID khi giao hàng
-        // - ONLINE/CARD: UNPAID, chờ webhook xác nhận thanh toán
-        order.setPaymentStatus(PaymentStatus.UNPAID);
 
         // Set thông tin giao hàng nếu giao hàng tận nơi
         if (request.deliveryType() == DeliveryType.HOME_DELIVERY) {
@@ -479,6 +473,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
     /**
      * Xác nhận thanh toán online thành công
+     * Webhook sẽ gọi method này khi thanh toán thành công
      */
     @Override
     @Transactional
@@ -492,16 +487,16 @@ public class CheckoutServiceImpl implements CheckoutService {
             throw new BadRequestException("Đơn hàng không phải thanh toán online/card");
         }
 
-        // Kiểm tra đã thanh toán chưa
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
-            log.warn("Đơn hàng {} đã được thanh toán rồi", orderId);
+        // Kiểm tra đã thanh toán chưa (trạng thái không phải UNPAID)
+        if (order.getStatus() != OrderStatus.UNPAID) {
+            log.warn("Đơn hàng {} đã được xử lý rồi (trạng thái: {})", orderId, order.getStatus());
             return buildCheckoutResponse(order, order.getOrderDetails());
         }
 
-        // Cập nhật trạng thái thanh toán
-        order.setPaymentStatus(PaymentStatus.PAID);
+        // Cập nhật trạng thái từ UNPAID sang PENDING khi thanh toán thành công
+        order.setStatus(OrderStatus.PENDING);
         order.setTransactionId(transactionId);
-        
+
         // Cập nhật số tiền đã thanh toán
         order.setAmountPaid(order.getTotalAmount());
 
@@ -511,7 +506,8 @@ public class CheckoutServiceImpl implements CheckoutService {
                 "Transaction ID: " + transactionId);
 
         order = orderRepository.save(order);
-        log.info("Đã xác nhận thanh toán cho đơn hàng {}, transactionId: {}", orderId, transactionId);
+        log.info("Đã xác nhận thanh toán cho đơn hàng {}, chuyển sang trạng thái PENDING, transactionId: {}",
+                orderId, transactionId);
 
         return buildCheckoutResponse(order, order.getOrderDetails());
     }
@@ -712,8 +708,13 @@ public class CheckoutServiceImpl implements CheckoutService {
         BigDecimal totalAmount = subtotal.add(totalTax);
         invoice.setTotalAmount(totalAmount);
 
-        // Set trạng thái thanh toán
-        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+        // Set trạng thái hóa đơn dựa trên trạng thái đơn hàng
+        // Nếu đơn hàng đã thanh toán online (có transactionId) thì đặt hóa đơn là PAID
+        if (order.getTransactionId() != null && !order.getTransactionId().isEmpty()) {
+            invoice.setStatus(InvoiceStatus.PAID);
+            invoice.setPaidAmount(totalAmount);
+        } else if (order.getPaymentMethod() == PaymentMethod.CASH) {
+            // Thanh toán tiền mặt, đánh dấu là đã thanh toán khi giao hàng
             invoice.setStatus(InvoiceStatus.PAID);
             invoice.setPaidAmount(totalAmount);
         } else {
@@ -873,10 +874,18 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Build online payment info (if applicable)
         OnlinePaymentInfoDTO onlinePaymentInfo = null;
         if (order.getPaymentMethod() == PaymentMethod.ONLINE || order.getPaymentMethod() == PaymentMethod.CARD) {
+            // Xác định trạng thái thanh toán dựa trên transactionId và orderStatus
+            String paymentStatus = "UNPAID"; // Mặc định
+            if (order.getTransactionId() != null && !order.getTransactionId().isEmpty()) {
+                paymentStatus = "PAID"; // Đã có transactionId nghĩa là đã thanh toán
+            } else if (order.getStatus() == OrderStatus.CANCELLED) {
+                paymentStatus = "FAILED"; // Đơn hàng bị hủy
+            }
+
             onlinePaymentInfo = new OnlinePaymentInfoDTO(
                 order.getTransactionId(), // transactionId từ webhook
                 "PayOS", // payment provider
-                order.getPaymentStatus().name(), // UNPAID, PAID, FAILED, REFUNDED
+                paymentStatus, // Trạng thái thanh toán
                 paymentUrl, // URL thanh toán
                 qrCode, // QR code
                 LocalDateTime.now().plusMinutes(15).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) // expiration time
@@ -943,7 +952,6 @@ public class CheckoutServiceImpl implements CheckoutService {
             order.getStatus(),
             order.getDeliveryType(),
             order.getPaymentMethod(),
-            order.getPaymentStatus(),
             order.getTransactionId(),
             customerInfo,
             deliveryInfo,
