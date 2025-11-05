@@ -177,9 +177,10 @@ public class ProductController {
 
     /**
      * API lấy danh sách sản phẩm với phân trang và lọc
+     * Hỗ trợ tìm kiếm theo tên sản phẩm hoặc mã sản phẩm
      */
     @PostMapping("/search")
-    @Operation(summary = "Lấy danh sách sản phẩm", description = "Lấy danh sách sản phẩm với phân trang, tìm kiếm và lọc")
+    @Operation(summary = "Lấy danh sách sản phẩm", description = "Lấy danh sách sản phẩm với phân trang, tìm kiếm theo tên hoặc mã sản phẩm, và lọc theo các tiêu chí")
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ")

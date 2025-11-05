@@ -36,9 +36,9 @@ public class ProductPageableRequest {
     private Integer size = 10;
 
     /**
-     * Từ khóa tìm kiếm (tìm trong tên, mã sản phẩm)
+     * Từ khóa tìm kiếm (tìm kiếm theo tên sản phẩm hoặc mã sản phẩm)
      */
-    @Schema(description = "Từ khóa tìm kiếm trong tên và mã sản phẩm", example = "")
+    @Schema(description = "Từ khóa tìm kiếm theo tên sản phẩm hoặc mã sản phẩm (product code)", example = "")
     private String searchTerm;
 
     /**

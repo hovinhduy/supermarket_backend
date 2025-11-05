@@ -57,8 +57,8 @@ public interface ProductService {
 
     /**
      * Lấy danh sách sản phẩm với phân trang và tìm kiếm/lọc
-     * 
-     * @param searchTerm    từ khóa tìm kiếm (tìm theo tên sản phẩm)
+     *
+     * @param searchTerm    từ khóa tìm kiếm (tìm theo tên sản phẩm hoặc mã sản phẩm)
      * @param categoryId    ID danh mục để lọc (tùy chọn)
      * @param brandId       ID thương hiệu để lọc (tùy chọn)
      * @param isActive      trạng thái hoạt động để lọc (tùy chọn)

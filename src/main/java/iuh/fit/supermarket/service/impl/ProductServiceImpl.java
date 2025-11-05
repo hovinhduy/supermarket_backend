@@ -304,14 +304,15 @@ public class ProductServiceImpl implements ProductService {
                 "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}",
                 searchTerm, categoryId, brandId, isActive, isRewardPoint);
 
-        // Tạm thời sử dụng method đơn giản, sau này có thể mở rộng với Specification
-        Page<Product> productPage;
-
-        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-            productPage = productRepository.findProductsAdvanced(searchTerm.trim(), isActive, pageable);
-        } else {
-            productPage = productRepository.findProductsAdvanced("", isActive, pageable);
-        }
+        // Sử dụng query với đầy đủ các filter
+        String searchTermClean = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : "";
+        Page<Product> productPage = productRepository.findProductsAdvanced(
+                searchTermClean,
+                categoryId,
+                brandId,
+                isActive,
+                isRewardPoint,
+                pageable);
 
         return mapToProductListResponse(productPage);
     }

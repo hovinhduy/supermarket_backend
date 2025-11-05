@@ -36,13 +36,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
         /**
          * Tìm kiếm sản phẩm nâng cao với filtering
+         * Tìm kiếm theo tên sản phẩm hoặc mã sản phẩm
+         * Lọc theo danh mục, thương hiệu, trạng thái hoạt động và tích điểm thưởng
          */
         @Query("SELECT p FROM Product p WHERE " +
-                        "(:searchTerm = '' OR (p.name LIKE %:searchTerm%)) AND " +
+                        "(:searchTerm = '' OR (p.name LIKE %:searchTerm% OR p.code LIKE %:searchTerm%)) AND " +
+                        "(:categoryId IS NULL OR p.category.categoryId = :categoryId) AND " +
+                        "(:brandId IS NULL OR p.brand.brandId = :brandId) AND " +
                         "(:isActive IS NULL OR p.isActive = :isActive) AND " +
+                        "(:isRewardPoint IS NULL OR p.isRewardPoint = :isRewardPoint) AND " +
                         "p.isDeleted = false")
         Page<Product> findProductsAdvanced(@Param("searchTerm") String searchTerm,
+                        @Param("categoryId") Integer categoryId,
+                        @Param("brandId") Integer brandId,
                         @Param("isActive") Boolean isActive,
+                        @Param("isRewardPoint") Boolean isRewardPoint,
                         Pageable pageable);
 
         /**
