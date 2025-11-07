@@ -3,6 +3,7 @@ package iuh.fit.supermarket.service;
 import iuh.fit.supermarket.dto.checkout.CheckoutRequestDTO;
 import iuh.fit.supermarket.dto.checkout.CheckoutResponseDTO;
 import iuh.fit.supermarket.enums.OrderStatus;
+import iuh.fit.supermarket.enums.DeliveryType;
 
 /**
  * Service interface xử lý nghiệp vụ checkout giỏ hàng
@@ -112,5 +113,19 @@ public interface CheckoutService {
      */
     org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
             OrderStatus status,
+            org.springframework.data.domain.Pageable pageable);
+
+    /**
+     * Lấy danh sách tất cả đơn hàng trong hệ thống với lọc theo loại hình nhận hàng (dành cho Admin)
+     * Có khả năng lọc theo trạng thái, loại hình nhận hàng và phân trang
+     *
+     * @param status trạng thái cần lọc (null để lấy tất cả)
+     * @param deliveryType loại hình nhận hàng (null để lấy tất cả)
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách tất cả đơn hàng có phân trang
+     */
+    org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
+            OrderStatus status,
+            DeliveryType deliveryType,
             org.springframework.data.domain.Pageable pageable);
 }

@@ -4,6 +4,7 @@ import iuh.fit.supermarket.dto.checkout.CheckoutResponseDTO;
 import iuh.fit.supermarket.dto.checkout.UpdateOrderStatusDTO;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.enums.OrderStatus;
+import iuh.fit.supermarket.enums.DeliveryType;
 import iuh.fit.supermarket.service.CheckoutService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,13 +32,15 @@ public class AdminOrderController {
         private final CheckoutService checkoutService;
 
         /**
-         * API lấy danh sách tất cả đơn hàng với khả năng lọc theo trạng thái
+         * API lấy danh sách tất cả đơn hàng với khả năng lọc theo trạng thái và loại hình nhận hàng
          * - Admin có thể xem tất cả đơn hàng trong hệ thống
          * - Có thể lọc theo trạng thái đơn hàng
+         * - Có thể lọc theo loại hình nhận hàng (nhận tại siêu thị hoặc giao hàng)
          * - Hỗ trợ phân trang và sắp xếp
          * - Mặc định sắp xếp theo ngày đặt hàng mới nhất
          *
          * @param status        trạng thái đơn hàng cần lọc (optional)
+         * @param deliveryType  loại hình nhận hàng: PICKUP_AT_STORE hoặc HOME_DELIVERY (optional)
          * @param page          số trang (bắt đầu từ 0, mặc định 0)
          * @param size          số lượng đơn hàng mỗi trang (mặc định 20)
          * @param sortBy        trường sắp xếp (mặc định "orderDate")
@@ -47,13 +50,14 @@ public class AdminOrderController {
         @GetMapping
         public ResponseEntity<ApiResponse<Page<CheckoutResponseDTO>>> getAllOrders(
                         @RequestParam(required = false) OrderStatus status,
+                        @RequestParam(required = false) DeliveryType deliveryType,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int size,
                         @RequestParam(defaultValue = "orderDate") String sortBy,
                         @RequestParam(defaultValue = "DESC") String sortDirection) {
 
-                log.info("Admin lấy danh sách đơn hàng - Status: {}, Page: {}, Size: {}, SortBy: {}, Direction: {}",
-                                status, page, size, sortBy, sortDirection);
+                log.info("Admin lấy danh sách đơn hàng - Status: {}, DeliveryType: {}, Page: {}, Size: {}, SortBy: {}, Direction: {}",
+                                status, deliveryType, page, size, sortBy, sortDirection);
 
                 // Xác định hướng sắp xếp
                 Sort.Direction direction = sortDirection.equalsIgnoreCase("ASC")
@@ -63,8 +67,8 @@ public class AdminOrderController {
                 // Tạo Pageable với sort
                 Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortBy));
 
-                // Gọi service để lấy danh sách đơn hàng
-                Page<CheckoutResponseDTO> orders = checkoutService.getAllOrders(status, pageable);
+                // Gọi service để lấy danh sách đơn hàng với lọc theo deliveryType
+                Page<CheckoutResponseDTO> orders = checkoutService.getAllOrders(status, deliveryType, pageable);
 
                 log.info("Tìm thấy {} đơn hàng, trang {}/{}",
                                 orders.getNumberOfElements(), page + 1, orders.getTotalPages());

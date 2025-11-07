@@ -44,8 +44,8 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<Page<CustomerDto>>> getCustomersWithPagination(
             @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Kích thước trang") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Trường sắp xếp") @RequestParam(defaultValue = "createdAt") String sortBy,
-            @Parameter(description = "Hướng sắp xếp") @RequestParam(defaultValue = "desc") String sortDirection) {
+            @Parameter(description = "Trường sắp xếp (name, email, phone, createdAt, updatedAt, customerType, address, customerCode)") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "Hướng sắp xếp (asc, desc)") @RequestParam(defaultValue = "desc") String sortDirection) {
 
         log.info("Nhận yêu cầu lấy danh sách khách hàng với phân trang: page={}, size={}, sortBy={}, sortDirection={}",
                 page, size, sortBy, sortDirection);

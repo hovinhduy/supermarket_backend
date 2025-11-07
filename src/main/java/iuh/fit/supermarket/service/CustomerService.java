@@ -67,7 +67,22 @@ public class CustomerService {
         log.debug("Lấy danh sách khách hàng với phân trang: page={}, size={}, sortBy={}, sortDirection={}",
                 page, size, sortBy, sortDirection);
 
-        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortBy);
+        // Map các field của User cần thêm prefix "user."
+        String sortField = sortBy;
+        if ("name".equals(sortField) || "email".equals(sortField) ||
+            "phone".equals(sortField) || "createdAt".equals(sortField) ||
+            "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
+            "gender".equals(sortField)) {
+            sortField = "user." + sortField;
+        } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
+                   "customerCode".equals(sortField) || "customerId".equals(sortField)) {
+            // Các field này thuộc Customer, giữ nguyên
+        } else {
+            // Mặc định sort theo user.createdAt nếu field không hợp lệ
+            sortField = "user.createdAt";
+        }
+
+        Sort sort = Sort.by(Sort.Direction.fromString(sortDirection), sortField);
         Pageable pageable = PageRequest.of(page, size, sort);
 
         return customerRepository.findAllByUser_IsDeletedFalse(pageable)
@@ -537,7 +552,22 @@ public class CustomerService {
     public Page<CustomerDto> searchCustomers(CustomerSearchRequest request) {
         log.debug("Tìm kiếm khách hàng với từ khóa: {}, loại: {}", request.getSearchTerm(), request.getCustomerType());
 
-        Sort sort = Sort.by(Sort.Direction.fromString(request.getSortDirection()), request.getSortBy());
+        // Map các field của User cần thêm prefix "user."
+        String sortField = request.getSortBy();
+        if ("name".equals(sortField) || "email".equals(sortField) ||
+            "phone".equals(sortField) || "createdAt".equals(sortField) ||
+            "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
+            "gender".equals(sortField)) {
+            sortField = "user." + sortField;
+        } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
+                   "customerCode".equals(sortField) || "customerId".equals(sortField)) {
+            // Các field này thuộc Customer, giữ nguyên
+        } else {
+            // Mặc định sort theo user.createdAt nếu field không hợp lệ
+            sortField = "user.createdAt";
+        }
+
+        Sort sort = Sort.by(Sort.Direction.fromString(request.getSortDirection()), sortField);
         Pageable pageable = PageRequest.of(request.getPage(), request.getSize(), sort);
 
         Page<Customer> customers;
@@ -578,7 +608,21 @@ public class CustomerService {
         validateAdvancedSearchRequest(request);
 
         // Tạo Pageable với sắp xếp
-        Sort sort = Sort.by(Sort.Direction.fromString(request.getSortDirection()), request.getSortBy());
+        // Map các field của User cần thêm prefix "user."
+        String sortField = request.getSortBy();
+        if ("name".equals(sortField) || "email".equals(sortField) ||
+            "phone".equals(sortField) || "createdAt".equals(sortField) ||
+            "updatedAt".equals(sortField)) {
+            sortField = "user." + sortField;
+        } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
+                   "customerCode".equals(sortField)) {
+            // Các field này thuộc Customer, giữ nguyên
+        } else {
+            // Mặc định sort theo user.createdAt nếu field không hợp lệ
+            sortField = "user.createdAt";
+        }
+
+        Sort sort = Sort.by(Sort.Direction.fromString(request.getSortDirection()), sortField);
         Pageable pageable = PageRequest.of(request.getPage(), request.getLimit(), sort);
 
         // Gọi repository method với các tham số

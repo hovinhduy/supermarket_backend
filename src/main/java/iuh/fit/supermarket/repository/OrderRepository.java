@@ -2,6 +2,7 @@ package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.Order;
 import iuh.fit.supermarket.enums.OrderStatus;
+import iuh.fit.supermarket.enums.DeliveryType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,4 +45,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @return danh sách đơn hàng theo trạng thái có phân trang
      */
     Page<Order> findByStatus(OrderStatus status, Pageable pageable);
+
+    /**
+     * Lấy danh sách đơn hàng theo loại hình nhận hàng với phân trang
+     *
+     * @param deliveryType loại hình nhận hàng
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng theo loại hình nhận hàng có phân trang
+     */
+    Page<Order> findByDeliveryType(DeliveryType deliveryType, Pageable pageable);
+
+    /**
+     * Lấy danh sách đơn hàng theo trạng thái và loại hình nhận hàng với phân trang
+     *
+     * @param status trạng thái đơn hàng
+     * @param deliveryType loại hình nhận hàng
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng có phân trang
+     */
+    Page<Order> findByStatusAndDeliveryType(OrderStatus status, DeliveryType deliveryType, Pageable pageable);
 }

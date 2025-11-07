@@ -35,6 +35,8 @@ public class CustomerSearchRequest {
 
     /**
      * Trường sắp xếp
+     * Các trường từ User: name, email, phone, createdAt, updatedAt, dateOfBirth, gender
+     * Các trường từ Customer: customerType, address, customerCode, customerId
      */
     private String sortBy = "createdAt";
 

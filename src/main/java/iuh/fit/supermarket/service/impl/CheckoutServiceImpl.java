@@ -1012,18 +1012,40 @@ public class CheckoutServiceImpl implements CheckoutService {
     public org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
             OrderStatus status,
             org.springframework.data.domain.Pageable pageable) {
+        // Gọi method overload với deliveryType = null
+        return getAllOrders(status, null, pageable);
+    }
 
-        log.info("Admin lấy danh sách tất cả đơn hàng, trạng thái: {}, page: {}, size: {}",
-                status, pageable.getPageNumber(), pageable.getPageSize());
+    /**
+     * Lấy danh sách tất cả đơn hàng trong hệ thống với lọc theo loại hình nhận hàng (dành cho Admin)
+     * Có khả năng lọc theo trạng thái, loại hình nhận hàng và phân trang
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<CheckoutResponseDTO> getAllOrders(
+            OrderStatus status,
+            DeliveryType deliveryType,
+            org.springframework.data.domain.Pageable pageable) {
+
+        log.info("Admin lấy danh sách tất cả đơn hàng, trạng thái: {}, loại hình nhận hàng: {}, page: {}, size: {}",
+                status, deliveryType, pageable.getPageNumber(), pageable.getPageSize());
 
         // Lấy danh sách tất cả đơn hàng với phân trang
         org.springframework.data.domain.Page<Order> orderPage;
-        if (status == null) {
+
+        // Xác định cách lấy dữ liệu dựa trên các tham số
+        if (status == null && deliveryType == null) {
             // Lấy tất cả đơn hàng
             orderPage = orderRepository.findAll(pageable);
-        } else {
-            // Lấy đơn hàng theo trạng thái
+        } else if (status != null && deliveryType == null) {
+            // Lọc theo trạng thái
             orderPage = orderRepository.findByStatus(status, pageable);
+        } else if (status == null && deliveryType != null) {
+            // Lọc theo loại hình nhận hàng
+            orderPage = orderRepository.findByDeliveryType(deliveryType, pageable);
+        } else {
+            // Lọc theo cả trạng thái và loại hình nhận hàng
+            orderPage = orderRepository.findByStatusAndDeliveryType(status, deliveryType, pageable);
         }
 
         log.info("Tìm thấy {} đơn hàng, tổng số trang: {}",

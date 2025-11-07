@@ -56,9 +56,11 @@ public class CustomerAdvancedSearchRequest {
 
     /**
      * Trường sắp xếp
+     * Các trường từ User: name, email, phone, createdAt, updatedAt, dateOfBirth, gender
+     * Các trường từ Customer: customerType, address, customerCode, customerId
      */
     @Schema(description = "Trường sắp xếp", example = "createdAt", allowableValues = { "name", "email", "phone",
-            "createdAt", "updatedAt" })
+            "createdAt", "updatedAt", "dateOfBirth", "gender", "customerType", "address", "customerCode", "customerId" })
     private String sortBy = "createdAt";
 
     /**
