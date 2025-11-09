@@ -205,9 +205,39 @@ public interface ProductService {
     /**
      * Lấy thông tin chi tiết đầy đủ của ProductUnit
      * Bao gồm tên sản phẩm, tên đơn vị, số lượng tồn kho và giá hiện tại
-     * 
+     *
      * @param productUnitId ID đơn vị sản phẩm
      * @return thông tin chi tiết đầy đủ của ProductUnit
      */
     iuh.fit.supermarket.dto.product.ProductUnitDetailResponse getProductUnitDetails(Long productUnitId);
+
+    // ==================== METHODS CHO AI CHAT ====================
+
+    /**
+     * Tìm kiếm sản phẩm cho AI chat
+     * Trả về kết quả dạng text format phù hợp cho AI response
+     *
+     * @param query từ khóa tìm kiếm
+     * @param limit số lượng kết quả tối đa
+     * @return kết quả tìm kiếm dạng text
+     */
+    String searchProductsForAI(String query, int limit);
+
+    /**
+     * Kiểm tra tồn kho cho AI chat
+     * Trả về tình trạng tồn kho dạng text
+     *
+     * @param productId ID sản phẩm
+     * @return thông tin tồn kho dạng text
+     */
+    String checkStockForAI(Long productId);
+
+    /**
+     * Lấy chi tiết sản phẩm cho AI chat
+     * Trả về thông tin chi tiết dạng text format
+     *
+     * @param productId ID sản phẩm
+     * @return chi tiết sản phẩm dạng text
+     */
+    String getProductDetailsForAI(Long productId);
 }

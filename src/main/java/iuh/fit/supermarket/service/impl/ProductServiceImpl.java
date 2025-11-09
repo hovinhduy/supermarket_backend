@@ -1144,4 +1144,243 @@ public class ProductServiceImpl implements ProductService {
 
         return response;
     }
+
+    // ==================== METHODS CHO AI CHAT ====================
+
+    /**
+     * Tìm kiếm sản phẩm cho AI chat
+     * Trả về kết quả dạng text format phù hợp cho AI response
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public String searchProductsForAI(String query, int limit) {
+        log.info("🤖 AI Tool: searchProductsForAI với query='{}', limit={}", query, limit);
+
+        try {
+            // Tìm kiếm sản phẩm theo tên hoặc mã
+            // TODO: Implement searchByNameOrCode trong ProductUnitRepository
+            List<ProductUnit> productUnits = productUnitRepository
+                    .findAll()  // Tạm thời dùng findAll, cần implement search method
+                    .stream()
+                    .filter(unit -> {
+                        String productName = unit.getProduct().getName().toLowerCase();
+                        String barcode = unit.getBarcode() != null ? unit.getBarcode().toLowerCase() : "";
+                        String searchTerm = query.toLowerCase();
+                        return productName.contains(searchTerm) || barcode.contains(searchTerm);
+                    })
+                    .limit(limit)
+                    .collect(Collectors.toList());
+
+            if (productUnits.isEmpty()) {
+                return "Không tìm thấy sản phẩm nào với từ khóa: " + query;
+            }
+
+            // Format kết quả cho AI dễ đọc với JSON-like format để AI dễ parse
+            StringBuilder result = new StringBuilder();
+            int validProductCount = 0; // Đếm số sản phẩm có giá
+
+            for (ProductUnit unit : productUnits) {
+                Product product = unit.getProduct();
+
+                // Lấy giá hiện tại
+                String price = null;
+                try {
+                    var priceInfo = priceService.getCurrentPriceByProductUnitId(unit.getId());
+                    if (priceInfo != null && priceInfo.getSalePrice() != null) {
+                        price = priceInfo.getSalePrice().toString();
+                    }
+                } catch (Exception e) {
+                    log.debug("Không lấy được giá cho ProductUnit ID: {}", unit.getId());
+                }
+
+                // Skip sản phẩm không có giá hoặc giá = 0
+                if (price == null || price.equals("0") || price.equals("0.0")) {
+                    log.debug("Bỏ qua ProductUnit ID: {} vì không có giá", unit.getId());
+                    continue;
+                }
+
+                // Lấy tồn kho
+                String stockStatus = "Hết hàng";
+                int quantity = 0;
+                try {
+                    var warehouse = warehouseRepository.findByProductUnitId(unit.getId());
+                    if (warehouse.isPresent()) {
+                        quantity = warehouse.get().getQuantityOnHand();
+                        stockStatus = quantity > 0 ? "Còn hàng" : "Hết hàng";
+                    }
+                } catch (Exception e) {
+                    log.debug("Không lấy được tồn kho cho ProductUnit ID: {}", unit.getId());
+                }
+
+                // Lấy main image URL
+                String imageUrl = null;
+                try {
+                    Optional<ProductUnitImage> primaryImage =
+                        productUnitImageRepository.findPrimaryImageByProductUnitId(unit.getId());
+                    if (primaryImage.isPresent()) {
+                        imageUrl = primaryImage.get().getProductImage().getImageUrl();
+                    }
+                } catch (Exception e) {
+                    log.debug("Không lấy được image cho ProductUnit ID: {}", unit.getId());
+                }
+
+                // Format dạng JSON-like để AI dễ parse
+                result.append(String.format("""
+
+                [PRODUCT]
+                product_unit_id: %d
+                name: %s (%s)
+                code: %s
+                price: %s
+                unit: %s
+                brand: %s
+                stock_status: %s
+                stock_quantity: %d
+                image_url: %s
+                description: %s
+                [/PRODUCT]
+                """,
+                        unit.getId(),
+                        product.getName(),
+                        unit.getUnit().getName(),
+                        unit.getBarcode() != null ? unit.getBarcode() : "N/A",
+                        price,
+                        unit.getUnit().getName(),
+                        product.getBrand() != null ? product.getBrand().getName() : "N/A",
+                        stockStatus,
+                        quantity,
+                        imageUrl != null ? imageUrl : "N/A",
+                        String.format("%s %s", product.getName(), unit.getUnit().getName())
+                ));
+
+                validProductCount++;
+            }
+
+            // Kiểm tra nếu không có sản phẩm nào có giá
+            if (validProductCount == 0) {
+                return "Tìm thấy sản phẩm nhưng hiện không có giá bán. Vui lòng liên hệ CSKH để biết thêm chi tiết.";
+            }
+
+            // Thêm header với số lượng sản phẩm thực sự có giá
+            return String.format("Tìm thấy %d sản phẩm:\n", validProductCount) + result.toString();
+        } catch (Exception e) {
+            log.error("Lỗi khi tìm kiếm sản phẩm cho AI", e);
+            return "Xin lỗi, có lỗi khi tìm kiếm sản phẩm. Vui lòng thử lại.";
+        }
+    }
+
+    /**
+     * Kiểm tra tồn kho cho AI chat
+     * Trả về tình trạng tồn kho dạng text
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public String checkStockForAI(Long productId) {
+        log.info("🤖 AI Tool: checkStockForAI cho productId={}", productId);
+
+        try {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new ProductNotFoundException("Không tìm thấy sản phẩm với ID: " + productId));
+
+            StringBuilder result = new StringBuilder();
+            result.append(String.format("📦 Tồn kho sản phẩm: %s\n", product.getName()));
+
+            // Lấy tất cả đơn vị của sản phẩm
+            List<ProductUnit> units = productUnitRepository.findByProductId(productId);
+
+            for (ProductUnit unit : units) {
+                var warehouse = warehouseRepository.findByProductUnitId(unit.getId());
+
+                String stockInfo = "Không có thông tin";
+                if (warehouse.isPresent()) {
+                    int quantity = warehouse.get().getQuantityOnHand();
+                    if (quantity > 10) {
+                        stockInfo = String.format("✅ Còn hàng: %d %s", quantity, unit.getUnit().getName());
+                    } else if (quantity > 0) {
+                        stockInfo = String.format("⚠️ Sắp hết: %d %s", quantity, unit.getUnit().getName());
+                    } else {
+                        stockInfo = "❌ Hết hàng";
+                    }
+                }
+
+                result.append(String.format("\n- %s: %s",
+                        unit.getUnit().getName(),
+                        stockInfo));
+            }
+
+            return result.toString();
+        } catch (ProductNotFoundException e) {
+            return "Không tìm thấy sản phẩm với ID: " + productId;
+        } catch (Exception e) {
+            log.error("Lỗi khi kiểm tra tồn kho cho AI", e);
+            return "Xin lỗi, không thể kiểm tra tồn kho lúc này.";
+        }
+    }
+
+    /**
+     * Lấy chi tiết sản phẩm cho AI chat
+     * Trả về thông tin chi tiết dạng text format
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public String getProductDetailsForAI(Long productId) {
+        log.info("🤖 AI Tool: getProductDetailsForAI cho productId={}", productId);
+
+        try {
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new ProductNotFoundException("Không tìm thấy sản phẩm với ID: " + productId));
+
+            StringBuilder result = new StringBuilder();
+            result.append(String.format("📋 THÔNG TIN CHI TIẾT SẢN PHẨM\n\n"));
+            result.append(String.format("🏷️ Tên: %s\n", product.getName()));
+
+            if (product.getDescription() != null && !product.getDescription().isEmpty()) {
+                result.append(String.format("📝 Mô tả: %s\n", product.getDescription()));
+            }
+
+            result.append(String.format("📂 Danh mục: %s\n", product.getCategory().getName()));
+            result.append(String.format("🏭 Thương hiệu: %s\n", product.getBrand().getName()));
+
+            // Thông tin đơn vị và giá
+            result.append("\n💰 BẢNG GIÁ:\n");
+            List<ProductUnit> units = productUnitRepository.findByProductId(productId);
+
+            for (ProductUnit unit : units) {
+                String price = "Liên hệ";
+                try {
+                    var priceInfo = priceService.getCurrentPriceByProductUnitId(unit.getId());
+                    if (priceInfo != null && priceInfo.getSalePrice() != null) {
+                        price = String.format("%,.0fđ", priceInfo.getSalePrice());
+                    }
+                } catch (Exception e) {
+                    log.debug("Không lấy được giá cho ProductUnit ID: {}", unit.getId());
+                }
+
+                result.append(String.format("- %s: %s",
+                        unit.getUnit().getName(),
+                        price));
+
+                if (!unit.getIsBaseUnit() && unit.getConversionValue() != null) {
+                    result.append(String.format(" (Quy đổi 1:%d)", unit.getConversionValue()));
+                }
+                result.append("\n");
+            }
+
+            // Thông tin khác
+            if (product.getIsRewardPoint()) {
+                result.append("\n✨ Sản phẩm được tích điểm thưởng");
+            }
+
+            if (!product.getIsActive()) {
+                result.append("\n⚠️ Sản phẩm tạm ngưng kinh doanh");
+            }
+
+            return result.toString();
+        } catch (ProductNotFoundException e) {
+            return "Không tìm thấy sản phẩm với ID: " + productId;
+        } catch (Exception e) {
+            log.error("Lỗi khi lấy chi tiết sản phẩm cho AI", e);
+            return "Xin lỗi, không thể lấy thông tin chi tiết sản phẩm lúc này.";
+        }
+    }
 }

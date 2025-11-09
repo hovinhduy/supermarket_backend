@@ -9,7 +9,7 @@ spring:
   # Cấu hình JPA/Hibernate
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: true # Hiển thị SQL queries trong console
     format-sql: true # Format SQL cho dễ đọc
     properties:
@@ -41,7 +41,7 @@ spring:
         base-url: https://generativelanguage.googleapis.com
         completions-path: /v1beta/openai/chat/completions
         options:
-          model: gemini-2.0-flash
+          model: gemini-flash-lite-latest
 
 # Cấu hình logging
 logging:
