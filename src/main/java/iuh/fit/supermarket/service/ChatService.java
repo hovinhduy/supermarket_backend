@@ -22,11 +22,12 @@ public interface ChatService {
 
     /**
      * Gửi tin nhắn và nhận response từ AI
-     * 
-     * @param request thông tin tin nhắn
+     *
+     * @param request thông tin tin nhắn (không bao gồm customerId)
+     * @param customerId ID khách hàng (lấy từ SecurityContext)
      * @return response từ AI
      */
-    ChatResponse sendMessage(ChatRequest request);
+    ChatResponse sendMessage(ChatRequest request, Integer customerId);
 
     /**
      * Lấy danh sách conversations của khách hàng

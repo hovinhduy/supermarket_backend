@@ -1,22 +1,16 @@
 package iuh.fit.supermarket.dto.chat;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 /**
  * DTO cho request gửi tin nhắn chat
+ * Customer ID sẽ được lấy tự động từ SecurityContext
  */
 public record ChatRequest(
         /**
          * ID của conversation (null nếu bắt đầu conversation mới)
          */
         String conversationId,
-
-        /**
-         * ID của khách hàng
-         */
-        @NotNull(message = "Customer ID không được để trống")
-        Integer customerId,
 
         /**
          * Nội dung tin nhắn từ user

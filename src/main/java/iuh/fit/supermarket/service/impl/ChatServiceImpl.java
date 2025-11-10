@@ -115,13 +115,14 @@ public class ChatServiceImpl implements ChatService {
      * AI sẽ:
      * 1. Tự động gọi các tools phù hợp dựa trên intent của user
      * 2. Trả về dữ liệu có cấu trúc (AIStructuredResponse) thay vì text đơn thuần
+     * 3. Biết thông tin khách hàng đang chat để cá nhân hóa trải nghiệm
      */
     @Override
-    public ChatResponse sendMessage(ChatRequest request) {
+    public ChatResponse sendMessage(ChatRequest request, Integer customerId) {
         // Verify customer tồn tại
-        Customer customer = customerRepository.findById(request.customerId())
+        Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(
-                        "Không tìm thấy khách hàng với ID: " + request.customerId()));
+                        "Không tìm thấy khách hàng với ID: " + customerId));
 
         // Lấy hoặc tạo conversation
         ChatConversation conversation = getOrCreateConversation(request.conversationId(), customer);
@@ -134,8 +135,8 @@ public class ChatServiceImpl implements ChatService {
                 .findTopNByConversationIdOrderByTimestampDesc(conversation.getId(), MEMORY_LIMIT);
         Collections.reverse(recentMessages); // Đảo ngược để có thứ tự chronological
 
-        // Build prompt messages với system message và history
-        List<Message> messages = buildPromptMessages(recentMessages, request.customerId(), request.message());
+        // Build prompt messages với system message và history (bao gồm thông tin customer)
+        List<Message> messages = buildPromptMessages(recentMessages, customer, request.message());
 
         // Tạo prompt với messages
         // Spring AI sẽ tự động detect và sử dụng Function beans nếu đã được config
@@ -260,15 +261,15 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * Build prompt messages từ history
+     * Build prompt messages từ history với thông tin customer
      * Với Function Calling, không cần inject context nữa - AI sẽ tự gọi tools khi cần
      */
-    private List<Message> buildPromptMessages(List<ChatMessage> recentMessages, Integer customerId,
+    private List<Message> buildPromptMessages(List<ChatMessage> recentMessages, Customer customer,
             String userMessage) {
         List<Message> messages = new ArrayList<>();
 
-        // System message với context về siêu thị và hướng dẫn sử dụng tools
-        messages.add(new SystemMessage(getSystemPrompt()));
+        // System message với context về siêu thị, hướng dẫn sử dụng tools và thông tin customer
+        messages.add(new SystemMessage(getSystemPrompt(customer)));
 
         // Thêm history messages để AI có context cuộc trò chuyện
         for (ChatMessage msg : recentMessages) {
@@ -297,10 +298,24 @@ public class ChatServiceImpl implements ChatService {
      * Hướng dẫn AI:
      * 1. Cách sử dụng các tools
      * 2. Format output dạng structured (AIStructuredResponse)
+     * 3. Thông tin về khách hàng đang chat
      */
-    private String getSystemPrompt() {
+    private String getSystemPrompt(Customer customer) {
+        String customerInfo = buildCustomerInfo(customer);
+
         return """
                 Bạn là trợ lý AI của siêu thị với khả năng sử dụng các TOOLS (functions) để tra cứu thông tin.
+
+                ===== THÔNG TIN KHÁCH HÀNG =====
+                %s
+
+                Hãy sử dụng thông tin này để cá nhân hóa trải nghiệm cho khách hàng.
+                Khi khách hỏi về "đơn hàng của tôi", "giỏ hàng của tôi", bạn đã biết họ là ai.
+
+                ⚠️ QUAN TRỌNG - BẢO MẬT:
+                - KHÔNG bao giờ tiết lộ ID khách hàng (customer_id) trong phản hồi
+                - Chỉ dùng tên khách hàng hoặc "bạn" khi nhắc đến khách hàng
+                - Ví dụ: Nói "Đây là giỏ hàng của bạn" thay vì "Đây là giỏ hàng của khách hàng ID 3"
 
                 ===== TOOLS CÓ SẴN CHO BẠN =====
                 Bạn có thể sử dụng các tools sau để lấy thông tin khi cần:
@@ -417,7 +432,36 @@ public class ChatServiceImpl implements ChatService {
                 - Tạo message văn bản thân thiện
                 - Thêm suggestions để khách có thể hỏi tiếp
                 - TUYỆT ĐỐI không bịa thông tin
-                """;
+                """.formatted(customerInfo);
+    }
+
+    /**
+     * Build thông tin customer để cung cấp cho AI
+     */
+    private String buildCustomerInfo(Customer customer) {
+        StringBuilder info = new StringBuilder();
+
+        info.append("- ID Khách hàng: ").append(customer.getCustomerId()).append("\n");
+
+        if (customer.getUser() != null) {
+            info.append("- Tên: ").append(customer.getUser().getName()).append("\n");
+            info.append("- Email: ").append(customer.getUser().getEmail()).append("\n");
+            if (customer.getUser().getPhone() != null) {
+                info.append("- Số điện thoại: ").append(customer.getUser().getPhone()).append("\n");
+            }
+        }
+
+        if (customer.getCustomerCode() != null) {
+            info.append("- Mã khách hàng: ").append(customer.getCustomerCode()).append("\n");
+        }
+
+        info.append("- Loại khách hàng: ").append(customer.getCustomerType()).append("\n");
+
+        if (customer.getAddress() != null) {
+            info.append("- Địa chỉ: ").append(customer.getAddress()).append("\n");
+        }
+
+        return info.toString();
     }
 
     /**

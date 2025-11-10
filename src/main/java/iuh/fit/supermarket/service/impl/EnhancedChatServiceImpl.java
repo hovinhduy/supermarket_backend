@@ -110,11 +110,11 @@ public class EnhancedChatServiceImpl implements ChatService {
     }
 
     @Override
-    public ChatResponse sendMessage(ChatRequest request) {
+    public ChatResponse sendMessage(ChatRequest request, Integer customerId) {
         // Verify customer
-        Customer customer = customerRepository.findById(request.customerId())
+        Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(
-                        "Không tìm thấy khách hàng với ID: " + request.customerId()));
+                        "Không tìm thấy khách hàng với ID: " + customerId));
 
         // Get or create conversation
         ChatConversation conversation = getOrCreateConversation(request.conversationId(), customer);
@@ -127,21 +127,22 @@ public class EnhancedChatServiceImpl implements ChatService {
                 .findTopNByConversationIdOrderByTimestampDesc(conversation.getId(), MEMORY_LIMIT);
         Collections.reverse(recentMessages);
 
-        // Step 1: Ask AI which tools to call
-        String toolDecision = getToolDecision(request.message(), recentMessages);
+        // Step 1: Ask AI which tools to call (với customer context)
+        String toolDecision = getToolDecision(request.message(), recentMessages, customer);
 
         // Step 2: Execute tools if needed
         String toolResults = "";
         if (containsToolCalls(toolDecision)) {
-            toolResults = executeToolCalls(toolDecision, request.customerId());
+            toolResults = executeToolCalls(toolDecision, customerId);
             log.info("📊 Tool results: {}", toolResults);
         }
 
-        // Step 3: Generate final structured response with tool results
+        // Step 3: Generate final structured response with tool results (với customer context)
         AIStructuredResponse structuredResponse = generateFinalStructuredResponse(
             request.message(),
             recentMessages,
-            toolResults
+            toolResults,
+            customer
         );
 
         // Save AI response (lưu dạng text message)
@@ -161,10 +162,10 @@ public class EnhancedChatServiceImpl implements ChatService {
     }
 
     /**
-     * Step 1: Hỏi AI cần gọi tools nào
+     * Step 1: Hỏi AI cần gọi tools nào (với customer context)
      */
-    private String getToolDecision(String userMessage, List<ChatMessage> history) {
-        String toolPrompt = getToolDecisionPrompt();
+    private String getToolDecision(String userMessage, List<ChatMessage> history, Customer customer) {
+        String toolPrompt = getToolDecisionPrompt(customer);
 
         List<Message> messages = new ArrayList<>();
         messages.add(new SystemMessage(toolPrompt));
@@ -302,9 +303,9 @@ public class EnhancedChatServiceImpl implements ChatService {
     /**
      * Step 3: Generate final structured response với tool results
      */
-    private AIStructuredResponse generateFinalStructuredResponse(String userMessage, List<ChatMessage> history, String toolResults) {
+    private AIStructuredResponse generateFinalStructuredResponse(String userMessage, List<ChatMessage> history, String toolResults, Customer customer) {
         List<Message> messages = new ArrayList<>();
-        messages.add(new SystemMessage(getFinalResponsePrompt()));
+        messages.add(new SystemMessage(getFinalResponsePrompt(customer)));
 
         // Add history
         for (ChatMessage msg : history) {
@@ -342,11 +343,24 @@ public class EnhancedChatServiceImpl implements ChatService {
     }
 
     /**
-     * Prompt để AI quyết định gọi tools nào
+     * Prompt để AI quyết định gọi tools nào (với customer context)
      */
-    private String getToolDecisionPrompt() {
+    private String getToolDecisionPrompt(Customer customer) {
+        String customerInfo = buildCustomerInfo(customer);
+
         return """
             Bạn là AI assistant có khả năng gọi các tools sau:
+
+            ===== THÔNG TIN KHÁCH HÀNG =====
+            %s
+
+            Hãy sử dụng thông tin này để biết bạn đang phục vụ khách hàng nào.
+
+            ⚠️ QUAN TRỌNG - BẢO MẬT:
+            - KHÔNG bao giờ tiết lộ ID khách hàng (customer_id) trong phản hồi
+            - Chỉ dùng tên khách hàng hoặc "bạn" khi nhắc đến khách hàng
+
+            ===== TOOLS CÓ SẴN =====
 
             1. orderLookup() - Tra cứu đơn hàng của khách
                Dùng khi: hỏi về đơn hàng, order, giao hàng, đã mua
@@ -388,15 +402,27 @@ public class EnhancedChatServiceImpl implements ChatService {
             - "Thêm 2 lon coca vào giỏ" → [TOOL_CALL:addToCart(productUnitId=1, productName='Coca Cola lon', quantity=2)]
             - "Xem giỏ hàng của tôi" → [TOOL_CALL:getCartSummary()]
             - "Xin chào" → NO_TOOLS_NEEDED
-            """;
+            """.formatted(customerInfo);
     }
 
     /**
-     * Prompt để generate final structured response
+     * Prompt để generate final structured response (với customer context)
      */
-    private String getFinalResponsePrompt() {
+    private String getFinalResponsePrompt(Customer customer) {
+        String customerInfo = buildCustomerInfo(customer);
+
         return """
             Bạn là trợ lý AI của siêu thị.
+
+            ===== THÔNG TIN KHÁCH HÀNG =====
+            %s
+
+            Hãy sử dụng thông tin này để cá nhân hóa phản hồi cho khách hàng.
+
+            ⚠️ QUAN TRỌNG - BẢO MẬT:
+            - KHÔNG bao giờ tiết lộ ID khách hàng (customer_id) trong phản hồi
+            - Chỉ dùng tên khách hàng hoặc "bạn" khi nhắc đến khách hàng
+            - Ví dụ: Nói "Đây là giỏ hàng của bạn" thay vì "Đây là giỏ hàng của khách hàng ID 3"
 
             NHIỆM VỤ: Trả lời câu hỏi của khách hàng dựa trên:
             1. Lịch sử cuộc trò chuyện (nếu có)
@@ -450,7 +476,36 @@ public class EnhancedChatServiceImpl implements ChatService {
             - Đổi trả trong 7 ngày
             - Giờ mở cửa: 7:00 - 22:00
             → Dùng response_type: "GENERAL_ANSWER"
-            """;
+            """.formatted(customerInfo);
+    }
+
+    /**
+     * Build thông tin customer để cung cấp cho AI
+     */
+    private String buildCustomerInfo(Customer customer) {
+        StringBuilder info = new StringBuilder();
+
+        info.append("- ID Khách hàng: ").append(customer.getCustomerId()).append("\n");
+
+        if (customer.getUser() != null) {
+            info.append("- Tên: ").append(customer.getUser().getName()).append("\n");
+            info.append("- Email: ").append(customer.getUser().getEmail()).append("\n");
+            if (customer.getUser().getPhone() != null) {
+                info.append("- Số điện thoại: ").append(customer.getUser().getPhone()).append("\n");
+            }
+        }
+
+        if (customer.getCustomerCode() != null) {
+            info.append("- Mã khách hàng: ").append(customer.getCustomerCode()).append("\n");
+        }
+
+        info.append("- Loại khách hàng: ").append(customer.getCustomerType()).append("\n");
+
+        if (customer.getAddress() != null) {
+            info.append("- Địa chỉ: ").append(customer.getAddress()).append("\n");
+        }
+
+        return info.toString();
     }
 
     // Các methods khác giữ nguyên từ ChatServiceImpl gốc

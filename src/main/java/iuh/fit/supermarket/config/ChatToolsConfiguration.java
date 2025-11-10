@@ -4,6 +4,7 @@ import iuh.fit.supermarket.service.OrderLookupService;
 import iuh.fit.supermarket.service.PromotionLookupService;
 import iuh.fit.supermarket.service.ProductService;
 import iuh.fit.supermarket.service.CartLookupService;
+import iuh.fit.supermarket.util.SecurityUtil;
 import iuh.fit.supermarket.dto.chat.tool.*;
 import iuh.fit.supermarket.dto.chat.tool.ClearCartRequest;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +21,9 @@ import java.util.function.Function;
  * Định nghĩa các Tool beans mà AI có thể gọi động dựa trên intent của user.
  * Mỗi tool được đăng ký như một Function bean với @Description để AI hiểu mục đích.
  *
+ * SECURITY: Tất cả tools tự động lấy customerId từ SecurityContext
+ * để đảm bảo customer chỉ có thể xem/thay đổi thông tin của chính họ.
+ *
  * Lợi ích:
  * - Giảm 60-70% token cost (chỉ gọi khi cần)
  * - Tăng accuracy (AI tự quyết định tool phù hợp)
@@ -34,22 +38,21 @@ public class ChatToolsConfiguration {
     private final PromotionLookupService promotionLookupService;
     private final ProductService productService;
     private final CartLookupService cartLookupService;
+    private final SecurityUtil securityUtil;
 
     /**
      * Tool tra cứu đơn hàng gần đây của khách hàng
      * AI sẽ gọi tool này khi user hỏi về: đơn hàng, giao hàng, mua hàng, đặt hàng
      *
-     * LƯU Ý: Trong Spring AI 1.0+, customerId phải được truyền từ context
-     * hoặc extract từ conversation
+     * SECURITY: customerId được lấy từ SecurityContext, không cho phép truyền vào
      */
     @Bean
     @Description("Tra cứu đơn hàng gần đây của khách hàng. Sử dụng khi user hỏi về: đơn hàng, order, giao hàng, mua hàng, đặt hàng, delivery")
     public Function<OrderLookupRequest, String> orderLookupTool() {
         return request -> {
             try {
-                // TODO: Cần cách để pass customerId từ ChatService context
-                // Tạm thời hardcode customerId = 1 để test
-                Integer customerId = request.customerId() != null ? request.customerId() : 1;
+                // SECURITY: Lấy customerId từ SecurityContext để đảm bảo chỉ xem được đơn hàng của chính mình
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
                 log.info("🔧 AI Tool Called: orderLookupTool for customerId={}, limit={}",
                         customerId, request.limit());
@@ -172,17 +175,19 @@ public class ChatToolsConfiguration {
     /**
      * Tool thêm sản phẩm vào giỏ hàng
      * AI sẽ gọi tool này khi user muốn: thêm vào giỏ, mua, đặt mua
+     *
+     * SECURITY: customerId được lấy từ SecurityContext
      */
     @Bean
     @Description("Thêm sản phẩm vào giỏ hàng. Sử dụng khi user muốn: thêm vào giỏ, mua sản phẩm, cho vào giỏ, add to cart")
     public Function<AddToCartRequest, String> addToCartTool() {
         return request -> {
             try {
-                // TODO: Lấy customerId từ context (hiện tại hardcode)
-                Integer customerId = 1;
+                // SECURITY: Lấy customerId từ SecurityContext
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
-                log.info("🔧 AI Tool Called: addToCartTool - productUnitId={}, quantity={}",
-                        request.productUnitId(), request.quantity());
+                log.info("🔧 AI Tool Called: addToCartTool - customerId={}, productUnitId={}, quantity={}",
+                        customerId, request.productUnitId(), request.quantity());
 
                 String result = cartLookupService.addToCart(
                         customerId,
@@ -203,17 +208,19 @@ public class ChatToolsConfiguration {
     /**
      * Tool cập nhật số lượng sản phẩm trong giỏ hàng
      * AI sẽ gọi tool này khi user muốn: thay đổi số lượng, update, sửa số lượng
+     *
+     * SECURITY: customerId được lấy từ SecurityContext
      */
     @Bean
     @Description("Cập nhật số lượng sản phẩm trong giỏ hàng. Sử dụng khi user muốn: thay đổi số lượng, update số lượng, sửa số lượng")
     public Function<UpdateCartItemAIRequest, String> updateCartItemTool() {
         return request -> {
             try {
-                // TODO: Lấy customerId từ context
-                Integer customerId = 1;
+                // SECURITY: Lấy customerId từ SecurityContext
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
-                log.info("🔧 AI Tool Called: updateCartItemTool - productUnitId={}, newQuantity={}",
-                        request.productUnitId(), request.newQuantity());
+                log.info("🔧 AI Tool Called: updateCartItemTool - customerId={}, productUnitId={}, newQuantity={}",
+                        customerId, request.productUnitId(), request.newQuantity());
 
                 String result = cartLookupService.updateCartItem(
                         customerId,
@@ -234,17 +241,19 @@ public class ChatToolsConfiguration {
     /**
      * Tool xóa sản phẩm khỏi giỏ hàng
      * AI sẽ gọi tool này khi user muốn: xóa khỏi giỏ, bỏ ra, remove
+     *
+     * SECURITY: customerId được lấy từ SecurityContext
      */
     @Bean
     @Description("Xóa sản phẩm khỏi giỏ hàng. Sử dụng khi user muốn: xóa khỏi giỏ, bỏ sản phẩm ra, remove from cart")
     public Function<RemoveFromCartRequest, String> removeFromCartTool() {
         return request -> {
             try {
-                // TODO: Lấy customerId từ context
-                Integer customerId = 1;
+                // SECURITY: Lấy customerId từ SecurityContext
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
-                log.info("🔧 AI Tool Called: removeFromCartTool - productUnitId={}",
-                        request.productUnitId());
+                log.info("🔧 AI Tool Called: removeFromCartTool - customerId={}, productUnitId={}",
+                        customerId, request.productUnitId());
 
                 String result = cartLookupService.removeFromCart(
                         customerId,
@@ -264,16 +273,18 @@ public class ChatToolsConfiguration {
     /**
      * Tool xem tổng quan giỏ hàng
      * AI sẽ gọi tool này khi user muốn: xem giỏ hàng, kiểm tra giỏ, tổng quan giỏ
+     *
+     * SECURITY: customerId được lấy từ SecurityContext
      */
     @Bean
     @Description("Xem tổng quan giỏ hàng. Sử dụng khi user muốn: xem giỏ hàng, kiểm tra giỏ hàng, giỏ của tôi, cart summary")
     public Function<GetCartSummaryRequest, String> getCartSummaryTool() {
         return request -> {
             try {
-                // TODO: Lấy customerId từ context
-                Integer customerId = 1;
+                // SECURITY: Lấy customerId từ SecurityContext
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
-                log.info("🔧 AI Tool Called: getCartSummaryTool");
+                log.info("🔧 AI Tool Called: getCartSummaryTool - customerId={}", customerId);
 
                 String result = cartLookupService.getCartSummary(customerId);
 
@@ -289,16 +300,18 @@ public class ChatToolsConfiguration {
     /**
      * Tool xóa hết tất cả sản phẩm trong giỏ hàng
      * AI sẽ gọi tool này khi user muốn: xóa hết giỏ hàng, clear cart, làm mới giỏ
+     *
+     * SECURITY: customerId được lấy từ SecurityContext
      */
     @Bean
     @Description("Xóa hết tất cả sản phẩm trong giỏ hàng. Sử dụng khi user muốn: xóa hết giỏ, xóa tất cả, clear cart, làm mới giỏ hàng")
     public Function<ClearCartRequest, String> clearCartTool() {
         return request -> {
             try {
-                // TODO: Lấy customerId từ context
-                Integer customerId = 1;
+                // SECURITY: Lấy customerId từ SecurityContext
+                Integer customerId = securityUtil.getCurrentCustomerId();
 
-                log.info("🔧 AI Tool Called: clearCartTool");
+                log.info("🔧 AI Tool Called: clearCartTool - customerId={}", customerId);
 
                 String result = cartLookupService.clearCart(customerId);
 
