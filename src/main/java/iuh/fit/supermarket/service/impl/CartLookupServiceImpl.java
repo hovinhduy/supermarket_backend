@@ -134,6 +134,38 @@ public class CartLookupServiceImpl implements CartLookupService {
     }
 
     /**
+     * Xóa hết tất cả sản phẩm trong giỏ hàng
+     */
+    @Override
+    public String clearCart(Integer customerId) {
+        log.info("🛒 AI Tool: clearCart - customerId={}", customerId);
+
+        try {
+            // Lấy giỏ hàng trước khi xóa để show thông tin
+            CartResponse cartBefore = shoppingCartService.getCart(customerId);
+
+            if (cartBefore.items() == null || cartBefore.items().isEmpty()) {
+                return "🛒 Giỏ hàng của bạn đang trống. Không có gì để xóa.";
+            }
+
+            int itemCount = cartBefore.totalItems();
+
+            // Xóa hết giỏ hàng
+            shoppingCartService.clearCart(customerId);
+
+            // Format response cho AI
+            return String.format("✅ Đã xóa hết %d sản phẩm khỏi giỏ hàng!\n\n" +
+                    "🛒 Giỏ hàng của bạn hiện đang trống.\n\n" +
+                    "💡 Gợi ý: Tìm kiếm sản phẩm và thêm vào giỏ hàng để tiếp tục mua sắm!",
+                    itemCount);
+
+        } catch (Exception e) {
+            log.error("Lỗi khi xóa giỏ hàng", e);
+            return "❌ Xin lỗi, không thể xóa giỏ hàng. Lỗi: " + e.getMessage();
+        }
+    }
+
+    /**
      * Format cart response cho AI (sau khi thêm/update/xóa)
      */
     private String formatCartResponse(CartResponse cart, String action) {

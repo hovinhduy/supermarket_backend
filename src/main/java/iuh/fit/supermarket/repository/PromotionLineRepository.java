@@ -34,9 +34,23 @@ public interface PromotionLineRepository extends JpaRepository<PromotionLine, Lo
 
     /**
      * Đếm số lượng line thuộc về một chương trình khuyến mãi
-     * 
+     *
      * @param promotionId ID của PromotionHeader
      * @return số lượng line
      */
     long countByHeader_PromotionId(Long promotionId);
+
+    /**
+     * Tìm tất cả các line còn active và còn hạn của một header
+     *
+     * @param promotionId ID của PromotionHeader
+     * @param currentDate ngày hiện tại để kiểm tra hạn
+     * @return danh sách các PromotionLine còn active và còn hạn
+     */
+    @Query("SELECT pl FROM PromotionLine pl " +
+           "WHERE pl.header.promotionId = :promotionId " +
+           "AND pl.status = 'ACTIVE' " +
+           "AND :currentDate BETWEEN pl.startDate AND pl.endDate")
+    List<PromotionLine> findActiveLinesByHeaderId(@Param("promotionId") Long promotionId,
+                                                   @Param("currentDate") java.time.LocalDate currentDate);
 }

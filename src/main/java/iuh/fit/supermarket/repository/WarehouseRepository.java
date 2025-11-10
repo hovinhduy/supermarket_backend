@@ -100,14 +100,15 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, Integer> {
 
     /**
      * Lấy danh sách tồn kho với thông tin đơn vị sản phẩm (để tránh N+1 query)
+     * Chỉ lấy các warehouse có productUnit tồn tại (INNER JOIN)
      *
      * @param pageable thông tin phân trang
      * @return Page<Warehouse>
      */
     @Query("SELECT w FROM Warehouse w " +
-            "LEFT JOIN FETCH w.productUnit pu " +
-            "LEFT JOIN FETCH pu.product p " +
-            "LEFT JOIN FETCH pu.unit u " +
+            "INNER JOIN FETCH w.productUnit pu " +
+            "INNER JOIN FETCH pu.product p " +
+            "INNER JOIN FETCH pu.unit u " +
             "ORDER BY w.updatedAt DESC")
     Page<Warehouse> findAllWithProductUnitDetails(Pageable pageable);
 

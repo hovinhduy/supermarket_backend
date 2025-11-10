@@ -45,4 +45,12 @@ public interface CartLookupService {
      * @return Giỏ hàng dạng text cho AI
      */
     String getCartSummary(Integer customerId);
+
+    /**
+     * Xóa hết tất cả sản phẩm trong giỏ hàng
+     *
+     * @param customerId Customer ID
+     * @return Kết quả dạng text cho AI
+     */
+    String clearCart(Integer customerId);
 }

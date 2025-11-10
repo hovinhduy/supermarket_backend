@@ -332,6 +332,9 @@ public class ChatServiceImpl implements ChatService {
                 9. getCartSummaryTool: Xem tổng quan giỏ hàng
                    → Dùng khi khách muốn: xem giỏ, kiểm tra giỏ
 
+                10. clearCartTool: Xóa hết tất cả sản phẩm trong giỏ hàng
+                   → Dùng khi khách muốn: xóa hết giỏ, xóa tất cả, clear cart, làm mới giỏ
+
                 ===== QUY TẮC SỬ DỤNG TOOLS =====
                 ✅ LUÔN gọi tool phù hợp khi khách hỏi về thông tin cần tra cứu
                 ✅ Có thể gọi nhiều tools nếu cần thiết

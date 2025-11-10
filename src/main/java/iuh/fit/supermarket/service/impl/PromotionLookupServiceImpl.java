@@ -35,73 +35,83 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /**
-     * Lấy khuyến mãi đang có với thông tin chi tiết Lines và Details
+     * Lấy khuyến mãi đang có với thông tin chi tiết từ Lines và Details
+     * Header chỉ dùng để kiểm tra còn active và còn hạn
+     * Data thực tế được lấy từ Line và Detail
      */
     @Override
     public String getActivePromotions(int limit) {
-        List<PromotionHeader> promotions = promotionRepository
-                .findActivePromotions(LocalDate.now(), PageRequest.of(0, limit))
+        LocalDate now = LocalDate.now();
+
+        // Lấy các header còn active và còn hạn (chỉ để kiểm tra)
+        List<PromotionHeader> activeHeaders = promotionRepository
+                .findActivePromotions(now, PageRequest.of(0, limit))
                 .getContent();
 
-        if (promotions.isEmpty()) {
+        if (activeHeaders.isEmpty()) {
             return "Hiện tại không có chương trình khuyến mãi nào đang diễn ra.";
         }
 
         StringBuilder result = new StringBuilder("🎁 KHUYẾN MÃI ĐANG DIỄN RA:\n");
         result.append("═".repeat(50)).append("\n\n");
 
-        for (int i = 0; i < promotions.size(); i++) {
-            PromotionHeader promo = promotions.get(i);
+        int promotionCount = 0;
 
-            // Header information
-            result.append(String.format("📌 %d. %s\n", i + 1, promo.getPromotionName().toUpperCase()));
-            result.append("─".repeat(40)).append("\n");
+        for (PromotionHeader header : activeHeaders) {
+            // Lấy các line còn active và còn hạn của header này
+            List<PromotionLine> activeLines = promotionLineRepository
+                    .findActiveLinesByHeaderId(header.getPromotionId(), now);
 
-            if (promo.getDescription() != null && !promo.getDescription().isEmpty()) {
-                result.append(String.format("📝 Mô tả: %s\n", promo.getDescription()));
+            // Chỉ hiển thị header nếu có line active
+            if (activeLines.isEmpty()) {
+                continue;
             }
 
-            result.append(String.format("📅 Thời gian: %s - %s\n",
-                    promo.getStartDate().format(dateFormatter),
-                    promo.getEndDate().format(dateFormatter)
-            ));
+            promotionCount++;
 
-            // Loại khuyến mãi được xác định ở PromotionLine level, không phải Header
+            // Hiển thị tên header ngắn gọn (chỉ để group các line)
+            result.append(String.format("📌 %d. CHƯƠNG TRÌNH: %s\n", promotionCount, header.getPromotionName().toUpperCase()));
+            result.append("─".repeat(40)).append("\n\n");
 
-            // Get Promotion Lines
-            List<PromotionLine> lines = promotionLineRepository.findByPromotionHeaderId(promo.getPromotionId());
+            // Focus vào Line và Detail
+            for (PromotionLine line : activeLines) {
+                result.append(String.format("   🏷️  %s", line.getLineName()));
 
-            if (!lines.isEmpty()) {
-                result.append("\n📋 CHI TIẾT KHUYẾN MÃI:\n");
-
-                for (PromotionLine line : lines) {
-                    result.append(String.format("   • Tên: %s", line.getLineName()));
-
-                    // Hiển thị loại khuyến mãi cho từng line
-                    if (line.getPromotionType() != null) {
-                        result.append(String.format(" [%s]", translatePromotionType(line.getPromotionType())));
-                    }
-                    result.append("\n");
-
-                    if (line.getDescription() != null && !line.getDescription().isEmpty()) {
-                        result.append(String.format("     %s\n", line.getDescription()));
-                    }
-
-                    // Lấy thông tin chi tiết của line này
-                    String detailInfo = getPromotionDetailInfo(line);
-                    if (!detailInfo.isEmpty()) {
-                        result.append(detailInfo);
-                    }
-
-                    result.append("\n");
+                // Hiển thị loại khuyến mãi
+                if (line.getPromotionType() != null) {
+                    result.append(String.format(" [%s]", translatePromotionType(line.getPromotionType())));
                 }
+                result.append("\n");
+
+                // Thời gian của line
+                result.append(String.format("       📅 %s - %s\n",
+                        line.getStartDate().format(dateFormatter),
+                        line.getEndDate().format(dateFormatter)
+                ));
+
+                // Mô tả line
+                if (line.getDescription() != null && !line.getDescription().isEmpty()) {
+                    result.append(String.format("       📝 %s\n", line.getDescription()));
+                }
+
+                // Lấy thông tin chi tiết từ Detail
+                String detailInfo = getPromotionDetailInfo(line);
+                if (!detailInfo.isEmpty()) {
+                    result.append(detailInfo);
+                }
+
+                result.append("\n");
             }
 
-            result.append("\n");
             result.append("═".repeat(50)).append("\n\n");
         }
 
-        log.info("🎁 Đã tải {} chương trình khuyến mãi với chi tiết", promotions.size());
+        if (promotionCount == 0) {
+            return "Hiện tại không có chương trình khuyến mãi nào đang diễn ra.";
+        }
+
+        log.info("🎁 Đã tải {} chương trình khuyến mãi với {} line đang active",
+                activeHeaders.size(), promotionCount);
         return result.toString();
     }
 
@@ -166,27 +176,42 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
                     } else if (detail instanceof BuyXGetYDetail) {
                         BuyXGetYDetail buyXGetY = (BuyXGetYDetail) detail;
 
-                        if (buyXGetY.getBuyMinQuantity() != null && buyXGetY.getGiftQuantity() != null) {
-                            detailInfo.append(String.format("       - Mua %d tặng %d\n",
-                                    buyXGetY.getBuyMinQuantity(),
-                                    buyXGetY.getGiftQuantity()));
-                        }
-
+                        // Hiển thị sản phẩm mua trước
                         if (buyXGetY.getBuyProduct() != null && buyXGetY.getBuyProduct().getProduct() != null) {
-                            detailInfo.append(String.format("       - Sản phẩm mua: %s\n",
+                            detailInfo.append(String.format("       - Sản phẩm áp dụng: %s\n",
                                     buyXGetY.getBuyProduct().getProduct().getName()));
                         }
 
-                        if (buyXGetY.getGiftProduct() != null && buyXGetY.getGiftProduct().getProduct() != null) {
-                            detailInfo.append(String.format("       - Sản phẩm tặng: %s\n",
-                                    buyXGetY.getGiftProduct().getProduct().getName()));
+                        // Hiển thị điều kiện và ưu đãi tùy theo giftDiscountType
+                        if (buyXGetY.getBuyMinQuantity() != null && buyXGetY.getGiftQuantity() != null) {
+                            if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.FREE) {
+                                // Tặng miễn phí
+                                detailInfo.append(String.format("       - Mua %d tặng %d miễn phí\n",
+                                        buyXGetY.getBuyMinQuantity(),
+                                        buyXGetY.getGiftQuantity()));
+                            } else if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.PERCENTAGE) {
+                                // Giảm % cho sản phẩm tiếp theo
+                                detailInfo.append(String.format("       - Mua %d giảm %s%% cho %d sản phẩm tiếp theo\n",
+                                        buyXGetY.getBuyMinQuantity(),
+                                        buyXGetY.getGiftDiscountValue(),
+                                        buyXGetY.getGiftQuantity()));
+                            } else if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.FIXED_AMOUNT) {
+                                // Giảm số tiền cố định cho sản phẩm tiếp theo
+                                detailInfo.append(String.format("       - Mua %d giảm %,.0fđ cho %d sản phẩm tiếp theo\n",
+                                        buyXGetY.getBuyMinQuantity(),
+                                        buyXGetY.getGiftDiscountValue(),
+                                        buyXGetY.getGiftQuantity()));
+                            }
                         }
 
-                        if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.FREE) {
-                            detailInfo.append("       - Tặng miễn phí\n");
-                        } else if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.PERCENTAGE) {
-                            detailInfo.append(String.format("       - Giảm %s%% cho sản phẩm tặng\n",
-                                    buyXGetY.getGiftDiscountValue()));
+                        // Chỉ hiển thị sản phẩm được giảm nếu khác với sản phẩm mua
+                        if (buyXGetY.getGiftProduct() != null &&
+                            buyXGetY.getGiftProduct().getProduct() != null &&
+                            buyXGetY.getBuyProduct() != null &&
+                            !buyXGetY.getGiftProduct().getProduct().getId().equals(
+                                buyXGetY.getBuyProduct().getProduct().getId())) {
+                            detailInfo.append(String.format("       - Sản phẩm được giảm: %s\n",
+                                    buyXGetY.getGiftProduct().getProduct().getName()));
                         }
                     }
                 }

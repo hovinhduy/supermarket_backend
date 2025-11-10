@@ -5,6 +5,7 @@ import iuh.fit.supermarket.service.PromotionLookupService;
 import iuh.fit.supermarket.service.ProductService;
 import iuh.fit.supermarket.service.CartLookupService;
 import iuh.fit.supermarket.dto.chat.tool.*;
+import iuh.fit.supermarket.dto.chat.tool.ClearCartRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Description;
@@ -281,6 +282,31 @@ public class ChatToolsConfiguration {
             } catch (Exception e) {
                 log.error("❌ Error in getCartSummaryTool", e);
                 return "Xin lỗi, không thể lấy thông tin giỏ hàng. Vui lòng thử lại sau.";
+            }
+        };
+    }
+
+    /**
+     * Tool xóa hết tất cả sản phẩm trong giỏ hàng
+     * AI sẽ gọi tool này khi user muốn: xóa hết giỏ hàng, clear cart, làm mới giỏ
+     */
+    @Bean
+    @Description("Xóa hết tất cả sản phẩm trong giỏ hàng. Sử dụng khi user muốn: xóa hết giỏ, xóa tất cả, clear cart, làm mới giỏ hàng")
+    public Function<ClearCartRequest, String> clearCartTool() {
+        return request -> {
+            try {
+                // TODO: Lấy customerId từ context
+                Integer customerId = 1;
+
+                log.info("🔧 AI Tool Called: clearCartTool");
+
+                String result = cartLookupService.clearCart(customerId);
+
+                log.info("✅ clearCartTool completed");
+                return result;
+            } catch (Exception e) {
+                log.error("❌ Error in clearCartTool", e);
+                return "Xin lỗi, không thể xóa giỏ hàng. Vui lòng thử lại sau.";
             }
         };
     }
