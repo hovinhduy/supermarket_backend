@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
+import iuh.fit.supermarket.dto.employee.EmployeeSearchRequest;
+import iuh.fit.supermarket.dto.employee.EmployeeSearchResponse;
 import iuh.fit.supermarket.entity.Employee;
 import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.service.EmployeeService;
@@ -36,33 +38,6 @@ public class EmployeeController {
     private final EmployeeService employeeService;
 
     /**
-     * Lấy danh sách tất cả nhân viên (chỉ ADMIN và MANAGER)
-     */
-    @Operation(summary = "Lấy danh sách tất cả nhân viên", description = "Lấy danh sách tất cả nhân viên trong hệ thống. Chỉ ADMIN và MANAGER mới có quyền truy cập.")
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách thành công", content = @Content(schema = @Schema(implementation = EmployeeDto.class))),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
-    })
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
-    public ResponseEntity<ApiResponse<List<EmployeeDto>>> getAllEmployees() {
-        log.info("Nhận yêu cầu lấy danh sách tất cả nhân viên");
-
-        try {
-            List<Employee> employees = employeeService.getAllEmployees();
-            List<EmployeeDto> employeeDtos = employees.stream()
-                    .map(EmployeeDto::fromEntity)
-                    .toList();
-            return ResponseEntity.ok(
-                    ApiResponse.success("Lấy danh sách nhân viên thành công", employeeDtos));
-        } catch (Exception e) {
-            log.error("Lỗi khi lấy danh sách nhân viên", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.error("Có lỗi xảy ra khi lấy danh sách nhân viên"));
-        }
-    }
-
-    /**
      * Lấy thông tin nhân viên theo ID (chỉ ADMIN và MANAGER)
      */
     @GetMapping("/{id}")
@@ -71,12 +46,11 @@ public class EmployeeController {
         log.info("Nhận yêu cầu lấy nhân viên với ID: {}", id);
 
         try {
-            Optional<Employee> employee = employeeService.getEmployeeById(id);
+            Optional<EmployeeDto> employeeDto = employeeService.getEmployeeById(id);
 
-            if (employee.isPresent()) {
-                EmployeeDto employeeDto = EmployeeDto.fromEntity(employee.get());
+            if (employeeDto.isPresent()) {
                 return ResponseEntity.ok(
-                        ApiResponse.success("Lấy thông tin nhân viên thành công", employeeDto));
+                        ApiResponse.success("Lấy thông tin nhân viên thành công", employeeDto.get()));
             } else {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ApiResponse.error("Không tìm thấy nhân viên với ID: " + id));
@@ -104,8 +78,7 @@ public class EmployeeController {
         log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", employee.getUser() != null ? employee.getUser().getEmail() : "null");
 
         try {
-            Employee createdEmployee = employeeService.createEmployee(employee);
-            EmployeeDto employeeDto = EmployeeDto.fromEntity(createdEmployee);
+            EmployeeDto employeeDto = employeeService.createEmployee(employee);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success("Tạo nhân viên thành công", employeeDto));
         } catch (IllegalArgumentException e) {
@@ -130,8 +103,7 @@ public class EmployeeController {
         log.info("Nhận yêu cầu cập nhật nhân viên với ID: {}", id);
 
         try {
-            Employee updatedEmployee = employeeService.updateEmployee(id, employee);
-            EmployeeDto employeeDto = EmployeeDto.fromEntity(updatedEmployee);
+            EmployeeDto employeeDto = employeeService.updateEmployee(id, employee);
             return ResponseEntity.ok(
                     ApiResponse.success("Cập nhật nhân viên thành công", employeeDto));
         } catch (IllegalArgumentException e) {
@@ -177,10 +149,7 @@ public class EmployeeController {
         log.info("Nhận yêu cầu lấy nhân viên theo role: {}", role);
 
         try {
-            List<Employee> employees = employeeService.getEmployeesByRole(role);
-            List<EmployeeDto> employeeDtos = employees.stream()
-                    .map(EmployeeDto::fromEntity)
-                    .toList();
+            List<EmployeeDto> employeeDtos = employeeService.getEmployeesByRole(role);
             return ResponseEntity.ok(
                     ApiResponse.success("Lấy danh sách nhân viên theo role thành công", employeeDtos));
         } catch (Exception e) {
@@ -191,22 +160,37 @@ public class EmployeeController {
     }
 
     /**
-     * Tìm kiếm nhân viên theo tên (tất cả role đã đăng nhập)
+     * Tìm kiếm nhân viên với nhiều tiêu chí và phân trang
+     * Hỗ trợ tìm theo: tên, email, mã nhân viên và lọc theo role
      */
+    @Operation(summary = "Tìm kiếm nhân viên", description = "Tìm kiếm nhân viên theo keyword (tên/email/mã) và lọc theo role với phân trang. Tất cả role đã đăng nhập có thể truy cập.")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tìm kiếm thành công", content = @Content(schema = @Schema(implementation = EmployeeSearchResponse.class))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
+    })
     @GetMapping("/search")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
-    public ResponseEntity<ApiResponse<List<EmployeeDto>>> searchEmployees(@RequestParam String name) {
-        log.info("Nhận yêu cầu tìm kiếm nhân viên với tên: {}", name);
+    public ResponseEntity<ApiResponse<EmployeeSearchResponse>> searchEmployees(
+            @Parameter(description = "Từ khóa tìm kiếm (tên, email, mã nhân viên)") @RequestParam(required = false) String keyword,
+            @Parameter(description = "Lọc theo role") @RequestParam(required = false) UserRole role,
+            @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") Integer page,
+            @Parameter(description = "Số lượng record trên mỗi trang") @RequestParam(defaultValue = "10") Integer size,
+            @Parameter(description = "Trường sắp xếp") @RequestParam(defaultValue = "createdAt") String sortBy,
+            @Parameter(description = "Hướng sắp xếp (ASC/DESC)") @RequestParam(defaultValue = "DESC") String sortDirection) {
+
+        log.info("Nhận yêu cầu tìm kiếm nhân viên: keyword={}, role={}, page={}, size={}, sortBy={}, sortDirection={}",
+                keyword, role, page, size, sortBy, sortDirection);
 
         try {
-            List<Employee> employees = employeeService.searchEmployeesByName(name);
-            List<EmployeeDto> employeeDtos = employees.stream()
-                    .map(EmployeeDto::fromEntity)
-                    .toList();
+            EmployeeSearchRequest searchRequest = new EmployeeSearchRequest(
+                    keyword, role, page, size, sortBy, sortDirection
+            );
+
+            EmployeeSearchResponse response = employeeService.searchEmployees(searchRequest);
             return ResponseEntity.ok(
-                    ApiResponse.success("Tìm kiếm nhân viên thành công", employeeDtos));
+                    ApiResponse.success("Tìm kiếm nhân viên thành công", response));
         } catch (Exception e) {
-            log.error("Lỗi khi tìm kiếm nhân viên với tên: {}", name, e);
+            log.error("Lỗi khi tìm kiếm nhân viên", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("Có lỗi xảy ra khi tìm kiếm nhân viên"));
         }

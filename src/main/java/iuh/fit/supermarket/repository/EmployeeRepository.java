@@ -2,6 +2,9 @@ package iuh.fit.supermarket.repository;
 
 import iuh.fit.supermarket.entity.Employee;
 import iuh.fit.supermarket.enums.UserRole;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +26,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      * @param userId ID của user
      * @return Optional<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     Optional<Employee> findByUser_UserId(Long userId);
 
     /**
@@ -31,6 +35,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      * @param userId ID của user
      * @return Optional<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     Optional<Employee> findByUser_UserIdAndUser_IsDeletedFalse(Long userId);
 
     /**
@@ -52,6 +57,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      *
      * @return List<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     List<Employee> findAllByUser_IsDeletedFalse();
 
     /**
@@ -60,6 +66,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      * @param userRole vai trò nhân viên (ADMIN, MANAGER, STAFF)
      * @return List<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     List<Employee> findByUser_UserRoleAndUser_IsDeletedFalse(UserRole userRole);
 
     /**
@@ -68,6 +75,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      * @param employeeId ID nhân viên
      * @return Optional<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     Optional<Employee> findByEmployeeIdAndUser_IsDeletedFalse(Integer employeeId);
 
     /**
@@ -85,6 +93,30 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
      * @param name tên nhân viên
      * @return List<Employee>
      */
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT e FROM Employee e JOIN e.user u WHERE u.name LIKE %:name% AND u.isDeleted = false")
     List<Employee> findByNameContainingAndIsDeletedFalse(@Param("name") String name);
+
+    /**
+     * Tìm kiếm nhân viên động với nhiều tiêu chí và phân trang
+     * Tìm theo keyword (trong name, email, employeeCode) và lọc theo role
+     * CHỈ tìm nhân viên có role: ADMIN, MANAGER, STAFF (loại bỏ CUSTOMER)
+     *
+     * @param keyword từ khóa tìm kiếm (có thể null)
+     * @param role vai trò nhân viên (có thể null)
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return Page<Employee>
+     */
+    @EntityGraph(attributePaths = {"user"})
+    @Query("SELECT e FROM Employee e JOIN e.user u " +
+           "WHERE u.isDeleted = false " +
+           "AND u.userRole IN ('ADMIN', 'MANAGER', 'STAFF') " +
+           "AND (:keyword IS NULL OR :keyword = '' OR " +
+           "    LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "    LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "    LOWER(e.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+           "AND (:role IS NULL OR u.userRole = :role)")
+    Page<Employee> searchEmployees(@Param("keyword") String keyword,
+                                    @Param("role") UserRole role,
+                                    Pageable pageable);
 }

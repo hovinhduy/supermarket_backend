@@ -15,6 +15,7 @@ import iuh.fit.supermarket.service.ChatService;
 import iuh.fit.supermarket.service.OrderLookupService;
 import iuh.fit.supermarket.service.PromotionLookupService;
 import iuh.fit.supermarket.service.ProductService;
+import iuh.fit.supermarket.service.CartLookupService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.*;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -55,6 +56,7 @@ public class EnhancedChatServiceImpl implements ChatService {
     private final OrderLookupService orderLookupService;
     private final PromotionLookupService promotionLookupService;
     private final ProductService productService;
+    private final CartLookupService cartLookupService;
 
     private static final int MEMORY_LIMIT = 10;
 
@@ -70,7 +72,8 @@ public class EnhancedChatServiceImpl implements ChatService {
             ChatClient.Builder chatClientBuilder,
             OrderLookupService orderLookupService,
             PromotionLookupService promotionLookupService,
-            ProductService productService) {
+            ProductService productService,
+            CartLookupService cartLookupService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.customerRepository = customerRepository;
@@ -78,6 +81,7 @@ public class EnhancedChatServiceImpl implements ChatService {
         this.orderLookupService = orderLookupService;
         this.promotionLookupService = promotionLookupService;
         this.productService = productService;
+        this.cartLookupService = cartLookupService;
 
         log.info("🚀 Enhanced Chat Service initialized với Manual Function Calling");
     }
@@ -240,6 +244,31 @@ public class EnhancedChatServiceImpl implements ChatService {
                     Long detailId = Long.parseLong(extractParam(params, "productId"));
                     return productService.getProductDetailsForAI(detailId);
 
+                case "addToCart":
+                    // Parse productUnitId, productName, quantity from params
+                    Long productUnitId = Long.parseLong(extractParam(params, "productUnitId"));
+                    String productName = extractParam(params, "productName");
+                    String quantityStr = extractParam(params, "quantity");
+                    Integer quantity = quantityStr.isEmpty() ? 1 : Integer.parseInt(quantityStr);
+                    return cartLookupService.addToCart(customerId, productUnitId, productName, quantity);
+
+                case "updateCartItem":
+                    // Parse productUnitId, productName, newQuantity from params
+                    Long updateProductUnitId = Long.parseLong(extractParam(params, "productUnitId"));
+                    String updateProductName = extractParam(params, "productName");
+                    Integer newQuantity = Integer.parseInt(extractParam(params, "newQuantity"));
+                    return cartLookupService.updateCartItem(customerId, updateProductUnitId, updateProductName, newQuantity);
+
+                case "removeFromCart":
+                    // Parse productUnitId, productName from params
+                    Long removeProductUnitId = Long.parseLong(extractParam(params, "productUnitId"));
+                    String removeProductName = extractParam(params, "productName");
+                    return cartLookupService.removeFromCart(customerId, removeProductUnitId, removeProductName);
+
+                case "getCartSummary":
+                    // No params needed
+                    return cartLookupService.getCartSummary(customerId);
+
                 default:
                     return "Tool không được hỗ trợ: " + toolName;
             }
@@ -334,6 +363,18 @@ public class EnhancedChatServiceImpl implements ChatService {
             5. productDetail(productId=123) - Chi tiết sản phẩm
                Dùng khi: hỏi thông tin chi tiết, thành phần
 
+            6. addToCart(productUnitId=123, productName='...', quantity=2) - Thêm vào giỏ hàng
+               Dùng khi: khách muốn thêm vào giỏ, mua
+
+            7. updateCartItem(productUnitId=123, productName='...', newQuantity=5) - Cập nhật giỏ
+               Dùng khi: khách muốn thay đổi số lượng
+
+            8. removeFromCart(productUnitId=123, productName='...') - Xóa khỏi giỏ
+               Dùng khi: khách muốn xóa sản phẩm khỏi giỏ
+
+            9. getCartSummary() - Xem giỏ hàng
+               Dùng khi: khách muốn xem giỏ, kiểm tra giỏ
+
             NHIỆM VỤ: Phân tích câu hỏi và trả về các tool cần gọi.
 
             FORMAT OUTPUT:
@@ -344,6 +385,8 @@ public class EnhancedChatServiceImpl implements ChatService {
             Ví dụ:
             - "Có khuyến mãi gì?" → [TOOL_CALL:promotions()]
             - "Tìm sữa tươi" → [TOOL_CALL:productSearch(query='sữa tươi')]
+            - "Thêm 2 lon coca vào giỏ" → [TOOL_CALL:addToCart(productUnitId=1, productName='Coca Cola lon', quantity=2)]
+            - "Xem giỏ hàng của tôi" → [TOOL_CALL:getCartSummary()]
             - "Xin chào" → NO_TOOLS_NEEDED
             """;
     }

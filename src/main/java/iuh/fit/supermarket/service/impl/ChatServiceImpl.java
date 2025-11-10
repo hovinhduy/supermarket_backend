@@ -320,6 +320,18 @@ public class ChatServiceImpl implements ChatService {
                 5. productDetailTool: Chi tiết sản phẩm
                    → Dùng khi cần: thành phần, xuất xứ, thông tin chi tiết
 
+                6. addToCartTool: Thêm sản phẩm vào giỏ hàng
+                   → Dùng khi khách muốn: thêm vào giỏ, mua, đặt mua
+
+                7. updateCartItemTool: Cập nhật số lượng trong giỏ
+                   → Dùng khi khách muốn: thay đổi số lượng, update
+
+                8. removeFromCartTool: Xóa sản phẩm khỏi giỏ
+                   → Dùng khi khách muốn: xóa khỏi giỏ, bỏ ra
+
+                9. getCartSummaryTool: Xem tổng quan giỏ hàng
+                   → Dùng khi khách muốn: xem giỏ, kiểm tra giỏ
+
                 ===== QUY TẮC SỬ DỤNG TOOLS =====
                 ✅ LUÔN gọi tool phù hợp khi khách hỏi về thông tin cần tra cứu
                 ✅ Có thể gọi nhiều tools nếu cần thiết

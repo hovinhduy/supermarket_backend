@@ -3,6 +3,7 @@ package iuh.fit.supermarket.config;
 import iuh.fit.supermarket.service.OrderLookupService;
 import iuh.fit.supermarket.service.PromotionLookupService;
 import iuh.fit.supermarket.service.ProductService;
+import iuh.fit.supermarket.service.CartLookupService;
 import iuh.fit.supermarket.dto.chat.tool.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,7 @@ public class ChatToolsConfiguration {
     private final OrderLookupService orderLookupService;
     private final PromotionLookupService promotionLookupService;
     private final ProductService productService;
+    private final CartLookupService cartLookupService;
 
     /**
      * Tool tra cứu đơn hàng gần đây của khách hàng
@@ -160,6 +162,125 @@ public class ChatToolsConfiguration {
             } catch (Exception e) {
                 log.error("❌ Error in productDetailTool", e);
                 return "Xin lỗi, không thể lấy thông tin chi tiết sản phẩm. Vui lòng thử lại sau.";
+            }
+        };
+    }
+
+    // ==================== CART MANAGEMENT TOOLS ====================
+
+    /**
+     * Tool thêm sản phẩm vào giỏ hàng
+     * AI sẽ gọi tool này khi user muốn: thêm vào giỏ, mua, đặt mua
+     */
+    @Bean
+    @Description("Thêm sản phẩm vào giỏ hàng. Sử dụng khi user muốn: thêm vào giỏ, mua sản phẩm, cho vào giỏ, add to cart")
+    public Function<AddToCartRequest, String> addToCartTool() {
+        return request -> {
+            try {
+                // TODO: Lấy customerId từ context (hiện tại hardcode)
+                Integer customerId = 1;
+
+                log.info("🔧 AI Tool Called: addToCartTool - productUnitId={}, quantity={}",
+                        request.productUnitId(), request.quantity());
+
+                String result = cartLookupService.addToCart(
+                        customerId,
+                        request.productUnitId(),
+                        request.productName(),
+                        request.quantity()
+                );
+
+                log.info("✅ addToCartTool completed");
+                return result;
+            } catch (Exception e) {
+                log.error("❌ Error in addToCartTool", e);
+                return "Xin lỗi, không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại sau.";
+            }
+        };
+    }
+
+    /**
+     * Tool cập nhật số lượng sản phẩm trong giỏ hàng
+     * AI sẽ gọi tool này khi user muốn: thay đổi số lượng, update, sửa số lượng
+     */
+    @Bean
+    @Description("Cập nhật số lượng sản phẩm trong giỏ hàng. Sử dụng khi user muốn: thay đổi số lượng, update số lượng, sửa số lượng")
+    public Function<UpdateCartItemAIRequest, String> updateCartItemTool() {
+        return request -> {
+            try {
+                // TODO: Lấy customerId từ context
+                Integer customerId = 1;
+
+                log.info("🔧 AI Tool Called: updateCartItemTool - productUnitId={}, newQuantity={}",
+                        request.productUnitId(), request.newQuantity());
+
+                String result = cartLookupService.updateCartItem(
+                        customerId,
+                        request.productUnitId(),
+                        request.productName(),
+                        request.newQuantity()
+                );
+
+                log.info("✅ updateCartItemTool completed");
+                return result;
+            } catch (Exception e) {
+                log.error("❌ Error in updateCartItemTool", e);
+                return "Xin lỗi, không thể cập nhật giỏ hàng. Vui lòng thử lại sau.";
+            }
+        };
+    }
+
+    /**
+     * Tool xóa sản phẩm khỏi giỏ hàng
+     * AI sẽ gọi tool này khi user muốn: xóa khỏi giỏ, bỏ ra, remove
+     */
+    @Bean
+    @Description("Xóa sản phẩm khỏi giỏ hàng. Sử dụng khi user muốn: xóa khỏi giỏ, bỏ sản phẩm ra, remove from cart")
+    public Function<RemoveFromCartRequest, String> removeFromCartTool() {
+        return request -> {
+            try {
+                // TODO: Lấy customerId từ context
+                Integer customerId = 1;
+
+                log.info("🔧 AI Tool Called: removeFromCartTool - productUnitId={}",
+                        request.productUnitId());
+
+                String result = cartLookupService.removeFromCart(
+                        customerId,
+                        request.productUnitId(),
+                        request.productName()
+                );
+
+                log.info("✅ removeFromCartTool completed");
+                return result;
+            } catch (Exception e) {
+                log.error("❌ Error in removeFromCartTool", e);
+                return "Xin lỗi, không thể xóa sản phẩm khỏi giỏ hàng. Vui lòng thử lại sau.";
+            }
+        };
+    }
+
+    /**
+     * Tool xem tổng quan giỏ hàng
+     * AI sẽ gọi tool này khi user muốn: xem giỏ hàng, kiểm tra giỏ, tổng quan giỏ
+     */
+    @Bean
+    @Description("Xem tổng quan giỏ hàng. Sử dụng khi user muốn: xem giỏ hàng, kiểm tra giỏ hàng, giỏ của tôi, cart summary")
+    public Function<GetCartSummaryRequest, String> getCartSummaryTool() {
+        return request -> {
+            try {
+                // TODO: Lấy customerId từ context
+                Integer customerId = 1;
+
+                log.info("🔧 AI Tool Called: getCartSummaryTool");
+
+                String result = cartLookupService.getCartSummary(customerId);
+
+                log.info("✅ getCartSummaryTool completed");
+                return result;
+            } catch (Exception e) {
+                log.error("❌ Error in getCartSummaryTool", e);
+                return "Xin lỗi, không thể lấy thông tin giỏ hàng. Vui lòng thử lại sau.";
             }
         };
     }
