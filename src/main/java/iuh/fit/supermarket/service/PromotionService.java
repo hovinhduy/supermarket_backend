@@ -87,7 +87,7 @@ public class PromotionService {
      */
     @Transactional
     public PromotionLineResponseDTO createPromotionLineWithDetail(Long headerId, PromotionLineRequestDTO requestDTO) {
-        log.info("Bắt đầu tạo promotion line với mã: {}", requestDTO.getPromotionCode());
+        log.info("Bắt đầu tạo promotion line với tên: {}", requestDTO.getLineName());
 
         // Kiểm tra header tồn tại
         PromotionHeader header = promotionHeaderRepository.findById(headerId)
@@ -100,14 +100,16 @@ public class PromotionService {
         // Validation ngày tháng của line phải nằm trong khoảng của header
         validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), header);
 
-        // Kiểm tra trùng mã
-        if (promotionLineRepository.existsByPromotionCodeIgnoreCase(requestDTO.getPromotionCode())) {
-            throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + requestDTO.getPromotionCode());
+        // Kiểm tra trùng mã khuyến mãi (giờ kiểm tra ở detail level)
+        if (requestDTO.getDetail() != null && requestDTO.getDetail().getPromotionCode() != null) {
+            if (promotionDetailRepository.existsByPromotionCodeIgnoreCase(requestDTO.getDetail().getPromotionCode())) {
+                throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + requestDTO.getDetail().getPromotionCode());
+            }
         }
 
         // Tạo line
         PromotionLine line = new PromotionLine();
-        line.setPromotionCode(requestDTO.getPromotionCode());
+        line.setLineName(requestDTO.getLineName());
         line.setPromotionType(requestDTO.getPromotionType());
         line.setDescription(requestDTO.getDescription());
         line.setStartDate(requestDTO.getStartDate());
@@ -145,7 +147,7 @@ public class PromotionService {
      */
     @Transactional
     public PromotionLineResponseDTO createPromotionLineOnly(Long headerId, PromotionLineOnlyRequestDTO requestDTO) {
-        log.info("Bắt đầu tạo promotion line với mã: {}", requestDTO.getPromotionCode());
+        log.info("Bắt đầu tạo promotion line với tên: {}", requestDTO.getLineName());
 
         // Kiểm tra header tồn tại
         PromotionHeader header = promotionHeaderRepository.findById(headerId)
@@ -158,14 +160,9 @@ public class PromotionService {
         // Validation ngày tháng của line phải nằm trong khoảng của header
         validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), header);
 
-        // Kiểm tra trùng mã
-        if (promotionLineRepository.existsByPromotionCodeIgnoreCase(requestDTO.getPromotionCode())) {
-            throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + requestDTO.getPromotionCode());
-        }
-
         // Tạo line
         PromotionLine line = new PromotionLine();
-        line.setPromotionCode(requestDTO.getPromotionCode());
+        line.setLineName(requestDTO.getLineName());
         line.setPromotionType(requestDTO.getPromotionType());
         line.setDescription(requestDTO.getDescription());
         line.setStartDate(requestDTO.getStartDate());
@@ -238,8 +235,8 @@ public class PromotionService {
                     "Tên chương trình khuyến mãi đã tồn tại: " + requestDTO.getPromotionName());
         }
 
-        // Kiểm tra trùng lặp mã khuyến mãi trong các lines
-        validateUniquePromotionCodes(requestDTO.getPromotionLines());
+        // Kiểm tra trùng lặp mã khuyến mãi trong các details
+        validateUniquePromotionCodesInDetails(requestDTO.getPromotionLines());
 
         // Tạo PromotionHeader
         PromotionHeader header = createPromotionHeaderFromDTO(requestDTO);
@@ -816,21 +813,22 @@ public class PromotionService {
     }
 
     /**
-     * Kiểm tra tính duy nhất của mã khuyến mãi trong danh sách lines
+     * Kiểm tra tính duy nhất của mã khuyến mãi trong danh sách details
      */
-    private void validateUniquePromotionCodes(List<PromotionLineRequestDTO> lines) {
+    private void validateUniquePromotionCodesInDetails(List<PromotionLineRequestDTO> lines) {
         List<String> codes = lines.stream()
-                .map(PromotionLineRequestDTO::getPromotionCode)
+                .filter(line -> line.getDetail() != null && line.getDetail().getPromotionCode() != null)
+                .map(line -> line.getDetail().getPromotionCode())
                 .collect(Collectors.toList());
 
         // Kiểm tra trùng lặp trong danh sách
         if (codes.size() != codes.stream().distinct().count()) {
-            throw new PromotionValidationException("Mã khuyến mãi trong các line không được trùng lặp");
+            throw new PromotionValidationException("Mã khuyến mãi trong các detail không được trùng lặp");
         }
 
         // Kiểm tra trùng lặp với database
         for (String code : codes) {
-            if (promotionLineRepository.existsByPromotionCodeIgnoreCase(code)) {
+            if (promotionDetailRepository.existsByPromotionCodeIgnoreCase(code)) {
                 throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + code);
             }
         }
@@ -899,7 +897,7 @@ public class PromotionService {
      */
     private PromotionLine createPromotionLineFromDTO(PromotionLineRequestDTO lineDTO, PromotionHeader header) {
         PromotionLine line = new PromotionLine();
-        line.setPromotionCode(lineDTO.getPromotionCode());
+        line.setLineName(lineDTO.getLineName());
         line.setPromotionType(lineDTO.getPromotionType());
         line.setDescription(lineDTO.getDescription());
         line.setStartDate(lineDTO.getStartDate());
@@ -915,6 +913,12 @@ public class PromotionService {
     private PromotionDetail createPromotionDetailFromDTO(PromotionDetailRequestDTO detailDTO, PromotionLine line) {
         PromotionDetail detail = promotionDetailFactory.createDetail(line.getPromotionType(), detailDTO);
         detail.setPromotionLine(line);
+
+        // Set các trường mới: promotionCode, usageLimit, usageCount
+        detail.setPromotionCode(detailDTO.getPromotionCode());
+        detail.setUsageLimit(detailDTO.getUsageLimit());
+        detail.setUsageCount(detailDTO.getUsageCount() != null ? detailDTO.getUsageCount() : 0);
+
         return detail;
     }
 
@@ -974,7 +978,7 @@ public class PromotionService {
 
         // Thiết lập thông tin cơ bản
         responseDTO.setPromotionLineId(line.getPromotionLineId());
-        responseDTO.setPromotionCode(line.getPromotionCode());
+        responseDTO.setLineName(line.getLineName());
         responseDTO.setPromotionType(line.getPromotionType());
         responseDTO.setDescription(line.getDescription());
         responseDTO.setStartDate(line.getStartDate());
@@ -1003,6 +1007,9 @@ public class PromotionService {
     private PromotionDetailResponseDTO convertToDetailResponseDTO(PromotionDetail detail) {
         PromotionDetailResponseDTO responseDTO = new PromotionDetailResponseDTO();
         responseDTO.setDetailId(detail.getDetailId());
+        responseDTO.setPromotionCode(detail.getPromotionCode());
+        responseDTO.setUsageLimit(detail.getUsageLimit());
+        responseDTO.setUsageCount(detail.getUsageCount());
 
         if (detail instanceof BuyXGetYDetail buyXGetY) {
             // Thiết lập thông tin BUY_X_GET_Y
@@ -1138,17 +1145,11 @@ public class PromotionService {
         // Validation ngày tháng của line phải nằm trong khoảng của header
         validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), existingLine.getHeader());
 
-        // Kiểm tra trùng mã (trừ line hiện tại)
-        if (promotionLineRepository.existsByPromotionCodeIgnoreCaseAndPromotionLineIdNot(
-                requestDTO.getPromotionCode(), lineId)) {
-            throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + requestDTO.getPromotionCode());
-        }
-
         // Kiểm tra xem có thể cập nhật không (dựa vào header)
         validatePromotionCanBeUpdated(existingLine.getHeader());
 
         // Cập nhật thông tin line (không động chạm đến details)
-        existingLine.setPromotionCode(requestDTO.getPromotionCode());
+        existingLine.setLineName(requestDTO.getLineName());
         existingLine.setPromotionType(requestDTO.getPromotionType());
         existingLine.setDescription(requestDTO.getDescription());
         existingLine.setStartDate(requestDTO.getStartDate());

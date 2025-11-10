@@ -21,13 +21,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 public class PromotionLineOnlyRequestDTO {
 
     /**
-     * Mã chương trình khuyến mãi (unique)
-     * Bắt buộc, độ dài từ 3-50 ký tự, chỉ chứa chữ cái, số và dấu gạch dưới
+     * Tên của line khuyến mãi
+     * Bắt buộc, độ dài từ 3-200 ký tự
      */
-    @NotBlank(message = "Mã chương trình khuyến mãi không được để trống")
-    @Size(min = 3, max = 50, message = "Mã chương trình phải có độ dài từ 3-50 ký tự")
-    @Pattern(regexp = "^[A-Za-z0-9_]+$", message = "Mã chương trình chỉ được chứa chữ cái, số và dấu gạch dưới")
-    private String promotionCode;
+    @NotBlank(message = "Tên line khuyến mãi không được để trống")
+    @Size(min = 3, max = 200, message = "Tên line phải có độ dài từ 3-200 ký tự")
+    private String lineName;
 
     /**
      * Loại khuyến mãi

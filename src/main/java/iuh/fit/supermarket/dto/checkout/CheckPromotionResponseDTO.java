@@ -23,8 +23,8 @@ public record CheckPromotionResponseDTO(
      * DTO cho thông tin khuyến mãi đơn hàng (ORDER_DISCOUNT)
      */
     public record OrderPromotionDTO(
-            String promotionId,
             String promotionName,
+            Long promotionLineId,
             Long promotionDetailId,
             String promotionSummary,
             String discountType,

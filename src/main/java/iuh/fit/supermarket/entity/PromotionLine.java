@@ -29,10 +29,10 @@ public class PromotionLine {
     private Long promotionLineId;
 
     /**
-     * Mã chương trình khuyến mãi
+     * Tên của line khuyến mãi
      */
-    @Column(name = "promotion_code", length = 50, nullable = false, unique = true)
-    private String promotionCode;
+    @Column(name = "line_name", length = 200, nullable = false)
+    private String lineName;
 
     /**
      * Loại khuyến mãi của line (được chuyển từ PromotionHeader)

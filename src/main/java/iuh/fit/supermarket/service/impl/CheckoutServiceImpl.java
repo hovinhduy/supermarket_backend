@@ -23,8 +23,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,6 +57,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final AppliedPromotionRepository appliedPromotionRepository;
     private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
     private final iuh.fit.supermarket.service.WarehouseService warehouseService;
+    private final PromotionDetailRepository promotionDetailRepository;
 
     /**
      * Thực hiện checkout giỏ hàng cho khách hàng
@@ -181,8 +184,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             // Set thông tin khuyến mãi nếu có
             if (cartItemResponse.promotionApplied() != null) {
                 PromotionAppliedDTO promotion = cartItemResponse.promotionApplied();
-                orderDetail.setPromotionId(promotion.promotionId());
                 orderDetail.setPromotionName(promotion.promotionName());
+                orderDetail.setPromotionLineId(promotion.promotionLineId());
                 orderDetail.setPromotionDetailId(promotion.promotionDetailId());
                 orderDetail.setPromotionSummary(promotion.promotionSummary());
                 orderDetail.setDiscountType(promotion.discountType());
@@ -338,6 +341,9 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Nếu chuyển sang DELIVERED -> Tạo hóa đơn bán hàng và tự động hoàn thành
         if (newStatus == OrderStatus.DELIVERED) {
             createSalesInvoice(order);
+
+            // Cập nhật số lượng sử dụng khuyến mãi
+            updatePromotionUsageCount(order);
 
             // Tự động chuyển sang trạng thái COMPLETED
             log.info("Tự động chuyển đơn hàng {} từ DELIVERED sang COMPLETED", orderId);
@@ -735,11 +741,11 @@ public class CheckoutServiceImpl implements CheckoutService {
             if (detailIndex < order.getOrderDetails().size()) {
                 OrderDetail orderDetail = order.getOrderDetails().get(detailIndex);
 
-                if (orderDetail.getPromotionId() != null) {
+                if (orderDetail.getPromotionLineId() != null) {
                     AppliedPromotion appliedPromotion = new AppliedPromotion();
                     appliedPromotion.setInvoiceDetail(savedDetail);
-                    appliedPromotion.setPromotionId(orderDetail.getPromotionId());
                     appliedPromotion.setPromotionName(orderDetail.getPromotionName());
+                    appliedPromotion.setPromotionLineId(orderDetail.getPromotionLineId());
                     appliedPromotion.setPromotionDetailId(orderDetail.getPromotionDetailId());
                     appliedPromotion.setPromotionSummary(orderDetail.getPromotionSummary());
                     appliedPromotion.setDiscountType(orderDetail.getDiscountType());
@@ -900,10 +906,10 @@ public class CheckoutServiceImpl implements CheckoutService {
         
         // Lấy khuyến mãi từ OrderDetail (PRODUCT_DISCOUNT, BUY_X_GET_Y)
         for (OrderDetail detail : orderDetails) {
-            if (detail.getPromotionId() != null) {
+            if (detail.getPromotionLineId() != null) {
                 appliedPromotions.add(new PromotionAppliedDTO(
-                    detail.getPromotionId(),
                     detail.getPromotionName(),
+                    detail.getPromotionLineId(),
                     detail.getPromotionDetailId(),
                     detail.getPromotionSummary(),
                     detail.getDiscountType(),
@@ -928,8 +934,8 @@ public class CheckoutServiceImpl implements CheckoutService {
                 // Convert sang PromotionAppliedDTO
                 for (CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion : orderPromotions) {
                     appliedPromotions.add(new PromotionAppliedDTO(
-                        orderPromotion.promotionId(),
                         orderPromotion.promotionName(),
+                        orderPromotion.promotionLineId(),
                         orderPromotion.promotionDetailId(),
                         orderPromotion.promotionSummary(),
                         orderPromotion.discountType(),
@@ -1056,5 +1062,68 @@ public class CheckoutServiceImpl implements CheckoutService {
             List<OrderDetail> orderDetails = orderDetailRepository.findByOrder_OrderId(order.getOrderId());
             return buildCheckoutResponse(order, orderDetails);
         });
+    }
+
+    /**
+     * Cập nhật số lượng sử dụng khuyến mãi khi đơn hàng thành công
+     *
+     * @param order Đơn hàng đã hoàn thành
+     */
+    private void updatePromotionUsageCount(Order order) {
+        log.info("Cập nhật usage count cho các khuyến mãi của đơn hàng {}", order.getOrderId());
+
+        Set<Long> processedDetailIds = new HashSet<>();
+
+        // Cập nhật usageCount cho khuyến mãi từ OrderDetails (PRODUCT_DISCOUNT, BUY_X_GET_Y)
+        for (OrderDetail orderDetail : order.getOrderDetails()) {
+            if (orderDetail.getPromotionDetailId() != null &&
+                !processedDetailIds.contains(orderDetail.getPromotionDetailId())) {
+
+                promotionDetailRepository.findById(orderDetail.getPromotionDetailId())
+                    .ifPresent(detail -> {
+                        Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                        detail.setUsageCount(currentCount + 1);
+                        promotionDetailRepository.save(detail);
+                        log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
+                            detail.getDetailId(), currentCount, currentCount + 1);
+                    });
+
+                processedDetailIds.add(orderDetail.getPromotionDetailId());
+            }
+        }
+
+        // Cập nhật usageCount cho khuyến mãi đơn hàng (ORDER_DISCOUNT)
+        if (order.getAppliedOrderPromotionsJson() != null && !order.getAppliedOrderPromotionsJson().isEmpty()) {
+            try {
+                List<CheckPromotionResponseDTO.OrderPromotionDTO> orderPromotions = objectMapper.readValue(
+                    order.getAppliedOrderPromotionsJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(
+                        List.class,
+                        CheckPromotionResponseDTO.OrderPromotionDTO.class
+                    )
+                );
+
+                for (CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion : orderPromotions) {
+                    if (orderPromotion.promotionDetailId() != null &&
+                        !processedDetailIds.contains(orderPromotion.promotionDetailId())) {
+
+                        promotionDetailRepository.findById(orderPromotion.promotionDetailId())
+                            .ifPresent(detail -> {
+                                Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                                detail.setUsageCount(currentCount + 1);
+                                promotionDetailRepository.save(detail);
+                                log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
+                                    detail.getDetailId(), currentCount, currentCount + 1);
+                            });
+
+                        processedDetailIds.add(orderPromotion.promotionDetailId());
+                    }
+                }
+            } catch (JsonProcessingException e) {
+                log.error("Lỗi khi parse appliedOrderPromotionsJson để cập nhật usageCount", e);
+            }
+        }
+
+        log.info("Hoàn thành cập nhật usage count cho {} promotion details", processedDetailIds.size());
     }
 }

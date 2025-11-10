@@ -25,9 +25,9 @@ public class PromotionLineResponseDTO {
     private Long promotionLineId;
 
     /**
-     * Mã chương trình khuyến mãi (unique)
+     * Tên của line khuyến mãi
      */
-    private String promotionCode;
+    private String lineName;
 
     /**
      * Loại khuyến mãi
@@ -79,11 +79,11 @@ public class PromotionLineResponseDTO {
     /**
      * Constructor cơ bản không bao gồm detail
      */
-    public PromotionLineResponseDTO(Long promotionLineId, String promotionCode, PromotionType promotionType,
+    public PromotionLineResponseDTO(Long promotionLineId, String lineName, PromotionType promotionType,
             String description, LocalDate startDate, LocalDate endDate,
             PromotionStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.promotionLineId = promotionLineId;
-        this.promotionCode = promotionCode;
+        this.lineName = lineName;
         this.promotionType = promotionType;
         this.description = description;
         this.startDate = startDate;

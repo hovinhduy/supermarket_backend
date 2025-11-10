@@ -75,7 +75,7 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
                 result.append("\n📋 CHI TIẾT KHUYẾN MÃI:\n");
 
                 for (PromotionLine line : lines) {
-                    result.append(String.format("   • Mã KM: %s", line.getPromotionCode()));
+                    result.append(String.format("   • Tên: %s", line.getLineName()));
 
                     // Hiển thị loại khuyến mãi cho từng line
                     if (line.getPromotionType() != null) {
@@ -119,6 +119,11 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
                 detailInfo.append("     💰 Ưu đãi:\n");
 
                 for (PromotionDetail detail : details) {
+                    // Hiển thị mã khuyến mãi (giờ nằm ở detail level)
+                    if (detail.getPromotionCode() != null) {
+                        detailInfo.append(String.format("       📍 Mã KM: %s\n", detail.getPromotionCode()));
+                    }
+
                     // Kiểm tra loại detail và format thông tin phù hợp
                     if (detail instanceof OrderDiscountDetail) {
                         OrderDiscountDetail orderDiscount = (OrderDiscountDetail) detail;
@@ -187,7 +192,7 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
                 }
             }
         } catch (Exception e) {
-            log.error("Lỗi khi lấy chi tiết khuyến mãi cho line {}: {}", line.getPromotionCode(), e.getMessage());
+            log.error("Lỗi khi lấy chi tiết khuyến mãi cho line {}: {}", line.getLineName(), e.getMessage());
         }
 
         return detailInfo.toString();

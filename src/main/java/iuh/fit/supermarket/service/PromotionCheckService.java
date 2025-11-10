@@ -94,10 +94,10 @@ public class PromotionCheckService {
                 lineTotal = lineTotal.subtract(discountAmount);
 
                 promotionApplied = new PromotionAppliedDTO(
-                        applicableDiscount.getPromotionLine().getPromotionCode(),
                         applicableDiscount.getPromotionLine().getDescription() != null
                             ? applicableDiscount.getPromotionLine().getDescription()
                             : "Giảm giá sản phẩm",
+                        applicableDiscount.getPromotionLine().getPromotionLineId(),
                         applicableDiscount.getDetailId(),
                         buildProductDiscountSummary(applicableDiscount, productUnit),
                         mapDiscountType(applicableDiscount.getProductDiscountType()),
@@ -200,11 +200,11 @@ public class PromotionCheckService {
                                 }
 
                                 PromotionAppliedDTO promotionAppliedDTO = new PromotionAppliedDTO(
-                                        giftPromotion.getPromotionLine().getPromotionCode(),
                                         giftPromotion.getPromotionLine().getDescription() != null
                                             ? giftPromotion.getPromotionLine().getDescription()
                                             : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
                                               (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                        giftPromotion.getPromotionLine().getPromotionLineId(),
                                         giftPromotion.getDetailId(),
                                         buildBuyXGetYDiscountSummary(giftPromotion),
                                         mapDiscountType(giftPromotion.getGiftDiscountType()),
@@ -275,11 +275,11 @@ public class PromotionCheckService {
                                 }
 
                                 promotionApplied = new PromotionAppliedDTO(
-                                        giftPromotion.getPromotionLine().getPromotionCode(),
                                         giftPromotion.getPromotionLine().getDescription() != null
                                             ? giftPromotion.getPromotionLine().getDescription()
                                             : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
                                               (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                        giftPromotion.getPromotionLine().getPromotionLineId(),
                                         giftPromotion.getDetailId(),
                                         buildBuyXGetYDiscountSummary(giftPromotion),
                                         mapDiscountType(giftPromotion.getGiftDiscountType()),
@@ -327,11 +327,11 @@ public class PromotionCheckService {
                             }
 
                             PromotionAppliedDTO promotionAppliedDTO = new PromotionAppliedDTO(
-                                    giftPromotion.getPromotionLine().getPromotionCode(),
                                     giftPromotion.getPromotionLine().getDescription() != null
                                         ? giftPromotion.getPromotionLine().getDescription()
                                         : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
                                           (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                    giftPromotion.getPromotionLine().getPromotionLineId(),
                                     giftPromotion.getDetailId(),
                                     buildBuyXGetYDiscountSummary(giftPromotion),
                                     mapDiscountType(giftPromotion.getGiftDiscountType()),
@@ -394,11 +394,11 @@ public class PromotionCheckService {
                             }
 
                             promotionApplied = new PromotionAppliedDTO(
-                                    giftPromotion.getPromotionLine().getPromotionCode(),
                                     giftPromotion.getPromotionLine().getDescription() != null
                                         ? giftPromotion.getPromotionLine().getDescription()
                                         : "Mua " + giftPromotion.getBuyMinQuantity() + " tặng " +
                                           (giftPromotion.getGiftQuantity() != null ? giftPromotion.getGiftQuantity() : 1),
+                                    giftPromotion.getPromotionLine().getPromotionLineId(),
                                     giftPromotion.getDetailId(),
                                     buildBuyXGetYDiscountSummary(giftPromotion),
                                     mapDiscountType(giftPromotion.getGiftDiscountType()),
@@ -574,7 +574,9 @@ public class PromotionCheckService {
             for (PromotionDetail detail : details) {
                 if (detail instanceof BuyXGetYDetail buyXGetYDetail) {
                     // Chỉ lấy promotion có giftDiscountType = FREE (tự động tặng)
+                    // VÀ kiểm tra còn lượt sử dụng
                     if (buyXGetYDetail.getGiftDiscountType() == DiscountType.FREE &&
+                        canUsePromotion(buyXGetYDetail) &&
                         isBuyXGetYApplicable(buyXGetYDetail, productUnitId, quantity)) {
                         applicablePromotions.add(buyXGetYDetail);
                     }
@@ -609,7 +611,10 @@ public class PromotionCheckService {
 
             for (PromotionDetail detail : details) {
                 if (detail instanceof BuyXGetYDetail buyXGetYDetail) {
-                    allPromotions.add(buyXGetYDetail);
+                    // Kiểm tra còn lượt sử dụng không
+                    if (canUsePromotion(buyXGetYDetail)) {
+                        allPromotions.add(buyXGetYDetail);
+                    }
                 }
             }
         }
@@ -800,10 +805,10 @@ public class PromotionCheckService {
                 + (promotion.getGiftQuantity() != null ? promotion.getGiftQuantity() : 1);
 
         PromotionAppliedDTO promotionApplied = new PromotionAppliedDTO(
-                promotion.getPromotionLine().getPromotionCode(),
-                promotion.getPromotionLine().getDescription() != null 
-                    ? promotion.getPromotionLine().getDescription() 
+                promotion.getPromotionLine().getDescription() != null
+                    ? promotion.getPromotionLine().getDescription()
                     : defaultDescription,
+                promotion.getPromotionLine().getPromotionLineId(),
                 promotion.getDetailId(),
                 buildBuyXGetYSummary(promotion, giftQuantity),
                 discountTypeStr,
@@ -956,17 +961,17 @@ public class PromotionCheckService {
                     totalAfterLineDiscount
             );
             
-            log.info("Áp dụng ORDER_DISCOUNT: {} - Giảm {}đ", 
-                    applicableOrderDiscount.getPromotionLine().getPromotionCode(),
+            log.info("Áp dụng ORDER_DISCOUNT: {} - Giảm {}đ",
+                    applicableOrderDiscount.getPromotionCode(),
                     orderDiscount);
-            
+
             // Thêm thông tin ORDER_DISCOUNT vào danh sách
-            CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion = 
+            CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion =
                     new CheckPromotionResponseDTO.OrderPromotionDTO(
-                            applicableOrderDiscount.getPromotionLine().getPromotionCode(),
                             applicableOrderDiscount.getPromotionLine().getDescription() != null
                                 ? applicableOrderDiscount.getPromotionLine().getDescription()
                                 : "Giảm giá đơn hàng",
+                            applicableOrderDiscount.getPromotionLine().getPromotionLineId(),
                             applicableOrderDiscount.getDetailId(),
                             buildOrderDiscountSummary(applicableOrderDiscount),
                             mapDiscountType(applicableOrderDiscount.getOrderDiscountType()),
@@ -1021,7 +1026,10 @@ public class PromotionCheckService {
 
             for (PromotionDetail detail : details) {
                 if (detail instanceof ProductDiscountDetail productDiscountDetail) {
-                    productDiscounts.add(productDiscountDetail);
+                    // Kiểm tra còn lượt sử dụng không
+                    if (canUsePromotion(productDiscountDetail)) {
+                        productDiscounts.add(productDiscountDetail);
+                    }
                 }
             }
         }
@@ -1157,12 +1165,17 @@ public class PromotionCheckService {
 
             for (PromotionDetail detail : details) {
                 if (detail instanceof OrderDiscountDetail orderDiscountDetail) {
+                    // Kiểm tra còn lượt sử dụng không
+                    if (!canUsePromotion(orderDiscountDetail)) {
+                        continue;
+                    }
+
                     if (isOrderDiscountApplicable(orderDiscountDetail, totalAfterLineDiscount, totalQuantity)) {
                         BigDecimal discountAmount = calculateOrderDiscountAmount(
                                 orderDiscountDetail,
                                 totalAfterLineDiscount
                         );
-                        
+
                         if (discountAmount.compareTo(maxDiscountAmount) > 0) {
                             maxDiscountAmount = discountAmount;
                             bestDiscount = orderDiscountDetail;
@@ -1379,7 +1392,24 @@ public class PromotionCheckService {
         if (!conditions.isEmpty()) {
             summary.append(" (").append(String.join(" và ", conditions)).append(")");
         }
-        
+
         return summary.toString();
+    }
+
+    /**
+     * Kiểm tra xem promotion detail còn có thể sử dụng không dựa trên usageLimit và usageCount
+     *
+     * @param detail PromotionDetail cần kiểm tra
+     * @return true nếu còn có thể sử dụng, false nếu đã hết lượt
+     */
+    private boolean canUsePromotion(PromotionDetail detail) {
+        // Nếu không có giới hạn (usageLimit = null), luôn có thể sử dụng
+        if (detail.getUsageLimit() == null) {
+            return true;
+        }
+
+        // Nếu có giới hạn, kiểm tra usageCount < usageLimit
+        Integer usageCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+        return usageCount < detail.getUsageLimit();
     }
 }

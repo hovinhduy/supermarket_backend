@@ -1,5 +1,8 @@
 package iuh.fit.supermarket.service.impl;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import iuh.fit.supermarket.dto.checkout.CheckPromotionResponseDTO;
 import iuh.fit.supermarket.dto.checkout.PromotionAppliedDTO;
 import iuh.fit.supermarket.dto.sale.OrderPromotionRequestDTO;
 import iuh.fit.supermarket.entity.*;
@@ -17,9 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Implementation của InvoiceService
@@ -35,6 +40,8 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final AppliedPromotionRepository appliedPromotionRepository;
     private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
     private final WarehouseService warehouseService;
+    private final PromotionDetailRepository promotionDetailRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -107,7 +114,74 @@ public class InvoiceServiceImpl implements InvoiceService {
             saleInvoiceDetailRepository.save(invoiceDetail);
         }
 
+        // Cập nhật usage count cho các khuyến mãi đã sử dụng
+        updatePromotionUsageCount(order);
+        log.info("Đã cập nhật usage count cho các khuyến mãi của order {}", orderId);
+
         return invoiceNumber;
+    }
+
+    /**
+     * Cập nhật số lượng sử dụng khuyến mãi khi tạo hóa đơn
+     *
+     * @param order Đơn hàng đã hoàn thành
+     */
+    private void updatePromotionUsageCount(Order order) {
+        log.info("Cập nhật usage count cho các khuyến mãi của đơn hàng {}", order.getOrderId());
+
+        Set<Long> processedDetailIds = new HashSet<>();
+
+        // Cập nhật usageCount cho khuyến mãi từ OrderDetails (PRODUCT_DISCOUNT, BUY_X_GET_Y)
+        for (OrderDetail orderDetail : order.getOrderDetails()) {
+            if (orderDetail.getPromotionDetailId() != null &&
+                !processedDetailIds.contains(orderDetail.getPromotionDetailId())) {
+
+                promotionDetailRepository.findById(orderDetail.getPromotionDetailId())
+                    .ifPresent(detail -> {
+                        Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                        detail.setUsageCount(currentCount + 1);
+                        promotionDetailRepository.save(detail);
+                        log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
+                            detail.getDetailId(), currentCount, currentCount + 1);
+                    });
+
+                processedDetailIds.add(orderDetail.getPromotionDetailId());
+            }
+        }
+
+        // Cập nhật usageCount cho khuyến mãi đơn hàng (ORDER_DISCOUNT)
+        if (order.getAppliedOrderPromotionsJson() != null && !order.getAppliedOrderPromotionsJson().isEmpty()) {
+            try {
+                List<CheckPromotionResponseDTO.OrderPromotionDTO> orderPromotions = objectMapper.readValue(
+                    order.getAppliedOrderPromotionsJson(),
+                    objectMapper.getTypeFactory().constructCollectionType(
+                        List.class,
+                        CheckPromotionResponseDTO.OrderPromotionDTO.class
+                    )
+                );
+
+                for (CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion : orderPromotions) {
+                    if (orderPromotion.promotionDetailId() != null &&
+                        !processedDetailIds.contains(orderPromotion.promotionDetailId())) {
+
+                        promotionDetailRepository.findById(orderPromotion.promotionDetailId())
+                            .ifPresent(detail -> {
+                                Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                                detail.setUsageCount(currentCount + 1);
+                                promotionDetailRepository.save(detail);
+                                log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
+                                    detail.getDetailId(), currentCount, currentCount + 1);
+                            });
+
+                        processedDetailIds.add(orderPromotion.promotionDetailId());
+                    }
+                }
+            } catch (JsonProcessingException e) {
+                log.error("Lỗi khi parse appliedOrderPromotionsJson để cập nhật usageCount", e);
+            }
+        }
+
+        log.info("Hoàn thành cập nhật usage count cho {} promotion details", processedDetailIds.size());
     }
 
     @Override
@@ -147,8 +221,8 @@ public class InvoiceServiceImpl implements InvoiceService {
                 
                 if (promotion != null) {
                     AppliedPromotion appliedPromotion = new AppliedPromotion();
-                    appliedPromotion.setPromotionId(promotion.promotionId());
                     appliedPromotion.setPromotionName(promotion.promotionName());
+                    appliedPromotion.setPromotionLineId(promotion.promotionLineId());
                     appliedPromotion.setPromotionDetailId(promotion.promotionDetailId());
                     appliedPromotion.setPromotionSummary(promotion.promotionSummary());
                     appliedPromotion.setDiscountType(promotion.discountType());

@@ -36,6 +36,24 @@ public abstract class PromotionDetail {
     private PromotionLine promotionLine;
 
     /**
+     * Mã khuyến mãi duy nhất
+     */
+    @Column(name = "promotion_code", length = 50, nullable = false, unique = true)
+    private String promotionCode;
+
+    /**
+     * Giới hạn số lần sử dụng (null = không giới hạn)
+     */
+    @Column(name = "usage_limit")
+    private Integer usageLimit;
+
+    /**
+     * Số lần đã sử dụng
+     */
+    @Column(name = "usage_count", nullable = false)
+    private Integer usageCount = 0;
+
+    /**
      * Lấy loại khuyến mãi từ subclass
      */
     public abstract PromotionType getPromotionType();

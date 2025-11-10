@@ -52,6 +52,7 @@ public class SaleServiceImpl implements SaleService {
     private final PaymentService paymentService;
     private final InvoiceService invoiceService;
     private final InvoicePdfService invoicePdfService;
+    private final PromotionDetailRepository promotionDetailRepository;
 
     @Override
     @Transactional
@@ -69,6 +70,9 @@ public class SaleServiceImpl implements SaleService {
                     .orElseThrow(() -> new InvalidSaleDataException(
                             "Không tìm thấy khách hàng với ID: " + request.customerId()));
         }
+
+        // Validate khuyến mãi (kiểm tra usageLimit)
+        validatePromotions(request);
 
         // Kiểm tra tồn kho
         validateAndCheckStock(request.items());
@@ -180,6 +184,9 @@ public class SaleServiceImpl implements SaleService {
                         "Bán hàng thanh toán tiền mặt - Invoice: " + invoiceNumber);
             }
             log.info("Đã trừ kho cho invoice {} (thanh toán tiền mặt)", invoiceNumber);
+
+            // Cập nhật usage count cho khuyến mãi (thanh toán tiền mặt)
+            updatePromotionUsageCount(request, invoiceNumber);
         }
 
         BigDecimal changeAmount = isCashPayment ? request.amountPaid().subtract(totalAmount) : BigDecimal.ZERO;
@@ -389,8 +396,8 @@ public class SaleServiceImpl implements SaleService {
      */
     private AppliedPromotionDetailDTO convertToAppliedPromotionDetailDTO(AppliedPromotion promotion) {
         return new AppliedPromotionDetailDTO(
-                promotion.getPromotionId(),
                 promotion.getPromotionName(),
+                promotion.getPromotionLineId(),
                 promotion.getPromotionDetailId(),
                 promotion.getPromotionSummary(),
                 promotion.getDiscountType(),
@@ -614,6 +621,151 @@ public class SaleServiceImpl implements SaleService {
             case PAID -> "Đã thanh toán";
             default -> status.name();
         };
+    }
+
+    /**
+     * Validate các khuyến mãi trong request còn sử dụng được không
+     * Kiểm tra usageLimit trước khi áp dụng
+     *
+     * @param request Thông tin bán hàng
+     * @throws InvalidSaleDataException nếu promotion đã hết lượt sử dụng
+     */
+    private void validatePromotions(CreateSaleRequestDTO request) {
+        log.debug("Bắt đầu validate khuyến mãi cho bán hàng");
+
+        java.util.Set<Long> checkedPromotionIds = new java.util.HashSet<>();
+
+        // Validate khuyến mãi từ items
+        for (SaleItemRequestDTO item : request.items()) {
+            if (item.promotionApplied() != null &&
+                item.promotionApplied().promotionDetailId() != null) {
+
+                Long promotionDetailId = item.promotionApplied().promotionDetailId();
+
+                // Tránh kiểm tra trùng
+                if (checkedPromotionIds.contains(promotionDetailId)) {
+                    continue;
+                }
+
+                PromotionDetail detail = promotionDetailRepository.findById(promotionDetailId)
+                    .orElseThrow(() -> new InvalidSaleDataException(
+                        "Không tìm thấy khuyến mãi với ID: " + promotionDetailId));
+
+                // Kiểm tra usageLimit
+                if (!canUsePromotion(detail)) {
+                    String promotionName = item.promotionApplied().promotionName();
+                    throw new InvalidSaleDataException(
+                        String.format("Khuyến mãi '%s' đã hết lượt sử dụng (giới hạn: %d, đã dùng: %d)",
+                            promotionName,
+                            detail.getUsageLimit(),
+                            detail.getUsageCount()));
+                }
+
+                checkedPromotionIds.add(promotionDetailId);
+            }
+        }
+
+        // Validate khuyến mãi order level
+        if (request.appliedOrderPromotions() != null) {
+            for (var orderPromotion : request.appliedOrderPromotions()) {
+                if (orderPromotion.promotionDetailId() != null) {
+                    Long promotionDetailId = orderPromotion.promotionDetailId();
+
+                    // Tránh kiểm tra trùng
+                    if (checkedPromotionIds.contains(promotionDetailId)) {
+                        continue;
+                    }
+
+                    PromotionDetail detail = promotionDetailRepository.findById(promotionDetailId)
+                        .orElseThrow(() -> new InvalidSaleDataException(
+                            "Không tìm thấy khuyến mãi với ID: " + promotionDetailId));
+
+                    // Kiểm tra usageLimit
+                    if (!canUsePromotion(detail)) {
+                        String promotionName = orderPromotion.promotionName();
+                        throw new InvalidSaleDataException(
+                            String.format("Khuyến mãi '%s' đã hết lượt sử dụng (giới hạn: %d, đã dùng: %d)",
+                                promotionName,
+                                detail.getUsageLimit(),
+                                detail.getUsageCount()));
+                    }
+
+                    checkedPromotionIds.add(promotionDetailId);
+                }
+            }
+        }
+
+        log.info("Đã validate {} khuyến mãi, tất cả còn khả dụng", checkedPromotionIds.size());
+    }
+
+    /**
+     * Kiểm tra xem promotion detail còn có thể sử dụng không
+     *
+     * @param detail PromotionDetail cần kiểm tra
+     * @return true nếu còn có thể sử dụng, false nếu đã hết lượt
+     */
+    private boolean canUsePromotion(PromotionDetail detail) {
+        // Nếu không có giới hạn (usageLimit = null), luôn có thể sử dụng
+        if (detail.getUsageLimit() == null) {
+            return true;
+        }
+
+        // Nếu có giới hạn, kiểm tra usageCount < usageLimit
+        Integer usageCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+        return usageCount < detail.getUsageLimit();
+    }
+
+    /**
+     * Cập nhật số lượng sử dụng khuyến mãi khi bán hàng thành công
+     *
+     * @param request Thông tin bán hàng
+     * @param invoiceNumber Số hóa đơn
+     */
+    private void updatePromotionUsageCount(CreateSaleRequestDTO request, String invoiceNumber) {
+        log.info("Cập nhật usage count cho các khuyến mãi của invoice {}", invoiceNumber);
+
+        java.util.Set<Long> processedDetailIds = new java.util.HashSet<>();
+
+        // Cập nhật usageCount cho khuyến mãi từ items
+        for (SaleItemRequestDTO item : request.items()) {
+            if (item.promotionApplied() != null &&
+                item.promotionApplied().promotionDetailId() != null &&
+                !processedDetailIds.contains(item.promotionApplied().promotionDetailId())) {
+
+                promotionDetailRepository.findById(item.promotionApplied().promotionDetailId())
+                    .ifPresent(detail -> {
+                        Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                        detail.setUsageCount(currentCount + 1);
+                        promotionDetailRepository.save(detail);
+                        log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
+                            detail.getDetailId(), currentCount, currentCount + 1);
+                    });
+
+                processedDetailIds.add(item.promotionApplied().promotionDetailId());
+            }
+        }
+
+        // Cập nhật usageCount cho khuyến mãi đơn hàng
+        if (request.appliedOrderPromotions() != null) {
+            for (var orderPromotion : request.appliedOrderPromotions()) {
+                if (orderPromotion.promotionDetailId() != null &&
+                    !processedDetailIds.contains(orderPromotion.promotionDetailId())) {
+
+                    promotionDetailRepository.findById(orderPromotion.promotionDetailId())
+                        .ifPresent(detail -> {
+                            Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                            detail.setUsageCount(currentCount + 1);
+                            promotionDetailRepository.save(detail);
+                            log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
+                                detail.getDetailId(), currentCount, currentCount + 1);
+                        });
+
+                    processedDetailIds.add(orderPromotion.promotionDetailId());
+                }
+            }
+        }
+
+        log.info("Hoàn thành cập nhật usage count cho {} promotion details", processedDetailIds.size());
     }
 
     private String getPaymentMethodText(PaymentMethod method) {

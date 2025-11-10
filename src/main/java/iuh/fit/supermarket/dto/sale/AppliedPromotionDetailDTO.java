@@ -6,8 +6,8 @@ import java.math.BigDecimal;
  * DTO chứa thông tin khuyến mãi áp dụng cho chi tiết hóa đơn
  */
 public record AppliedPromotionDetailDTO(
-        String promotionId,
         String promotionName,
+        Long promotionLineId,
         Long promotionDetailId,
         String promotionSummary,
         String discountType,

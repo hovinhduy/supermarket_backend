@@ -28,16 +28,16 @@ public class AppliedPromotion {
     private Long appliedPromotionId;
 
     /**
-     * Mã khuyến mãi
-     */
-    @Column(name = "promotion_id", length = 50)
-    private String promotionId;
-
-    /**
      * Tên khuyến mãi
      */
     @Column(name = "promotion_name", length = 255)
     private String promotionName;
+
+    /**
+     * ID của promotion line
+     */
+    @Column(name = "promotion_line_id")
+    private Long promotionLineId;
 
     /**
      * ID chi tiết khuyến mãi

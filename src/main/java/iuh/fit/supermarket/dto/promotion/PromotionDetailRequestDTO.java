@@ -22,6 +22,27 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @AllArgsConstructor
 public class PromotionDetailRequestDTO {
 
+    /**
+     * Mã khuyến mãi duy nhất
+     * Bắt buộc, độ dài từ 3-50 ký tự, chỉ chứa chữ cái, số và dấu gạch dưới
+     */
+    @NotBlank(message = "Mã khuyến mãi không được để trống")
+    @Size(min = 3, max = 50, message = "Mã khuyến mãi phải có độ dài từ 3-50 ký tự")
+    @Pattern(regexp = "^[A-Za-z0-9_]+$", message = "Mã khuyến mãi chỉ được chứa chữ cái, số và dấu gạch dưới")
+    private String promotionCode;
+
+    /**
+     * Giới hạn số lần sử dụng (null = không giới hạn)
+     */
+    @Min(value = 1, message = "Giới hạn số lần sử dụng phải là số dương")
+    private Integer usageLimit;
+
+    /**
+     * Số lần đã sử dụng (mặc định là 0 khi tạo mới)
+     */
+    @Min(value = 0, message = "Số lần đã sử dụng không được âm")
+    private Integer usageCount;
+
     // =====================================================
     // LOẠI 1: MUA X TẶNG Y (BUY_X_GET_Y)
     // =====================================================

@@ -22,6 +22,21 @@ public class PromotionDetailResponseDTO {
      */
     private Long detailId;
 
+    /**
+     * Mã khuyến mãi duy nhất
+     */
+    private String promotionCode;
+
+    /**
+     * Giới hạn số lần sử dụng (null = không giới hạn)
+     */
+    private Integer usageLimit;
+
+    /**
+     * Số lần đã sử dụng
+     */
+    private Integer usageCount;
+
     // =====================================================
     // LOẠI 1: MUA X TẶNG Y (BUY_X_GET_Y)
     // =====================================================

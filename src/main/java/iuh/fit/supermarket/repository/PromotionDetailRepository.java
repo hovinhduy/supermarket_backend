@@ -17,8 +17,33 @@ import java.util.Optional;
 public interface PromotionDetailRepository extends JpaRepository<PromotionDetail, Long> {
 
     /**
+     * Tìm promotion detail theo mã khuyến mãi (không phân biệt hoa thường)
+     *
+     * @param promotionCode mã khuyến mãi
+     * @return Optional chứa PromotionDetail nếu tìm thấy
+     */
+    Optional<PromotionDetail> findByPromotionCodeIgnoreCase(String promotionCode);
+
+    /**
+     * Kiểm tra xem mã khuyến mãi đã tồn tại chưa
+     *
+     * @param promotionCode mã khuyến mãi
+     * @return true nếu mã đã tồn tại
+     */
+    boolean existsByPromotionCodeIgnoreCase(String promotionCode);
+
+    /**
+     * Kiểm tra xem mã khuyến mãi đã tồn tại chưa (trừ detail hiện tại)
+     *
+     * @param promotionCode mã khuyến mãi
+     * @param detailId ID của detail hiện tại (để loại trừ)
+     * @return true nếu mã đã tồn tại
+     */
+    boolean existsByPromotionCodeIgnoreCaseAndDetailIdNot(String promotionCode, Long detailId);
+
+    /**
      * Tìm tất cả chi tiết khuyến mãi theo ID của promotion line
-     * 
+     *
      * @param promotionLineId ID của PromotionLine
      * @return List chứa các PromotionDetail
      */

@@ -83,7 +83,7 @@ public class PromotionController {
             @Parameter(description = "ID của promotion header", required = true) @PathVariable Long headerId,
             @Valid @RequestBody PromotionLineOnlyRequestDTO requestDTO) {
 
-        log.info("API: Tạo promotion line mới cho header ID: {} - {}", headerId, requestDTO.getPromotionCode());
+        log.info("API: Tạo promotion line mới cho header ID: {} - {}", headerId, requestDTO.getLineName());
 
         PromotionLineResponseDTO responseDTO = promotionService.createPromotionLineOnly(headerId, requestDTO);
 
@@ -236,7 +236,7 @@ public class PromotionController {
             @Parameter(description = "ID của promotion line", required = true) @PathVariable Long lineId,
             @Valid @RequestBody PromotionLineOnlyRequestDTO requestDTO) {
 
-        log.info("API: Cập nhật promotion line ID: {} - {}", lineId, requestDTO.getPromotionCode());
+        log.info("API: Cập nhật promotion line ID: {} - {}", lineId, requestDTO.getLineName());
 
         PromotionLineResponseDTO responseDTO = promotionService.updatePromotionLine(lineId, requestDTO);
 
