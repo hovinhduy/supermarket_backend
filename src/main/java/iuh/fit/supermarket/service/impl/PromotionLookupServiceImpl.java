@@ -36,14 +36,13 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
 
     /**
      * Lấy khuyến mãi đang có với thông tin chi tiết từ Lines và Details
-     * Header chỉ dùng để kiểm tra còn active và còn hạn
-     * Data thực tế được lấy từ Line và Detail
+     * Trả về format JSON để AI có thể parse thành structured data
      */
     @Override
     public String getActivePromotions(int limit) {
         LocalDate now = LocalDate.now();
 
-        // Lấy các header còn active và còn hạn (chỉ để kiểm tra)
+        // Lấy các header còn active và còn hạn
         List<PromotionHeader> activeHeaders = promotionRepository
                 .findActivePromotions(now, PageRequest.of(0, limit))
                 .getContent();
@@ -52,182 +51,379 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
             return "Hiện tại không có chương trình khuyến mãi nào đang diễn ra.";
         }
 
-        StringBuilder result = new StringBuilder("🎁 KHUYẾN MÃI ĐANG DIỄN RA:\n");
-        result.append("═".repeat(50)).append("\n\n");
-
-        int promotionCount = 0;
+        StringBuilder result = new StringBuilder("[PROMOTIONS]\n");
 
         for (PromotionHeader header : activeHeaders) {
             // Lấy các line còn active và còn hạn của header này
             List<PromotionLine> activeLines = promotionLineRepository
                     .findActiveLinesByHeaderId(header.getPromotionId(), now);
 
-            // Chỉ hiển thị header nếu có line active
+            // Chỉ xử lý nếu có line active
             if (activeLines.isEmpty()) {
                 continue;
             }
 
-            promotionCount++;
-
-            // Hiển thị tên header ngắn gọn (chỉ để group các line)
-            result.append(String.format("📌 %d. CHƯƠNG TRÌNH: %s\n", promotionCount, header.getPromotionName().toUpperCase()));
-            result.append("─".repeat(40)).append("\n\n");
-
-            // Focus vào Line và Detail
+            // Mỗi line + detail tạo thành một promotion riêng
             for (PromotionLine line : activeLines) {
-                result.append(String.format("   🏷️  %s", line.getLineName()));
+                // Lấy các detail của line này
+                List<PromotionDetail> details = promotionDetailRepository
+                        .findByPromotionLine_PromotionLineId(line.getPromotionLineId());
 
-                // Hiển thị loại khuyến mãi
-                if (line.getPromotionType() != null) {
-                    result.append(String.format(" [%s]", translatePromotionType(line.getPromotionType())));
+                for (PromotionDetail detail : details) {
+                    result.append(formatPromotionAsJson(line, detail));
                 }
-                result.append("\n");
-
-                // Thời gian của line
-                result.append(String.format("       📅 %s - %s\n",
-                        line.getStartDate().format(dateFormatter),
-                        line.getEndDate().format(dateFormatter)
-                ));
-
-                // Mô tả line
-                if (line.getDescription() != null && !line.getDescription().isEmpty()) {
-                    result.append(String.format("       📝 %s\n", line.getDescription()));
-                }
-
-                // Lấy thông tin chi tiết từ Detail
-                String detailInfo = getPromotionDetailInfo(line);
-                if (!detailInfo.isEmpty()) {
-                    result.append(detailInfo);
-                }
-
-                result.append("\n");
             }
-
-            result.append("═".repeat(50)).append("\n\n");
         }
 
-        if (promotionCount == 0) {
-            return "Hiện tại không có chương trình khuyến mãi nào đang diễn ra.";
-        }
-
-        log.info("🎁 Đã tải {} chương trình khuyến mãi với {} line đang active",
-                activeHeaders.size(), promotionCount);
+        log.info("🎁 Đã tải khuyến mãi từ {} header", activeHeaders.size());
         return result.toString();
     }
 
     /**
-     * Lấy thông tin chi tiết của PromotionDetail dựa trên PromotionLine
+     * Format promotion thành JSON cho AI parse
+     * Mỗi PromotionLine + PromotionDetail = 1 promotion entry
      */
-    private String getPromotionDetailInfo(PromotionLine line) {
-        StringBuilder detailInfo = new StringBuilder();
+    private String formatPromotionAsJson(PromotionLine line, PromotionDetail detail) {
+        StringBuilder json = new StringBuilder();
 
-        try {
-            // Tìm PromotionDetail liên quan đến line này
-            List<PromotionDetail> details = promotionDetailRepository.findByPromotionLine_PromotionLineId(line.getPromotionLineId());
+        json.append("{\n");
+        json.append(String.format("  \"promotion_line_id\": %d,\n", line.getPromotionLineId()));
+        json.append(String.format("  \"promotion_code\": \"%s\",\n",
+                detail.getPromotionCode() != null ? detail.getPromotionCode() : ""));
+        json.append(String.format("  \"name\": \"%s\",\n", escapejson(line.getLineName())));
+        json.append(String.format("  \"description\": \"%s\",\n",
+                line.getDescription() != null ? escapejson(line.getDescription()) : ""));
+        
+        // Thêm mô tả ngắn gọn, dễ hiểu
+        String summary = generatePromotionSummary(detail);
+        json.append(String.format("  \"summary\": \"%s\",\n", escapejson(summary)));
+        
+        json.append(String.format("  \"type\": \"%s\",\n", line.getPromotionType().name()));
+        json.append(String.format("  \"start_date\": \"%s\",\n", line.getStartDate()));
+        json.append(String.format("  \"end_date\": \"%s\",\n", line.getEndDate()));
+        json.append(String.format("  \"status\": \"%s\",\n", line.getStatus().name()));
+        json.append(String.format("  \"usage_limit\": %s,\n",
+                detail.getUsageLimit() != null ? detail.getUsageLimit() : "null"));
+        json.append(String.format("  \"usage_count\": %d,\n", detail.getUsageCount()));
 
-            if (!details.isEmpty()) {
-                detailInfo.append("     💰 Ưu đãi:\n");
-
-                for (PromotionDetail detail : details) {
-                    // Hiển thị mã khuyến mãi (giờ nằm ở detail level)
-                    if (detail.getPromotionCode() != null) {
-                        detailInfo.append(String.format("       📍 Mã KM: %s\n", detail.getPromotionCode()));
-                    }
-
-                    // Kiểm tra loại detail và format thông tin phù hợp
-                    if (detail instanceof OrderDiscountDetail) {
-                        OrderDiscountDetail orderDiscount = (OrderDiscountDetail) detail;
-                        if (orderDiscount.getOrderDiscountType() == iuh.fit.supermarket.enums.DiscountType.PERCENTAGE) {
-                            detailInfo.append(String.format("       - Giảm %s%% cho đơn hàng",
-                                    orderDiscount.getOrderDiscountValue()));
-                            if (orderDiscount.getOrderDiscountMaxValue() != null) {
-                                detailInfo.append(String.format(" (Tối đa: %,.0fđ)",
-                                        orderDiscount.getOrderDiscountMaxValue()));
-                            }
-                            detailInfo.append("\n");
-                        } else {
-                            detailInfo.append(String.format("       - Giảm trực tiếp: %,.0fđ\n",
-                                    orderDiscount.getOrderDiscountValue()));
-                        }
-
-                        if (orderDiscount.getOrderMinTotalValue() != null) {
-                            detailInfo.append(String.format("       - Áp dụng cho đơn từ: %,.0fđ\n",
-                                    orderDiscount.getOrderMinTotalValue()));
-                        }
-                    } else if (detail instanceof ProductDiscountDetail) {
-                        ProductDiscountDetail productDiscount = (ProductDiscountDetail) detail;
-                        if (productDiscount.getProductDiscountType() == iuh.fit.supermarket.enums.DiscountType.PERCENTAGE) {
-                            detailInfo.append(String.format("       - Giảm %s%% cho sản phẩm\n",
-                                    productDiscount.getProductDiscountValue()));
-                        } else {
-                            detailInfo.append(String.format("       - Giảm %,.0fđ cho sản phẩm\n",
-                                    productDiscount.getProductDiscountValue()));
-                        }
-
-                        if (productDiscount.getApplyToProduct() != null && productDiscount.getApplyToProduct().getProduct() != null) {
-                            detailInfo.append(String.format("       - Sản phẩm: %s\n",
-                                    productDiscount.getApplyToProduct().getProduct().getName()));
-                        }
-
-                        if (productDiscount.getProductMinOrderValue() != null) {
-                            detailInfo.append(String.format("       - Đơn hàng tối thiểu: %,.0fđ\n",
-                                    productDiscount.getProductMinOrderValue()));
-                        }
-                    } else if (detail instanceof BuyXGetYDetail) {
-                        BuyXGetYDetail buyXGetY = (BuyXGetYDetail) detail;
-
-                        // Hiển thị sản phẩm mua trước
-                        if (buyXGetY.getBuyProduct() != null && buyXGetY.getBuyProduct().getProduct() != null) {
-                            detailInfo.append(String.format("       - Sản phẩm áp dụng: %s\n",
-                                    buyXGetY.getBuyProduct().getProduct().getName()));
-                        }
-
-                        // Hiển thị điều kiện và ưu đãi tùy theo giftDiscountType
-                        if (buyXGetY.getBuyMinQuantity() != null && buyXGetY.getGiftQuantity() != null) {
-                            if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.FREE) {
-                                // Tặng miễn phí
-                                detailInfo.append(String.format("       - Mua %d tặng %d miễn phí\n",
-                                        buyXGetY.getBuyMinQuantity(),
-                                        buyXGetY.getGiftQuantity()));
-                            } else if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.PERCENTAGE) {
-                                // Giảm % cho sản phẩm tiếp theo
-                                detailInfo.append(String.format("       - Mua %d giảm %s%% cho %d sản phẩm tiếp theo\n",
-                                        buyXGetY.getBuyMinQuantity(),
-                                        buyXGetY.getGiftDiscountValue(),
-                                        buyXGetY.getGiftQuantity()));
-                            } else if (buyXGetY.getGiftDiscountType() == iuh.fit.supermarket.enums.DiscountType.FIXED_AMOUNT) {
-                                // Giảm số tiền cố định cho sản phẩm tiếp theo
-                                detailInfo.append(String.format("       - Mua %d giảm %,.0fđ cho %d sản phẩm tiếp theo\n",
-                                        buyXGetY.getBuyMinQuantity(),
-                                        buyXGetY.getGiftDiscountValue(),
-                                        buyXGetY.getGiftQuantity()));
-                            }
-                        }
-
-                        // Chỉ hiển thị sản phẩm được giảm nếu khác với sản phẩm mua
-                        if (buyXGetY.getGiftProduct() != null &&
-                            buyXGetY.getGiftProduct().getProduct() != null &&
-                            buyXGetY.getBuyProduct() != null &&
-                            !buyXGetY.getGiftProduct().getProduct().getId().equals(
-                                buyXGetY.getBuyProduct().getProduct().getId())) {
-                            detailInfo.append(String.format("       - Sản phẩm được giảm: %s\n",
-                                    buyXGetY.getGiftProduct().getProduct().getName()));
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.error("Lỗi khi lấy chi tiết khuyến mãi cho line {}: {}", line.getLineName(), e.getMessage());
+        // Thêm thông tin chi tiết theo loại khuyến mãi
+        if (detail instanceof BuyXGetYDetail) {
+            json.append(formatBuyXGetYDetail((BuyXGetYDetail) detail));
+        } else if (detail instanceof OrderDiscountDetail) {
+            json.append(formatOrderDiscountDetail((OrderDiscountDetail) detail));
+        } else if (detail instanceof ProductDiscountDetail) {
+            json.append(formatProductDiscountDetail((ProductDiscountDetail) detail));
         }
 
-        return detailInfo.toString();
+        json.append("}\n");
+        return json.toString();
+    }
+
+    /**
+     * Tạo mô tả ngắn gọn cho khuyến mãi
+     */
+    private String generatePromotionSummary(PromotionDetail detail) {
+        if (detail instanceof BuyXGetYDetail) {
+            return generateBuyXGetYSummary((BuyXGetYDetail) detail);
+        } else if (detail instanceof OrderDiscountDetail) {
+            return generateOrderDiscountSummary((OrderDiscountDetail) detail);
+        } else if (detail instanceof ProductDiscountDetail) {
+            return generateProductDiscountSummary((ProductDiscountDetail) detail);
+        }
+        return "";
+    }
+
+    /**
+     * Tạo mô tả cho Mua X Tặng Y
+     * Ví dụ: "Mua 5 hộp Sữa tươi Vinamilk tặng 1 hộp miễn phí", "Mua 5 hộp Sữa tươi Vinamilk giảm 10% cho 1 hộp tiếp theo"
+     */
+    private String generateBuyXGetYSummary(BuyXGetYDetail detail) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Lấy thông tin sản phẩm và đơn vị mua
+        String buyProductName = "";
+        String buyUnitName = "";
+        if (detail.getBuyProduct() != null) {
+            if (detail.getBuyProduct().getProduct() != null) {
+                buyProductName = detail.getBuyProduct().getProduct().getName();
+            }
+            if (detail.getBuyProduct().getUnit() != null) {
+                buyUnitName = detail.getBuyProduct().getUnit().getName();
+            }
+        }
+        
+        // Lấy thông tin sản phẩm và đơn vị tặng/giảm
+        String giftProductName = "";
+        String giftUnitName = "";
+        if (detail.getGiftProduct() != null) {
+            if (detail.getGiftProduct().getProduct() != null) {
+                giftProductName = detail.getGiftProduct().getProduct().getName();
+            }
+            if (detail.getGiftProduct().getUnit() != null) {
+                giftUnitName = detail.getGiftProduct().getUnit().getName();
+            }
+        }
+        
+        // Điều kiện mua
+        if (detail.getBuyMinQuantity() != null) {
+            summary.append(String.format("Mua %d", detail.getBuyMinQuantity()));
+            if (!buyUnitName.isEmpty()) {
+                summary.append(" ").append(buyUnitName);
+            }
+            if (!buyProductName.isEmpty()) {
+                summary.append(" ").append(buyProductName);
+            }
+        } else if (detail.getBuyMinValue() != null) {
+            if (!buyProductName.isEmpty()) {
+                summary.append(String.format("Mua %s từ %,.0fđ", buyProductName, detail.getBuyMinValue()));
+            } else {
+                summary.append(String.format("Mua từ %,.0fđ", detail.getBuyMinValue()));
+            }
+        }
+        
+        // Ưu đãi nhận được
+        if (detail.getGiftDiscountType() == DiscountType.FREE) {
+            // Tặng miễn phí
+            if (detail.getGiftQuantity() != null) {
+                summary.append(String.format(" tặng %d", detail.getGiftQuantity()));
+                if (!giftUnitName.isEmpty()) {
+                    summary.append(" ").append(giftUnitName);
+                }
+                // Chỉ hiển thị tên sản phẩm tặng nếu khác với sản phẩm mua
+                if (!giftProductName.isEmpty() && !giftProductName.equals(buyProductName)) {
+                    summary.append(" ").append(giftProductName);
+                }
+                summary.append(" miễn phí");
+            }
+        } else if (detail.getGiftDiscountType() == DiscountType.PERCENTAGE) {
+            // Giảm %
+            if (detail.getGiftQuantity() != null && detail.getGiftDiscountValue() != null) {
+                summary.append(String.format(" giảm %s%% cho %d", 
+                    detail.getGiftDiscountValue(), detail.getGiftQuantity()));
+                if (!giftUnitName.isEmpty()) {
+                    summary.append(" ").append(giftUnitName);
+                }
+                // Chỉ hiển thị tên sản phẩm giảm nếu khác với sản phẩm mua
+                if (!giftProductName.isEmpty() && !giftProductName.equals(buyProductName)) {
+                    summary.append(" ").append(giftProductName);
+                }
+                summary.append(" tiếp theo");
+            }
+        } else if (detail.getGiftDiscountType() == DiscountType.FIXED_AMOUNT) {
+            // Giảm số tiền
+            if (detail.getGiftQuantity() != null && detail.getGiftDiscountValue() != null) {
+                summary.append(String.format(" giảm %,.0fđ cho %d", 
+                    detail.getGiftDiscountValue(), detail.getGiftQuantity()));
+                if (!giftUnitName.isEmpty()) {
+                    summary.append(" ").append(giftUnitName);
+                }
+                // Chỉ hiển thị tên sản phẩm giảm nếu khác với sản phẩm mua
+                if (!giftProductName.isEmpty() && !giftProductName.equals(buyProductName)) {
+                    summary.append(" ").append(giftProductName);
+                }
+                summary.append(" tiếp theo");
+            }
+        }
+        
+        return summary.toString();
+    }
+
+    /**
+     * Tạo mô tả cho Giảm Giá Đơn Hàng
+     * Ví dụ: "Giảm 10% đơn hàng từ 500.000đ (tối đa 50.000đ)"
+     */
+    private String generateOrderDiscountSummary(OrderDiscountDetail detail) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Giá trị giảm
+        if (detail.getOrderDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append(String.format("Giảm %s%% đơn hàng", detail.getOrderDiscountValue()));
+            
+            // Giảm tối đa
+            if (detail.getOrderDiscountMaxValue() != null) {
+                summary.append(String.format(" (tối đa %,.0fđ)", detail.getOrderDiscountMaxValue()));
+            }
+        } else if (detail.getOrderDiscountType() == DiscountType.FIXED_AMOUNT) {
+            summary.append(String.format("Giảm %,.0fđ cho đơn hàng", detail.getOrderDiscountValue()));
+        }
+        
+        // Điều kiện đơn hàng
+        if (detail.getOrderMinTotalValue() != null) {
+            summary.append(String.format(" khi mua từ %,.0fđ", detail.getOrderMinTotalValue()));
+        } else if (detail.getOrderMinTotalQuantity() != null) {
+            summary.append(String.format(" khi mua từ %d sản phẩm", detail.getOrderMinTotalQuantity()));
+        }
+        
+        return summary.toString();
+    }
+
+    /**
+     * Tạo mô tả cho Giảm Giá Sản Phẩm
+     * Ví dụ: "Giảm 15% cho Sữa tươi Vinamilk", "Giảm 10.000đ mỗi hộp Sữa tươi Vinamilk khi mua từ 3"
+     */
+    private String generateProductDiscountSummary(ProductDiscountDetail detail) {
+        StringBuilder summary = new StringBuilder();
+        
+        // Lấy thông tin sản phẩm và đơn vị
+        String productName = "";
+        String unitName = "";
+        if (detail.getApplyToProduct() != null) {
+            if (detail.getApplyToProduct().getProduct() != null) {
+                productName = detail.getApplyToProduct().getProduct().getName();
+            }
+            if (detail.getApplyToProduct().getUnit() != null) {
+                unitName = detail.getApplyToProduct().getUnit().getName();
+            }
+        }
+        
+        // Giá trị giảm
+        if (detail.getProductDiscountType() == DiscountType.PERCENTAGE) {
+            summary.append(String.format("Giảm %s%%", detail.getProductDiscountValue()));
+        } else if (detail.getProductDiscountType() == DiscountType.FIXED_AMOUNT) {
+            summary.append(String.format("Giảm %,.0fđ", detail.getProductDiscountValue()));
+        }
+        
+        // Áp dụng cho
+        if (!productName.isEmpty()) {
+            if (!unitName.isEmpty()) {
+                summary.append(String.format(" mỗi %s %s", unitName, productName));
+            } else {
+                summary.append(String.format(" cho %s", productName));
+            }
+        } else {
+            summary.append(" cho sản phẩm");
+        }
+        
+        // Điều kiện
+        if (detail.getProductMinOrderValue() != null) {
+            summary.append(String.format(" khi đơn hàng từ %,.0fđ", detail.getProductMinOrderValue()));
+        } else if (detail.getProductMinPromotionQuantity() != null) {
+            summary.append(String.format(" khi mua từ %d", detail.getProductMinPromotionQuantity()));
+            if (!unitName.isEmpty()) {
+                summary.append(" ").append(unitName);
+            }
+        }
+        
+        return summary.toString();
+    }
+
+    /**
+     * Format chi tiết Mua X Tặng Y
+     */
+    private String formatBuyXGetYDetail(BuyXGetYDetail detail) {
+        StringBuilder json = new StringBuilder();
+        json.append("  \"buy_x_get_y_detail\": {\n");
+
+        if (detail.getBuyProduct() != null && detail.getBuyProduct().getProduct() != null) {
+            json.append(String.format("    \"buy_product_name\": \"%s\",\n",
+                    escapejson(detail.getBuyProduct().getProduct().getName())));
+        }
+
+        json.append(String.format("    \"buy_min_quantity\": %s,\n",
+                detail.getBuyMinQuantity() != null ? detail.getBuyMinQuantity() : "null"));
+        json.append(String.format("    \"buy_min_value\": %s,\n",
+                detail.getBuyMinValue() != null ? detail.getBuyMinValue() : "null"));
+
+        if (detail.getGiftProduct() != null && detail.getGiftProduct().getProduct() != null) {
+            json.append(String.format("    \"gift_product_name\": \"%s\",\n",
+                    escapejson(detail.getGiftProduct().getProduct().getName())));
+        }
+
+        json.append(String.format("    \"gift_quantity\": %s,\n",
+                detail.getGiftQuantity() != null ? detail.getGiftQuantity() : "null"));
+        json.append(String.format("    \"gift_discount_type\": \"%s\",\n",
+                detail.getGiftDiscountType() != null ? detail.getGiftDiscountType().name() : ""));
+        json.append(String.format("    \"gift_discount_value\": %s,\n",
+                detail.getGiftDiscountValue() != null ? detail.getGiftDiscountValue() : "null"));
+        json.append(String.format("    \"gift_max_quantity\": %s\n",
+                detail.getGiftMaxQuantity() != null ? detail.getGiftMaxQuantity() : "null"));
+
+        json.append("  },\n");
+        json.append("  \"order_discount_detail\": null,\n");
+        json.append("  \"product_discount_detail\": null\n");
+
+        return json.toString();
+    }
+
+    /**
+     * Format chi tiết Giảm Giá Đơn Hàng
+     */
+    private String formatOrderDiscountDetail(OrderDiscountDetail detail) {
+        StringBuilder json = new StringBuilder();
+        json.append("  \"buy_x_get_y_detail\": null,\n");
+        json.append("  \"order_discount_detail\": {\n");
+
+        json.append(String.format("    \"discount_type\": \"%s\",\n",
+                detail.getOrderDiscountType() != null ? detail.getOrderDiscountType().name() : ""));
+        json.append(String.format("    \"discount_value\": %s,\n",
+                detail.getOrderDiscountValue() != null ? detail.getOrderDiscountValue() : "null"));
+        json.append(String.format("    \"max_discount\": %s,\n",
+                detail.getOrderDiscountMaxValue() != null ? detail.getOrderDiscountMaxValue() : "null"));
+        json.append(String.format("    \"min_order_value\": %s,\n",
+                detail.getOrderMinTotalValue() != null ? detail.getOrderMinTotalValue() : "null"));
+        json.append(String.format("    \"min_order_quantity\": %s\n",
+                detail.getOrderMinTotalQuantity() != null ? detail.getOrderMinTotalQuantity() : "null"));
+
+        json.append("  },\n");
+        json.append("  \"product_discount_detail\": null\n");
+
+        return json.toString();
+    }
+
+    /**
+     * Format chi tiết Giảm Giá Sản Phẩm
+     */
+    private String formatProductDiscountDetail(ProductDiscountDetail detail) {
+        StringBuilder json = new StringBuilder();
+        json.append("  \"buy_x_get_y_detail\": null,\n");
+        json.append("  \"order_discount_detail\": null,\n");
+        json.append("  \"product_discount_detail\": {\n");
+
+        json.append(String.format("    \"discount_type\": \"%s\",\n",
+                detail.getProductDiscountType() != null ? detail.getProductDiscountType().name() : ""));
+        json.append(String.format("    \"discount_value\": %s,\n",
+                detail.getProductDiscountValue() != null ? detail.getProductDiscountValue() : "null"));
+        json.append(String.format("    \"apply_to_type\": \"%s\",\n",
+                detail.getApplyToType() != null ? detail.getApplyToType().name() : ""));
+
+        if (detail.getApplyToProduct() != null && detail.getApplyToProduct().getProduct() != null) {
+            json.append(String.format("    \"apply_to_product_name\": \"%s\",\n",
+                    escapejson(detail.getApplyToProduct().getProduct().getName())));
+        } else {
+            json.append("    \"apply_to_product_name\": null,\n");
+        }
+
+        json.append(String.format("    \"min_order_value\": %s,\n",
+                detail.getProductMinOrderValue() != null ? detail.getProductMinOrderValue() : "null"));
+        json.append(String.format("    \"min_promotion_value\": %s,\n",
+                detail.getProductMinPromotionValue() != null ? detail.getProductMinPromotionValue() : "null"));
+        json.append(String.format("    \"min_promotion_quantity\": %s\n",
+                detail.getProductMinPromotionQuantity() != null ? detail.getProductMinPromotionQuantity() : "null"));
+
+        json.append("  }\n");
+
+        return json.toString();
+    }
+
+    /**
+     * Escape JSON string
+     */
+    private String escapejson(String str) {
+        if (str == null)
+            return "";
+        return str.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     /**
      * Dịch loại khuyến mãi
      */
     private String translatePromotionType(PromotionType promotionType) {
-        if (promotionType == null) return "Chung";
+        if (promotionType == null)
+            return "Chung";
 
         return switch (promotionType) {
             case PRODUCT_DISCOUNT -> "Giảm giá sản phẩm";
@@ -254,16 +450,15 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
         for (int i = 0; i < promotions.size(); i++) {
             PromotionHeader promo = promotions.get(i);
             result.append(String.format("%d. %s\n", i + 1, promo.getPromotionName()));
-            
+
             if (promo.getDescription() != null && !promo.getDescription().isEmpty()) {
                 result.append(String.format("   %s\n", promo.getDescription()));
             }
-            
+
             result.append(String.format("   Trạng thái: %s\n", translateStatus(promo.getStatus().name())));
             result.append(String.format("   Thời gian: %s - %s\n",
                     promo.getStartDate().format(dateFormatter),
-                    promo.getEndDate().format(dateFormatter)
-            ));
+                    promo.getEndDate().format(dateFormatter)));
             result.append("\n");
         }
 
@@ -277,6 +472,7 @@ public class PromotionLookupServiceImpl implements PromotionLookupService {
         return switch (status) {
             case "ACTIVE" -> "Đang diễn ra";
             case "UPCOMING" -> "Sắp diễn ra";
+            case "PAUSED" -> "Đang tạm dừng";
             case "EXPIRED" -> "Đã hết hạn";
             case "CANCELLED" -> "Đã hủy";
             default -> status;

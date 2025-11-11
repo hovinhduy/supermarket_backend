@@ -445,14 +445,69 @@ public class ChatServiceImpl implements ChatService {
                    - delivery_type → delivery_method (loại hình giao hàng, optional)
                    - delivery_address → delivery_address (địa chỉ giao hàng, optional)
 
+                3. Khi nhận được tool results dạng [PROMOTIONS], parse thành PromotionInfo:
+                   Tool trả về JSON objects, mỗi object có cấu trúc:
+                   {
+                     "promotion_line_id": number,
+                     "promotion_code": "string",
+                     "name": "Tên chương trình",
+                     "description": "Mô tả chi tiết",
+                     "summary": "Mô tả ngắn gọn dễ hiểu" (VD: "Mua 5 tặng 1", "Giảm 10% đơn từ 500k"),
+                     "type": "BUY_X_GET_Y" | "ORDER_DISCOUNT" | "PRODUCT_DISCOUNT",
+                     "start_date": "yyyy-MM-dd",
+                     "end_date": "yyyy-MM-dd",
+                     "status": "ACTIVE" | "UPCOMING" | "EXPIRED",
+                     "usage_limit": number | null,
+                     "usage_count": number,
+                     
+                     // Chỉ 1 trong 3 detail sau được điền, 2 cái còn lại là null
+                     "buy_x_get_y_detail": {
+                       "buy_product_name": "Sản phẩm phải mua",
+                       "buy_min_quantity": number,
+                       "buy_min_value": number,
+                       "gift_product_name": "Sản phẩm được tặng/giảm",
+                       "gift_quantity": number,
+                       "gift_discount_type": "FREE" | "PERCENTAGE" | "FIXED_AMOUNT",
+                       "gift_discount_value": number,
+                       "gift_max_quantity": number
+                     },
+                     "order_discount_detail": {
+                       "discount_type": "PERCENTAGE" | "FIXED_AMOUNT",
+                       "discount_value": number,
+                       "max_discount": number,
+                       "min_order_value": number,
+                       "min_order_quantity": number
+                     },
+                     "product_discount_detail": {
+                       "discount_type": "PERCENTAGE" | "FIXED_AMOUNT",
+                       "discount_value": number,
+                       "apply_to_type": "ALL" | "PRODUCT",
+                       "apply_to_product_name": "Tên sản phẩm" | null,
+                       "min_order_value": number,
+                       "min_promotion_value": number,
+                       "min_promotion_quantity": number
+                     }
+                   }
+                   
+                   Parse CHÍNH XÁC theo cấu trúc trên, giữ nguyên các field name và structure.
+                   
+                   ⚠️ KHI TRẢ LỜI VỀ KHUYẾN MÃI:
+                   - Sử dụng field "summary" để tạo message văn bản ngắn gọn, dễ hiểu cho khách
+                   - VD: "Hiện có chương trình Mua 5 tặng 1 cho Sữa tươi Vinamilk"
+                   - Không cần liệt kê chi tiết kỹ thuật (discount_type, discount_value...) trong message
+                   - Structured data sẽ chứa đầy đủ thông tin chi tiết
+
                 VÍ DỤ:
                 - Khách hỏi về sản phẩm → response_type: "PRODUCT_INFO", data.products chứa thông tin
                 - Khách hỏi về đơn hàng → response_type: "ORDER_INFO", data.orders chứa thông tin
+                - Khách hỏi về khuyến mãi → response_type: "PROMOTION_INFO", data.promotions chứa thông tin, message dùng "summary"
                 - Khách hỏi chính sách → response_type: "GENERAL_ANSWER", data.policy chứa thông tin
 
                 LƯU Ý:
                 - KHÔNG được bỏ sót product_id (product_unit_id) và image_url khi parse [PRODUCT]
                 - KHÔNG được bỏ sót order_id và order_code khi parse [ORDER]
+                - KHÔNG được bỏ sót promotion_line_id và detail objects khi parse [PROMOTIONS]
+                - Khi parse [PROMOTIONS], PHẢI kiểm tra type và điền đúng detail object tương ứng
 
                 ===== QUY TẮC VÀNG: KHÔNG ĐƯỢC BỊA THÔNG TIN =====
                 ⚠️ NGHIÊM CẤM tự bịa hoặc đoán:

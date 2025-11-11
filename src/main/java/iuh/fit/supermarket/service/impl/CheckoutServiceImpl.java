@@ -108,7 +108,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         if (request.deliveryType() == DeliveryType.HOME_DELIVERY) {
             if (request.deliveryAddress() != null) {
                 order.setDeliveryAddress(request.deliveryAddress());
-                
+
                 // Tính phí vận chuyển
                 BigDecimal shippingFee = calculateShippingFee(request.deliveryAddress());
                 order.setShippingFee(shippingFee);
@@ -127,37 +127,34 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Bước 2: Gọi PromotionCheckService để tính khuyến mãi
         log.info("Kiểm tra khuyến mãi cho {} sản phẩm trong giỏ hàng", cartItemRequests.size());
         CheckPromotionResponseDTO promotionResponse = promotionCheckService.checkAndApplyPromotions(promotionRequest);
-        log.info("Áp dụng khuyến mãi: lineItemDiscount={}, orderDiscount={}", 
-                promotionResponse.summary().lineItemDiscount(), 
+        log.info("Áp dụng khuyến mãi: lineItemDiscount={}, orderDiscount={}",
+                promotionResponse.summary().lineItemDiscount(),
                 promotionResponse.summary().orderDiscount());
 
         // Bước 3: Kiểm tra tồn kho trước khi tạo đơn hàng
         for (CartItemResponseDTO cartItemResponse : promotionResponse.items()) {
             // Chỉ kiểm tra tồn kho cho item gốc (không phải gift item tự động)
-            if (cartItemResponse.promotionApplied() != null && 
-                cartItemResponse.promotionApplied().sourceLineItemId() != null) {
+            if (cartItemResponse.promotionApplied() != null &&
+                    cartItemResponse.promotionApplied().sourceLineItemId() != null) {
                 // Đây là gift item tự động thêm, bỏ qua kiểm tra tồn kho
                 continue;
             }
 
             ProductUnit productUnit = productUnitRepository.findById(cartItemResponse.productUnitId())
                     .orElseThrow(() -> new NotFoundException(
-                        String.format("Không tìm thấy sản phẩm với ID: %d", cartItemResponse.productUnitId())
-                    ));
+                            String.format("Không tìm thấy sản phẩm với ID: %d", cartItemResponse.productUnitId())));
 
             Warehouse warehouse = warehouseRepository.findByProductUnit(productUnit)
                     .orElseThrow(() -> new NotFoundException(
-                        String.format("Không tìm thấy thông tin kho cho sản phẩm %s",
-                        productUnit.getProduct().getName())
-                    ));
+                            String.format("Không tìm thấy thông tin kho cho sản phẩm %s",
+                                    productUnit.getProduct().getName())));
 
             if (warehouse.getQuantityOnHand() < cartItemResponse.quantity()) {
                 throw new BadRequestException(
-                    String.format("Sản phẩm %s không đủ hàng trong kho (còn %d, yêu cầu %d)",
-                    productUnit.getProduct().getName(),
-                    warehouse.getQuantityOnHand(),
-                    cartItemResponse.quantity())
-                );
+                        String.format("Sản phẩm %s không đủ hàng trong kho (còn %d, yêu cầu %d)",
+                                productUnit.getProduct().getName(),
+                                warehouse.getQuantityOnHand(),
+                                cartItemResponse.quantity()));
             }
         }
 
@@ -168,8 +165,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         for (CartItemResponseDTO cartItemResponse : promotionResponse.items()) {
             ProductUnit productUnit = productUnitRepository.findById(cartItemResponse.productUnitId())
                     .orElseThrow(() -> new NotFoundException(
-                        String.format("Không tìm thấy sản phẩm với ID: %d", cartItemResponse.productUnitId())
-                    ));
+                            String.format("Không tìm thấy sản phẩm với ID: %d", cartItemResponse.productUnitId())));
 
             OrderDetail orderDetail = new OrderDetail();
             orderDetail.setOrder(order);
@@ -178,7 +174,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             orderDetail.setPriceAtPurchase(cartItemResponse.unitPrice());
 
             // Tính discount: giá gốc - giá sau khuyến mãi
-            BigDecimal originalTotal = cartItemResponse.unitPrice().multiply(BigDecimal.valueOf(cartItemResponse.quantity()));
+            BigDecimal originalTotal = cartItemResponse.unitPrice()
+                    .multiply(BigDecimal.valueOf(cartItemResponse.quantity()));
             BigDecimal discount = originalTotal.subtract(cartItemResponse.lineTotal());
             orderDetail.setDiscount(discount);
 
@@ -191,7 +188,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 orderDetail.setPromotionSummary(promotion.promotionSummary());
                 orderDetail.setDiscountType(promotion.discountType());
                 orderDetail.setDiscountValue(promotion.discountValue());
-                
+
                 // Set sourceLineItemId (cho item tặng)
                 if (promotion.sourceLineItemId() != null) {
                     // Tìm OrderDetail tương ứng với sourceLineItemId
@@ -201,7 +198,7 @@ public class CheckoutServiceImpl implements CheckoutService {
             }
 
             orderDetails.add(orderDetail);
-            
+
             // Lưu mapping lineItemId → index để xử lý sourceLineItemId sau
             lineItemIdToOrderDetailId.put(cartItemResponse.lineItemId(), (long) (orderDetails.size() - 1));
         }
@@ -212,9 +209,11 @@ public class CheckoutServiceImpl implements CheckoutService {
         order.setLineItemDiscount(promotionResponse.summary().lineItemDiscount());
 
         // Serialize appliedOrderPromotions sang JSON
-        if (promotionResponse.appliedOrderPromotions() != null && !promotionResponse.appliedOrderPromotions().isEmpty()) {
+        if (promotionResponse.appliedOrderPromotions() != null
+                && !promotionResponse.appliedOrderPromotions().isEmpty()) {
             try {
-                order.setAppliedOrderPromotionsJson(objectMapper.writeValueAsString(promotionResponse.appliedOrderPromotions()));
+                order.setAppliedOrderPromotionsJson(
+                        objectMapper.writeValueAsString(promotionResponse.appliedOrderPromotions()));
             } catch (JsonProcessingException e) {
                 log.error("Lỗi khi serialize appliedOrderPromotions sang JSON", e);
                 // Không throw exception, chỉ log lỗi và tiếp tục
@@ -226,8 +225,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 promotionResponse.summary().subTotal()
                         .subtract(promotionResponse.summary().lineItemDiscount())
                         .subtract(promotionResponse.summary().orderDiscount())
-                        .add(order.getShippingFee())
-        );
+                        .add(order.getShippingFee()));
 
         // Set số tiền khách trả
         // Mặc định amountPaid = totalAmount (sẽ cập nhật sau khi thanh toán online)
@@ -251,7 +249,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Tạo payment link nếu thanh toán ONLINE
         String paymentUrl = null;
         String qrCode = null;
-        
+
         if (order.getPaymentMethod() == PaymentMethod.ONLINE) {
             try {
                 // Sử dụng orderId làm orderCode cho payment
@@ -260,18 +258,18 @@ public class CheckoutServiceImpl implements CheckoutService {
                 // Chuyển đổi orderDetails sang PaymentItemData
                 List<iuh.fit.supermarket.service.PaymentService.PaymentItemData> paymentItems = orderDetails.stream()
                         .map(detail -> new iuh.fit.supermarket.service.PaymentService.PaymentItemData(
-                                detail.getProductUnit().getProduct().getName() + " - " + 
-                                    detail.getProductUnit().getUnit().getName(),
+                                detail.getProductUnit().getProduct().getName() + " - " +
+                                        detail.getProductUnit().getUnit().getName(),
                                 detail.getQuantity(),
                                 detail.getPriceAtPurchase().intValue()))
                         .toList();
 
-                vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse paymentResponse = 
-                    paymentService.createPaymentLink(
-                        paymentOrderCode,
-                        order.getTotalAmount(),
-                        "Thanh toan don hang #" + order.getOrderId(),
-                        paymentItems);
+                vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse paymentResponse = paymentService
+                        .createPaymentLink(
+                                paymentOrderCode,
+                                order.getTotalAmount(),
+                                "Thanh toan don hang #" + order.getOrderId(),
+                                paymentItems);
 
                 paymentUrl = paymentResponse.getCheckoutUrl();
                 qrCode = paymentResponse.getQrCode();
@@ -297,8 +295,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Phương thức này deprecated, không còn hỗ trợ
         throw new UnsupportedOperationException(
-            "Phương thức này đã deprecated. Vui lòng sử dụng checkoutForCustomer với authentication."
-        );
+                "Phương thức này đã deprecated. Vui lòng sử dụng checkoutForCustomer với authentication.");
     }
 
     /**
@@ -312,9 +309,8 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Ngăn chặn việc cập nhật thủ công sang COMPLETED
         if (newStatus == OrderStatus.COMPLETED) {
             throw new BadRequestException(
-                "Không thể cập nhật thủ công sang trạng thái COMPLETED. " +
-                "Đơn hàng sẽ tự động hoàn thành sau khi được giao (DELIVERED)."
-            );
+                    "Không thể cập nhật thủ công sang trạng thái COMPLETED. " +
+                            "Đơn hàng sẽ tự động hoàn thành sau khi được giao (DELIVERED).");
         }
 
         Order order = orderRepository.findById(orderId)
@@ -326,15 +322,15 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Validate chuyển trạng thái hợp lệ với loại giao hàng
         if (!statusTransitionValidator.isValidTransition(currentStatus, newStatus, deliveryType)) {
             String errorMessage = statusTransitionValidator.getTransitionErrorMessage(
-                currentStatus, newStatus, deliveryType);
+                    currentStatus, newStatus, deliveryType);
             throw new BadRequestException(errorMessage);
         }
 
         // Kiểm tra trạng thái có phù hợp với loại giao hàng không
         if (!statusTransitionValidator.isStatusValidForDeliveryType(newStatus, deliveryType)) {
             throw new BadRequestException(
-                String.format("Trạng thái %s không phù hợp với loại giao hàng %s",
-                    newStatus, deliveryType));
+                    String.format("Trạng thái %s không phù hợp với loại giao hàng %s",
+                            newStatus, deliveryType));
         }
 
         order.setStatus(newStatus);
@@ -363,7 +359,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         order = orderRepository.save(order);
 
         log.info("Đã cập nhật trạng thái đơn hàng {} từ {} sang {}",
-            orderId, currentStatus, newStatus);
+                orderId, currentStatus, newStatus);
 
         return buildCheckoutResponse(order, order.getOrderDetails());
     }
@@ -387,7 +383,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản"));
 
         if (order.getCustomer() == null ||
-            !order.getCustomer().getCustomerId().equals(user.getCustomer().getCustomerId())) {
+                !order.getCustomer().getCustomerId().equals(user.getCustomer().getCustomerId())) {
             throw new UnauthorizedException("Bạn không có quyền xem đơn hàng này");
         }
 
@@ -427,7 +423,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản"));
 
         if (order.getCustomer() == null ||
-            !order.getCustomer().getCustomerId().equals(user.getCustomer().getCustomerId())) {
+                !order.getCustomer().getCustomerId().equals(user.getCustomer().getCustomerId())) {
             throw new UnauthorizedException("Bạn không có quyền hủy đơn hàng này");
         }
 
@@ -437,9 +433,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        order.setNote(order.getNote() != null ?
-                order.getNote() + " | Lý do hủy: " + reason :
-                "Lý do hủy: " + reason);
+        order.setNote(order.getNote() != null ? order.getNote() + " | Lý do hủy: " + reason : "Lý do hủy: " + reason);
 
         // Hoàn lại tồn kho
         restoreInventory(order.getOrderDetails());
@@ -466,9 +460,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
 
         order.setStatus(OrderStatus.CANCELLED);
-        order.setNote(order.getNote() != null ?
-                order.getNote() + " | Lý do hủy: " + reason :
-                "Lý do hủy: " + reason);
+        order.setNote(order.getNote() != null ? order.getNote() + " | Lý do hủy: " + reason : "Lý do hủy: " + reason);
 
         // Hoàn lại tồn kho
         restoreInventory(order.getOrderDetails());
@@ -508,9 +500,8 @@ public class CheckoutServiceImpl implements CheckoutService {
         order.setAmountPaid(order.getTotalAmount());
 
         // Thêm thông tin giao dịch vào note
-        order.setNote(order.getNote() != null ?
-                order.getNote() + " | Transaction ID: " + transactionId :
-                "Transaction ID: " + transactionId);
+        order.setNote(order.getNote() != null ? order.getNote() + " | Transaction ID: " + transactionId
+                : "Transaction ID: " + transactionId);
 
         order = orderRepository.save(order);
         log.info("Đã xác nhận thanh toán cho đơn hàng {}, chuyển sang trạng thái PENDING, transactionId: {}",
@@ -532,8 +523,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             return BigDecimal.ZERO;
         }
 
-        // Phí vận chuyển cố định 30,000 VND
-        return new BigDecimal("30000");
+        // Phí vận chuyển cố định 0 VND
+        return new BigDecimal("0");
     }
 
     /**
@@ -547,7 +538,6 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
         return username;
     }
-
 
     /**
      * Cập nhật tồn kho sau khi đặt hàng
@@ -564,34 +554,33 @@ public class CheckoutServiceImpl implements CheckoutService {
                 // Sử dụng WarehouseService để xuất kho và ghi lại lịch sử
                 // quantityChange = -detail.getQuantity() (số âm để xuất kho)
                 warehouseService.stockOut(
-                    productUnit.getId(),
-                    detail.getQuantity(),
-                    referenceId,
-                    String.format("Xuất kho cho đơn hàng #%s - %s",
-                        orderId,
-                        productUnit.getProduct().getName())
-                );
+                        productUnit.getId(),
+                        detail.getQuantity(),
+                        referenceId,
+                        String.format("Xuất kho cho đơn hàng #%s - %s",
+                                orderId,
+                                productUnit.getProduct().getName()));
 
                 log.info("Đã trừ {} {} {} khỏi kho cho đơn hàng #{}",
-                    detail.getQuantity(),
-                    productUnit.getUnit().getName(),
-                    productUnit.getProduct().getName(),
-                    orderId);
+                        detail.getQuantity(),
+                        productUnit.getUnit().getName(),
+                        productUnit.getProduct().getName(),
+                        orderId);
 
             } catch (Exception e) {
                 log.error("Lỗi khi trừ kho cho sản phẩm {}: {}",
-                    productUnit.getProduct().getName(), e.getMessage());
+                        productUnit.getProduct().getName(), e.getMessage());
                 throw new BadRequestException(
-                    String.format("Không thể trừ kho cho sản phẩm %s: %s",
-                        productUnit.getProduct().getName(), e.getMessage())
-                );
+                        String.format("Không thể trừ kho cho sản phẩm %s: %s",
+                                productUnit.getProduct().getName(), e.getMessage()));
             }
         }
     }
 
     /**
      * Hoàn lại tồn kho khi hủy đơn hàng
-     * Sử dụng WarehouseService để hoàn kho và ghi lại lịch sử giao dịch với TransactionType.RETURN
+     * Sử dụng WarehouseService để hoàn kho và ghi lại lịch sử giao dịch với
+     * TransactionType.RETURN
      */
     private void restoreInventory(List<OrderDetail> orderDetails) {
         Long orderId = orderDetails.isEmpty() ? null : orderDetails.get(0).getOrder().getOrderId();
@@ -604,28 +593,26 @@ public class CheckoutServiceImpl implements CheckoutService {
                 // Sử dụng WarehouseService.updateStock với TransactionType.RETURN để hoàn kho
                 // (không dùng stockIn vì nó tạo transaction với type STOCK_IN)
                 warehouseService.updateStock(
-                    productUnit.getId(),
-                    detail.getQuantity(), // số dương để tăng tồn kho
-                    WarehouseTransaction.TransactionType.RETURN,
-                    referenceId,
-                    String.format("Hoàn kho từ đơn hàng hủy #%s - %s",
-                        orderId,
-                        productUnit.getProduct().getName())
-                );
+                        productUnit.getId(),
+                        detail.getQuantity(), // số dương để tăng tồn kho
+                        WarehouseTransaction.TransactionType.RETURN,
+                        referenceId,
+                        String.format("Hoàn kho từ đơn hàng hủy #%s - %s",
+                                orderId,
+                                productUnit.getProduct().getName()));
 
                 log.info("Đã hoàn {} {} {} vào kho từ đơn hàng hủy #{}",
-                    detail.getQuantity(),
-                    productUnit.getUnit().getName(),
-                    productUnit.getProduct().getName(),
-                    orderId);
+                        detail.getQuantity(),
+                        productUnit.getUnit().getName(),
+                        productUnit.getProduct().getName(),
+                        orderId);
 
             } catch (Exception e) {
                 log.error("Lỗi khi hoàn kho cho sản phẩm {}: {}",
-                    productUnit.getProduct().getName(), e.getMessage());
+                        productUnit.getProduct().getName(), e.getMessage());
                 throw new BadRequestException(
-                    String.format("Không thể hoàn kho cho sản phẩm %s: %s",
-                        productUnit.getProduct().getName(), e.getMessage())
-                );
+                        String.format("Không thể hoàn kho cho sản phẩm %s: %s",
+                                productUnit.getProduct().getName(), e.getMessage()));
             }
         }
     }
@@ -654,13 +641,14 @@ public class CheckoutServiceImpl implements CheckoutService {
         invoice.setOrder(order);
         invoice.setCustomer(order.getCustomer());
 
-        // Set nhân viên - nếu đơn hàng không có nhân viên thì lấy nhân viên hệ thống (ID = 1)
+        // Set nhân viên - nếu đơn hàng không có nhân viên thì lấy nhân viên hệ thống
+        // (ID = 1)
         if (order.getEmployee() != null) {
             invoice.setEmployee(order.getEmployee());
         } else {
             // Lấy nhân viên hệ thống mặc định (thường là admin với ID = 1)
             Employee systemEmployee = employeeRepository.findById(1)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy nhân viên hệ thống"));
+                    .orElseThrow(() -> new NotFoundException("Không tìm thấy nhân viên hệ thống"));
             invoice.setEmployee(systemEmployee);
         }
 
@@ -685,8 +673,8 @@ public class CheckoutServiceImpl implements CheckoutService {
 
             // Tính thành tiền trước thuế
             BigDecimal lineTotal = orderDetail.getPriceAtPurchase()
-                .multiply(BigDecimal.valueOf(orderDetail.getQuantity()))
-                .subtract(orderDetail.getDiscount());
+                    .multiply(BigDecimal.valueOf(orderDetail.getQuantity()))
+                    .subtract(orderDetail.getDiscount());
             detail.setLineTotal(lineTotal);
 
             // Tính thuế (mặc định VAT 10%)
@@ -754,7 +742,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
                     appliedPromotionRepository.save(appliedPromotion);
                     log.debug("Đã lưu thông tin khuyến mãi {} cho chi tiết hóa đơn",
-                        orderDetail.getPromotionName());
+                            orderDetail.getPromotionName());
                 }
             }
             detailIndex++;
@@ -765,9 +753,8 @@ public class CheckoutServiceImpl implements CheckoutService {
             try {
                 // Parse JSON thành danh sách OrderPromotionDTO
                 List<OrderPromotionDTO> orderPromotions = objectMapper.readValue(
-                    order.getAppliedOrderPromotionsJson(),
-                    objectMapper.getTypeFactory().constructCollectionType(List.class, OrderPromotionDTO.class)
-                );
+                        order.getAppliedOrderPromotionsJson(),
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, OrderPromotionDTO.class));
 
                 for (OrderPromotionDTO promotionDTO : orderPromotions) {
                     AppliedOrderPromotion appliedOrderPromotion = new AppliedOrderPromotion();
@@ -788,7 +775,7 @@ public class CheckoutServiceImpl implements CheckoutService {
         }
 
         log.info("Đã tạo hóa đơn số {} cho đơn hàng {}, tổng tiền: {}",
-            invoiceNumber, order.getOrderId(), totalAmount);
+                invoiceNumber, order.getOrderId(), totalAmount);
     }
 
     /**
@@ -801,7 +788,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Tìm số hóa đơn cuối cùng trong tháng
         List<String> lastInvoiceNumbers = saleInvoiceHeaderRepository
-            .findLastInvoiceNumberByMonth(yearMonth);
+                .findLastInvoiceNumberByMonth(yearMonth);
 
         int nextNumber = 1;
         if (!lastInvoiceNumbers.isEmpty()) {
@@ -824,7 +811,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Tìm mã đơn hàng cuối cùng trong ngày
         org.springframework.data.domain.Page<String> lastOrderCodes = orderRepository
-            .findLastOrderCodeByDate(datePattern, org.springframework.data.domain.PageRequest.of(0, 1));
+                .findLastOrderCodeByDate(datePattern, org.springframework.data.domain.PageRequest.of(0, 1));
 
         int nextNumber = 1;
         if (lastOrderCodes.hasContent()) {
@@ -847,19 +834,19 @@ public class CheckoutServiceImpl implements CheckoutService {
     /**
      * Xây dựng response cho checkout với thông tin thanh toán online
      */
-    private CheckoutResponseDTO buildCheckoutResponse(Order order, List<OrderDetail> orderDetails, 
-                                                     String paymentUrl, String qrCode) {
+    private CheckoutResponseDTO buildCheckoutResponse(Order order, List<OrderDetail> orderDetails,
+            String paymentUrl, String qrCode) {
         // Build customer info
         CustomerInfoDTO customerInfo = null;
         if (order.getCustomer() != null) {
             Customer customer = order.getCustomer();
             User user = customer.getUser();
             customerInfo = new CustomerInfoDTO(
-                customer.getCustomerId(),
-                user.getName(),
-                user.getPhone(),
-                user.getEmail(),
-                0 // TODO: Lấy điểm tích lũy thực tế
+                    customer.getCustomerId(),
+                    user.getName(),
+                    user.getPhone(),
+                    user.getEmail(),
+                    0 // TODO: Lấy điểm tích lũy thực tế
             );
         }
 
@@ -867,39 +854,38 @@ public class CheckoutServiceImpl implements CheckoutService {
         DeliveryInfoDTO deliveryInfo = null;
         if (order.getDeliveryType() == DeliveryType.HOME_DELIVERY && order.getDeliveryAddress() != null) {
             deliveryInfo = new DeliveryInfoDTO(
-                null,  // recipientName - không dùng nữa
-                null,  // deliveryPhone - không dùng nữa
-                order.getDeliveryAddress(),
-                null   // deliveryNote - không dùng nữa
+                    null, // recipientName - không dùng nữa
+                    null, // deliveryPhone - không dùng nữa
+                    order.getDeliveryAddress(),
+                    null // deliveryNote - không dùng nữa
             );
         }
 
         // Build order items
         List<OrderItemDTO> orderItems = orderDetails.stream()
-            .map(detail -> {
-                // Xây dựng thông tin khuyến mãi cho từng item
-                String promotionInfo = null;
-                if (detail.getPromotionName() != null) {
-                    promotionInfo = detail.getPromotionName();
-                    if (detail.getPromotionSummary() != null) {
-                        promotionInfo += " - " + detail.getPromotionSummary();
+                .map(detail -> {
+                    // Xây dựng thông tin khuyến mãi cho từng item
+                    String promotionInfo = null;
+                    if (detail.getPromotionName() != null) {
+                        promotionInfo = detail.getPromotionName();
+                        if (detail.getPromotionSummary() != null) {
+                            promotionInfo += " - " + detail.getPromotionSummary();
+                        }
                     }
-                }
 
-                return new OrderItemDTO(
-                    detail.getProductUnit().getId(),
-                    detail.getProductUnit().getProduct().getName(),
-                    detail.getProductUnit().getUnit().getName(),
-                    detail.getProductUnit().getBarcode(),
-                    detail.getQuantity(),
-                    detail.getPriceAtPurchase(),
-                    detail.getPriceAtPurchase().subtract(detail.getDiscount()),
-                    detail.getDiscount(),
-                    detail.getLineTotal(),
-                    promotionInfo
-                );
-            })
-            .collect(Collectors.toList());
+                    return new OrderItemDTO(
+                            detail.getProductUnit().getId(),
+                            detail.getProductUnit().getProduct().getName(),
+                            detail.getProductUnit().getUnit().getName(),
+                            detail.getProductUnit().getBarcode(),
+                            detail.getQuantity(),
+                            detail.getPriceAtPurchase(),
+                            detail.getPriceAtPurchase().subtract(detail.getDiscount()),
+                            detail.getDiscount(),
+                            detail.getLineTotal(),
+                            promotionInfo);
+                })
+                .collect(Collectors.toList());
 
         // Build online payment info (if applicable)
         OnlinePaymentInfoDTO onlinePaymentInfo = null;
@@ -913,58 +899,55 @@ public class CheckoutServiceImpl implements CheckoutService {
             }
 
             onlinePaymentInfo = new OnlinePaymentInfoDTO(
-                order.getTransactionId(), // transactionId từ webhook
-                "PayOS", // payment provider
-                paymentStatus, // Trạng thái thanh toán
-                paymentUrl, // URL thanh toán
-                qrCode, // QR code
-                LocalDateTime.now().plusMinutes(15).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) // expiration time
+                    order.getTransactionId(), // transactionId từ webhook
+                    "PayOS", // payment provider
+                    paymentStatus, // Trạng thái thanh toán
+                    paymentUrl, // URL thanh toán
+                    qrCode, // QR code
+                    LocalDateTime.now().plusMinutes(15).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) // expiration time
             );
         }
 
-        // Calculate change amount - không còn tính changeAmount vì không có amountPaid trong request
+        // Calculate change amount - không còn tính changeAmount vì không có amountPaid
+        // trong request
         BigDecimal changeAmount = BigDecimal.ZERO;
 
         // Build danh sách khuyến mãi đã áp dụng
         List<PromotionAppliedDTO> appliedPromotions = new ArrayList<>();
-        
+
         // Lấy khuyến mãi từ OrderDetail (PRODUCT_DISCOUNT, BUY_X_GET_Y)
         for (OrderDetail detail : orderDetails) {
             if (detail.getPromotionLineId() != null) {
                 appliedPromotions.add(new PromotionAppliedDTO(
-                    detail.getPromotionName(),
-                    detail.getPromotionLineId(),
-                    detail.getPromotionDetailId(),
-                    detail.getPromotionSummary(),
-                    detail.getDiscountType(),
-                    detail.getDiscountValue(),
-                    detail.getSourceLineItemId()
-                ));
+                        detail.getPromotionName(),
+                        detail.getPromotionLineId(),
+                        detail.getPromotionDetailId(),
+                        detail.getPromotionSummary(),
+                        detail.getDiscountType(),
+                        detail.getDiscountValue(),
+                        detail.getSourceLineItemId()));
             }
         }
 
         // Lấy khuyến mãi toàn đơn từ JSON (ORDER_DISCOUNT)
         if (order.getAppliedOrderPromotionsJson() != null && !order.getAppliedOrderPromotionsJson().isEmpty()) {
             try {
-                List<CheckPromotionResponseDTO.OrderPromotionDTO> orderPromotions = 
-                    objectMapper.readValue(
-                        order.getAppliedOrderPromotionsJson(), 
+                List<CheckPromotionResponseDTO.OrderPromotionDTO> orderPromotions = objectMapper.readValue(
+                        order.getAppliedOrderPromotionsJson(),
                         objectMapper.getTypeFactory().constructCollectionType(
-                            List.class, 
-                            CheckPromotionResponseDTO.OrderPromotionDTO.class
-                        )
-                    );
-                
+                                List.class,
+                                CheckPromotionResponseDTO.OrderPromotionDTO.class));
+
                 // Convert sang PromotionAppliedDTO
                 for (CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion : orderPromotions) {
                     appliedPromotions.add(new PromotionAppliedDTO(
-                        orderPromotion.promotionName(),
-                        orderPromotion.promotionLineId(),
-                        orderPromotion.promotionDetailId(),
-                        orderPromotion.promotionSummary(),
-                        orderPromotion.discountType(),
-                        orderPromotion.discountValue(),
-                        null // ORDER_DISCOUNT không có sourceLineItemId
+                            orderPromotion.promotionName(),
+                            orderPromotion.promotionLineId(),
+                            orderPromotion.promotionDetailId(),
+                            orderPromotion.promotionSummary(),
+                            orderPromotion.discountType(),
+                            orderPromotion.discountValue(),
+                            null // ORDER_DISCOUNT không có sourceLineItemId
                     ));
                 }
             } catch (JsonProcessingException e) {
@@ -977,42 +960,42 @@ public class CheckoutServiceImpl implements CheckoutService {
         BigDecimal totalDiscount = order.getLineItemDiscount().add(order.getOrderDiscount());
 
         return new CheckoutResponseDTO(
-            order.getOrderId(),
-            order.getOrderCode(), // Sử dụng orderCode từ database
-            order.getStatus(),
-            order.getDeliveryType(),
-            order.getPaymentMethod(),
-            order.getTransactionId(),
-            customerInfo,
-            deliveryInfo,
-            orderItems,
-            order.getSubtotal(),
-            totalDiscount,
-            order.getShippingFee(),
-            0, // loyaltyPointsUsed
-            BigDecimal.ZERO, // loyaltyPointsDiscount
-            order.getTotalAmount(),
-            order.getAmountPaid(),
-            changeAmount,
-            onlinePaymentInfo,
-            appliedPromotions,
-            0, // TODO: Điểm tích lũy nhận được
-            order.getCreatedAt(),
-            "Đặt hàng thành công"
-        );
+                order.getOrderId(),
+                order.getOrderCode(), // Sử dụng orderCode từ database
+                order.getStatus(),
+                order.getDeliveryType(),
+                order.getPaymentMethod(),
+                order.getTransactionId(),
+                customerInfo,
+                deliveryInfo,
+                orderItems,
+                order.getSubtotal(),
+                totalDiscount,
+                order.getShippingFee(),
+                0, // loyaltyPointsUsed
+                BigDecimal.ZERO, // loyaltyPointsDiscount
+                order.getTotalAmount(),
+                order.getAmountPaid(),
+                changeAmount,
+                onlinePaymentInfo,
+                appliedPromotions,
+                0, // TODO: Điểm tích lũy nhận được
+                order.getCreatedAt(),
+                "Đặt hàng thành công");
     }
 
     /**
-     * Lấy danh sách đơn hàng của khách hàng với khả năng lọc theo trạng thái và phân trang
+     * Lấy danh sách đơn hàng của khách hàng với khả năng lọc theo trạng thái và
+     * phân trang
      */
     @Override
     @Transactional(readOnly = true)
     public org.springframework.data.domain.Page<CheckoutResponseDTO> getCustomerOrders(
-            String username, 
-            OrderStatus status, 
+            String username,
+            OrderStatus status,
             org.springframework.data.domain.Pageable pageable) {
-        
-        log.info("Lấy danh sách đơn hàng cho khách hàng: {}, trạng thái: {}, page: {}, size: {}", 
+
+        log.info("Lấy danh sách đơn hàng cho khách hàng: {}, trạng thái: {}, page: {}, size: {}",
                 username, status, pageable.getPageNumber(), pageable.getPageSize());
 
         // Bỏ prefix nếu có
@@ -1047,7 +1030,8 @@ public class CheckoutServiceImpl implements CheckoutService {
     }
 
     /**
-     * Lấy danh sách tất cả đơn hàng trong hệ thống với lọc theo loại hình nhận hàng (dành cho Admin)
+     * Lấy danh sách tất cả đơn hàng trong hệ thống với lọc theo loại hình nhận hàng
+     * (dành cho Admin)
      * Có khả năng lọc theo trạng thái, loại hình nhận hàng và phân trang
      */
     @Override
@@ -1098,19 +1082,20 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         Set<Long> processedDetailIds = new HashSet<>();
 
-        // Cập nhật usageCount cho khuyến mãi từ OrderDetails (PRODUCT_DISCOUNT, BUY_X_GET_Y)
+        // Cập nhật usageCount cho khuyến mãi từ OrderDetails (PRODUCT_DISCOUNT,
+        // BUY_X_GET_Y)
         for (OrderDetail orderDetail : order.getOrderDetails()) {
             if (orderDetail.getPromotionDetailId() != null &&
-                !processedDetailIds.contains(orderDetail.getPromotionDetailId())) {
+                    !processedDetailIds.contains(orderDetail.getPromotionDetailId())) {
 
                 promotionDetailRepository.findById(orderDetail.getPromotionDetailId())
-                    .ifPresent(detail -> {
-                        Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
-                        detail.setUsageCount(currentCount + 1);
-                        promotionDetailRepository.save(detail);
-                        log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
-                            detail.getDetailId(), currentCount, currentCount + 1);
-                    });
+                        .ifPresent(detail -> {
+                            Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                            detail.setUsageCount(currentCount + 1);
+                            promotionDetailRepository.save(detail);
+                            log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
+                                    detail.getDetailId(), currentCount, currentCount + 1);
+                        });
 
                 processedDetailIds.add(orderDetail.getPromotionDetailId());
             }
@@ -1120,25 +1105,23 @@ public class CheckoutServiceImpl implements CheckoutService {
         if (order.getAppliedOrderPromotionsJson() != null && !order.getAppliedOrderPromotionsJson().isEmpty()) {
             try {
                 List<CheckPromotionResponseDTO.OrderPromotionDTO> orderPromotions = objectMapper.readValue(
-                    order.getAppliedOrderPromotionsJson(),
-                    objectMapper.getTypeFactory().constructCollectionType(
-                        List.class,
-                        CheckPromotionResponseDTO.OrderPromotionDTO.class
-                    )
-                );
+                        order.getAppliedOrderPromotionsJson(),
+                        objectMapper.getTypeFactory().constructCollectionType(
+                                List.class,
+                                CheckPromotionResponseDTO.OrderPromotionDTO.class));
 
                 for (CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion : orderPromotions) {
                     if (orderPromotion.promotionDetailId() != null &&
-                        !processedDetailIds.contains(orderPromotion.promotionDetailId())) {
+                            !processedDetailIds.contains(orderPromotion.promotionDetailId())) {
 
                         promotionDetailRepository.findById(orderPromotion.promotionDetailId())
-                            .ifPresent(detail -> {
-                                Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
-                                detail.setUsageCount(currentCount + 1);
-                                promotionDetailRepository.save(detail);
-                                log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
-                                    detail.getDetailId(), currentCount, currentCount + 1);
-                            });
+                                .ifPresent(detail -> {
+                                    Integer currentCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+                                    detail.setUsageCount(currentCount + 1);
+                                    promotionDetailRepository.save(detail);
+                                    log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
+                                            detail.getDetailId(), currentCount, currentCount + 1);
+                                });
 
                         processedDetailIds.add(orderPromotion.promotionDetailId());
                     }
