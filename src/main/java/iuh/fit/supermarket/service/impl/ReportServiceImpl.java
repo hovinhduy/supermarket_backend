@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.service.impl;
 
 import iuh.fit.supermarket.dto.report.*;
+import iuh.fit.supermarket.repository.ReturnInvoiceHeaderRepository;
 import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.service.ReportService;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Map;
 public class ReportServiceImpl implements ReportService {
 
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
+    private final ReturnInvoiceHeaderRepository returnInvoiceHeaderRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -197,6 +200,98 @@ public class ReportServiceImpl implements ReportService {
                 grandTotalDiscount,
                 grandTotalRevenueBeforeDiscount,
                 grandTotalRevenueAfterDiscount
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReturnReportResponseDTO getReturnReport(ReturnReportRequestDTO request) {
+        log.info("Lấy báo cáo trả hàng từ {} đến {}", request.fromDate(), request.toDate());
+
+        // Lấy dữ liệu thô từ repository
+        List<Object[]> rawResults = returnInvoiceHeaderRepository.getReturnReportRaw(
+                request.fromDate(),
+                request.toDate()
+        );
+
+        log.info("Tìm thấy {} bản ghi trả hàng", rawResults.size());
+
+        // Group dữ liệu theo returnCode
+        Map<String, List<Object[]>> groupedByReturnCode = new LinkedHashMap<>();
+        for (Object[] row : rawResults) {
+            String returnCode = (String) row[2];
+            groupedByReturnCode.computeIfAbsent(returnCode, k -> new ArrayList<>()).add(row);
+        }
+
+        // Chuyển đổi sang DTO và tính tổng
+        List<ReturnReportItemDTO> returnItems = new ArrayList<>();
+        Integer grandTotalQuantity = 0;
+        BigDecimal grandTotalRefundAmount = BigDecimal.ZERO;
+
+        for (Map.Entry<String, List<Object[]>> entry : groupedByReturnCode.entrySet()) {
+            List<Object[]> invoiceRows = entry.getValue();
+            Object[] firstRow = invoiceRows.get(0);
+
+            // Lấy thông tin chung của hóa đơn trả từ row đầu tiên
+            String originalInvoiceNumber = (String) firstRow[0];
+            LocalDate originalInvoiceDate = ((java.time.LocalDateTime) firstRow[1]).toLocalDate();
+            String returnCode = (String) firstRow[2];
+            LocalDate returnDate = ((java.time.LocalDateTime) firstRow[3]).toLocalDate();
+
+            // Tạo danh sách sản phẩm và tính tổng cho hóa đơn này
+            List<ReturnProductItemDTO> products = new ArrayList<>();
+            Integer invoiceTotalQuantity = 0;
+            BigDecimal invoiceTotalRefundAmount = BigDecimal.ZERO;
+
+            for (Object[] row : invoiceRows) {
+                String categoryName = (String) row[4];
+                String productCode = (String) row[5];
+                String productName = (String) row[6];
+                String unitName = (String) row[7];
+                Integer quantity = (Integer) row[8];
+                BigDecimal priceAtReturn = (BigDecimal) row[9];
+                BigDecimal refundAmount = (BigDecimal) row[10];
+
+                ReturnProductItemDTO product = new ReturnProductItemDTO(
+                        categoryName != null ? categoryName : "Chưa phân loại",
+                        productCode,
+                        productName,
+                        unitName,
+                        quantity,
+                        priceAtReturn,
+                        refundAmount
+                );
+
+                products.add(product);
+                invoiceTotalQuantity += quantity;
+                invoiceTotalRefundAmount = invoiceTotalRefundAmount.add(refundAmount);
+            }
+
+            // Tạo DTO cho hóa đơn trả
+            ReturnReportItemDTO returnItem = new ReturnReportItemDTO(
+                    originalInvoiceNumber,
+                    originalInvoiceDate,
+                    returnCode,
+                    returnDate,
+                    products,
+                    invoiceTotalQuantity,
+                    invoiceTotalRefundAmount
+            );
+
+            returnItems.add(returnItem);
+            grandTotalQuantity += invoiceTotalQuantity;
+            grandTotalRefundAmount = grandTotalRefundAmount.add(invoiceTotalRefundAmount);
+        }
+
+        log.info("Tổng hợp báo cáo trả hàng: {} hóa đơn trả, tổng số lượng: {}, tổng tiền hoàn: {}",
+                returnItems.size(), grandTotalQuantity, grandTotalRefundAmount);
+
+        return new ReturnReportResponseDTO(
+                request.fromDate(),
+                request.toDate(),
+                returnItems,
+                grandTotalQuantity,
+                grandTotalRefundAmount
         );
     }
 }
