@@ -33,6 +33,12 @@ public class Order {
     private Long orderId;
 
     /**
+     * Mã đơn hàng (tự động sinh)
+     */
+    @Column(name = "order_code", unique = true, nullable = false, length = 50)
+    private String orderCode;
+
+    /**
      * Ngày đặt hàng
      */
     @Column(name = "order_date")

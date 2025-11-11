@@ -64,4 +64,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @return danh sách đơn hàng có phân trang
      */
     Page<Order> findByStatusAndDeliveryType(OrderStatus status, DeliveryType deliveryType, Pageable pageable);
+
+    /**
+     * Lấy mã đơn hàng cuối cùng theo ngày
+     *
+     * @param datePattern pattern ngày tháng (yyyyMMdd)
+     * @return danh sách mã đơn hàng
+     */
+    @Query("SELECT o.orderCode FROM Order o WHERE o.orderCode LIKE CONCAT('ORD', :datePattern, '%') ORDER BY o.orderCode DESC")
+    Page<String> findLastOrderCodeByDate(@Param("datePattern") String datePattern, Pageable pageable);
 }

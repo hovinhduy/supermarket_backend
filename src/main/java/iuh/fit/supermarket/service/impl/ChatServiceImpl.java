@@ -40,7 +40,8 @@ import java.util.stream.Collectors;
  * Implementation của ChatService
  * Xử lý logic chat AI với conversation memory và Function Calling (Tools)
  *
- * Function Calling cho phép AI tự động gọi các tools phù hợp dựa trên intent của user,
+ * Function Calling cho phép AI tự động gọi các tools phù hợp dựa trên intent
+ * của user,
  * giúp giảm 60-70% token cost và tăng accuracy
  */
 @Service
@@ -77,9 +78,7 @@ public class ChatServiceImpl implements ChatService {
         // Log các tools đã được đăng ký
         if (!functionBeans.isEmpty()) {
             System.out.println("🚀 Đã đăng ký " + functionBeans.size() + " AI Function beans:");
-            functionBeans.keySet().forEach(name ->
-                System.out.println("   - " + name)
-            );
+            functionBeans.keySet().forEach(name -> System.out.println("   - " + name));
         }
     }
 
@@ -137,7 +136,8 @@ public class ChatServiceImpl implements ChatService {
                 .findTopNByConversationIdOrderByTimestampDesc(conversation.getId(), MEMORY_LIMIT);
         Collections.reverse(recentMessages); // Đảo ngược để có thứ tự chronological
 
-        // Build prompt messages với system message và history (bao gồm thông tin customer)
+        // Build prompt messages với system message và history (bao gồm thông tin
+        // customer)
         List<Message> messages = buildPromptMessages(recentMessages, customer, request.message());
 
         // Tạo prompt với messages
@@ -159,8 +159,7 @@ public class ChatServiceImpl implements ChatService {
                     textResponse,
                     null,
                     null,
-                    null
-            );
+                    null);
         }
 
         // Lưu AI response với structured data
@@ -260,7 +259,8 @@ public class ChatServiceImpl implements ChatService {
     /**
      * Lưu message với data vào database
      */
-    private ChatMessage saveMessage(ChatConversation conversation, SenderType senderType, String content, ChatData data) {
+    private ChatMessage saveMessage(ChatConversation conversation, SenderType senderType, String content,
+            ChatData data) {
         ChatMessage message = new ChatMessage();
         message.setConversation(conversation);
         message.setSenderType(senderType);
@@ -307,13 +307,15 @@ public class ChatServiceImpl implements ChatService {
 
     /**
      * Build prompt messages từ history với thông tin customer
-     * Với Function Calling, không cần inject context nữa - AI sẽ tự gọi tools khi cần
+     * Với Function Calling, không cần inject context nữa - AI sẽ tự gọi tools khi
+     * cần
      */
     private List<Message> buildPromptMessages(List<ChatMessage> recentMessages, Customer customer,
             String userMessage) {
         List<Message> messages = new ArrayList<>();
 
-        // System message với context về siêu thị, hướng dẫn sử dụng tools và thông tin customer
+        // System message với context về siêu thị, hướng dẫn sử dụng tools và thông tin
+        // customer
         messages.add(new SystemMessage(getSystemPrompt(customer)));
 
         // Thêm history messages để AI có context cuộc trò chuyện
@@ -327,14 +329,14 @@ public class ChatServiceImpl implements ChatService {
 
         // Thêm user message hiện tại (nếu chưa có trong history)
         if (recentMessages.isEmpty() ||
-            !recentMessages.get(recentMessages.size() - 1).getContent().equals(userMessage)) {
+                !recentMessages.get(recentMessages.size() - 1).getContent().equals(userMessage)) {
             messages.add(new UserMessage(userMessage));
         }
 
         return messages;
     }
 
-// Method buildAdditionalContext đã được remove
+    // Method buildAdditionalContext đã được remove
     // Với Function Calling, AI sẽ tự động gọi các tools khi cần
     // Không cần inject context cứng nữa - giảm 60-70% token cost
 
@@ -453,10 +455,8 @@ public class ChatServiceImpl implements ChatService {
 
                 ===== CHÍNH SÁCH SIÊU THỊ (Thông tin cố định) =====
                 Bạn có thể trả lời TRỰC TIẾP (không cần gọi tool) về:
-                - Miễn phí giao hàng cho đơn từ 200,000đ
                 - Đổi trả trong 7 ngày với sản phẩm còn nguyên vẹn
-                - Tích điểm: 1 điểm cho mỗi 10,000đ chi tiêu
-                - Thanh toán: Tiền mặt, thẻ, chuyển khoản, ví điện tử
+                - Thanh toán: mua hàng trên app phải thành toán mới được mua hàng, không cho nợ
                 - Giờ mở cửa: 7:00 - 22:00 hàng ngày
                 → Dùng response_type: "GENERAL_ANSWER"
 
@@ -465,6 +465,7 @@ public class ChatServiceImpl implements ChatService {
                 - Lịch sử, địa lý, khoa học (ngoài sản phẩm)
                 - Viết code, làm bài tập, dịch thuật
                 - Tư vấn đầu tư, tài chính
+                - Không trả lời các câu hỏi ngoài phạm vi siêu thị
 
                 Khi gặp câu hỏi ngoài phạm vi:
                 → response_type: "ERROR"
@@ -477,7 +478,8 @@ public class ChatServiceImpl implements ChatService {
                 - Tạo message văn bản thân thiện
                 - Thêm suggestions để khách có thể hỏi tiếp
                 - TUYỆT ĐỐI không bịa thông tin
-                """.formatted(customerInfo);
+                """
+                .formatted(customerInfo);
     }
 
     /**

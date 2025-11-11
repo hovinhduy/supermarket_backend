@@ -95,6 +95,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Tạo đơn hàng
         Order order = new Order();
+        order.setOrderCode(generateOrderCode()); // Sinh mã đơn hàng tự động
         order.setOrderDate(LocalDateTime.now());
         order.setCustomer(customer);
         order.setEmployee(null); // Không có nhân viên vì khách hàng tự checkout
@@ -814,6 +815,29 @@ public class CheckoutServiceImpl implements CheckoutService {
     }
 
     /**
+     * Tạo mã đơn hàng tự động
+     * Format: ORD + năm + tháng + ngày + số thứ tự (5 chữ số)
+     * Ví dụ: ORD2025111100001
+     */
+    private String generateOrderCode() {
+        String datePattern = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        // Tìm mã đơn hàng cuối cùng trong ngày
+        org.springframework.data.domain.Page<String> lastOrderCodes = orderRepository
+            .findLastOrderCodeByDate(datePattern, org.springframework.data.domain.PageRequest.of(0, 1));
+
+        int nextNumber = 1;
+        if (lastOrderCodes.hasContent()) {
+            String lastOrderCode = lastOrderCodes.getContent().get(0);
+            // Lấy 5 chữ số cuối
+            String lastNumberStr = lastOrderCode.substring(lastOrderCode.length() - 5);
+            nextNumber = Integer.parseInt(lastNumberStr) + 1;
+        }
+
+        return String.format("ORD%s%05d", datePattern, nextNumber);
+    }
+
+    /**
      * Xây dựng response cho checkout
      */
     private CheckoutResponseDTO buildCheckoutResponse(Order order, List<OrderDetail> orderDetails) {
@@ -954,7 +978,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         return new CheckoutResponseDTO(
             order.getOrderId(),
-            "ORD" + String.format("%08d", order.getOrderId()),
+            order.getOrderCode(), // Sử dụng orderCode từ database
             order.getStatus(),
             order.getDeliveryType(),
             order.getPaymentMethod(),
