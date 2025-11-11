@@ -2,6 +2,8 @@ package iuh.fit.supermarket.converter;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import iuh.fit.supermarket.dto.ChatData;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
@@ -10,12 +12,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * JPA Converter để chuyển đổi giữa ChatData object và JSON string
  * Sử dụng Jackson ObjectMapper để serialize/deserialize
+ * Hỗ trợ Java 8 Date/Time types (LocalDateTime, LocalDate, etc.)
  */
 @Converter(autoApply = false)
 @Slf4j
 public class ChatDataConverter implements AttributeConverter<ChatData, String> {
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule()) // Hỗ trợ Java 8 Date/Time
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Serialize dates as ISO-8601 strings
 
     /**
      * Chuyển đổi ChatData object sang JSON string để lưu vào database

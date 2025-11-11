@@ -34,6 +34,7 @@ public class OrderLookupServiceImpl implements OrderLookupService {
 
     /**
      * Lấy đơn hàng gần đây của khách hàng
+     * Format output theo dạng [ORDER] structured để AI dễ parse
      */
     @Override
     public String getRecentOrders(Integer customerId, int limit) {
@@ -47,16 +48,26 @@ public class OrderLookupServiceImpl implements OrderLookupService {
             return "Khách hàng chưa có đơn hàng nào.";
         }
 
-        StringBuilder result = new StringBuilder("Đơn hàng gần đây:\n");
-        for (int i = 0; i < orders.size(); i++) {
-            Order order = orders.get(i);
-            result.append(String.format("%d. Đơn #%d - %s - Tổng: %s - Trạng thái: %s\n",
-                    i + 1,
-                    order.getOrderId(),
-                    order.getOrderDate().format(dateFormatter),
-                    currencyFormat.format(order.getTotalAmount()),
-                    translateStatus(order.getStatus().name())
-            ));
+        StringBuilder result = new StringBuilder("Đơn hàng gần đây:\n\n");
+        for (Order order : orders) {
+            result.append("[ORDER]\n");
+            result.append("order_id: ").append(order.getOrderId()).append("\n");
+            result.append("order_code: ").append(order.getOrderCode() != null ? order.getOrderCode() : "N/A")
+                    .append("\n");
+            result.append("order_date: ").append(order.getOrderDate()).append("\n");
+            result.append("status: ").append(translateStatus(order.getStatus().name())).append("\n");
+            result.append("total_amount: ").append(order.getTotalAmount()).append("\n");
+
+            // Thêm thông tin delivery nếu có
+            if (order.getDeliveryType() != null) {
+                result.append("delivery_type: ").append(translateDeliveryType(order.getDeliveryType().name()))
+                        .append("\n");
+            }
+            if (order.getDeliveryAddress() != null && !order.getDeliveryAddress().isEmpty()) {
+                result.append("delivery_address: ").append(order.getDeliveryAddress()).append("\n");
+            }
+
+            result.append("[/ORDER]\n\n");
         }
 
         return result.toString();
@@ -68,13 +79,13 @@ public class OrderLookupServiceImpl implements OrderLookupService {
     @Override
     public String getOrderDetails(Long orderId, Integer customerId) {
         Optional<Order> orderOpt = orderRepository.findById(orderId);
-        
+
         if (orderOpt.isEmpty()) {
             return "Không tìm thấy đơn hàng #" + orderId;
         }
 
         Order order = orderOpt.get();
-        
+
         // Verify ownership
         if (order.getCustomer() == null || !order.getCustomer().getCustomerId().equals(customerId)) {
             return "Đơn hàng này không thuộc về khách hàng.";
@@ -86,7 +97,7 @@ public class OrderLookupServiceImpl implements OrderLookupService {
         details.append(String.format("- Trạng thái: %s\n", translateStatus(order.getStatus().name())));
         details.append(String.format("- Thành tiền: %s\n", currencyFormat.format(order.getSubtotal())));
         details.append(String.format("- Tổng thanh toán: %s\n", currencyFormat.format(order.getTotalAmount())));
-        details.append(String.format("- Phương thức thanh toán: %s\n", 
+        details.append(String.format("- Phương thức thanh toán: %s\n",
                 translatePaymentMethod(order.getPaymentMethod().name())));
 
         if (order.getNote() != null && !order.getNote().isEmpty()) {
@@ -102,19 +113,19 @@ public class OrderLookupServiceImpl implements OrderLookupService {
     @Override
     public String getOrderStatus(Long orderId, Integer customerId) {
         Optional<Order> orderOpt = orderRepository.findById(orderId);
-        
+
         if (orderOpt.isEmpty()) {
             return "Không tìm thấy đơn hàng #" + orderId;
         }
 
         Order order = orderOpt.get();
-        
+
         // Verify ownership
         if (order.getCustomer() == null || !order.getCustomer().getCustomerId().equals(customerId)) {
             return "Đơn hàng này không thuộc về khách hàng.";
         }
 
-        return String.format("Đơn hàng #%d đang ở trạng thái: %s", 
+        return String.format("Đơn hàng #%d đang ở trạng thái: %s",
                 orderId, translateStatus(order.getStatus().name()));
     }
 
@@ -123,6 +134,7 @@ public class OrderLookupServiceImpl implements OrderLookupService {
      */
     private String translateStatus(String status) {
         return switch (status) {
+            case "UNPAID" -> "Chưa thanh toán";
             case "PENDING" -> "Đang xử lý";
             case "CONFIRMED" -> "Đã xác nhận";
             case "PROCESSING" -> "Đang chuẩn bị";
@@ -140,12 +152,20 @@ public class OrderLookupServiceImpl implements OrderLookupService {
     private String translatePaymentMethod(String method) {
         return switch (method) {
             case "CASH" -> "Tiền mặt";
-            case "CREDIT_CARD" -> "Thẻ tín dụng";
-            case "DEBIT_CARD" -> "Thẻ ghi nợ";
-            case "BANK_TRANSFER" -> "Chuyển khoản";
-            case "MOMO" -> "Ví MoMo";
-            case "ZALOPAY" -> "ZaloPay";
+            case "ONLINE" -> "Ngân hàng";
             default -> method;
+        };
+    }
+
+    /**
+     * Dịch loại hình giao hàng sang tiếng Việt
+     */
+    private String translateDeliveryType(String deliveryType) {
+        return switch (deliveryType) {
+            case "HOME_DELIVERY" -> "Giao hàng tận nơi";
+            case "STORE_PICKUP" -> "Nhận tại cửa hàng";
+            case "EXPRESS_DELIVERY" -> "Giao hàng nhanh";
+            default -> deliveryType;
         };
     }
 }

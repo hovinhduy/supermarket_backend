@@ -424,23 +424,35 @@ public class ChatServiceImpl implements ChatService {
                 }
 
                 ===== CÁCH PARSE TOOL RESULTS =====
-                Khi nhận được tool results dạng [PRODUCT], parse thành ProductInfo:
-                - product_unit_id → product_id (QUAN TRỌNG: Phải có để frontend dùng)
-                - name → name (tên sản phẩm)
-                - code → code (mã sản phẩm/barcode)
-                - price → price (giá bán, numeric)
-                - unit → unit (đơn vị)
-                - brand → brand (thương hiệu)
-                - stock_status → stock_status (Còn hàng/Hết hàng)
-                - image_url → image_url (QUAN TRỌNG: URL hình ảnh chính, nếu là N/A thì để null)
-                - description → description (mô tả)
+
+                1. Khi nhận được tool results dạng [PRODUCT], parse thành ProductInfo:
+                   - product_unit_id → product_id (QUAN TRỌNG: Phải có để frontend dùng)
+                   - name → name (tên sản phẩm)
+                   - code → code (mã sản phẩm/barcode)
+                   - price → price (giá bán, numeric)
+                   - unit → unit (đơn vị)
+                   - brand → brand (thương hiệu)
+                   - stock_status → stock_status (Còn hàng/Hết hàng)
+                   - image_url → image_url (QUAN TRỌNG: URL hình ảnh chính, nếu là N/A thì để null)
+                   - description → description (mô tả)
+
+                2. Khi nhận được tool results dạng [ORDER], parse thành OrderInfo:
+                   - order_id → order_id (QUAN TRỌNG: ID đơn hàng, numeric)
+                   - order_code → order_code (QUAN TRỌNG: Mã đơn hàng duy nhất, string)
+                   - order_date → order_date (ngày đặt hàng, ISO datetime)
+                   - status → status (trạng thái đơn hàng bằng tiếng Việt)
+                   - total_amount → total_amount (tổng tiền, numeric)
+                   - delivery_type → delivery_method (loại hình giao hàng, optional)
+                   - delivery_address → delivery_address (địa chỉ giao hàng, optional)
 
                 VÍ DỤ:
                 - Khách hỏi về sản phẩm → response_type: "PRODUCT_INFO", data.products chứa thông tin
                 - Khách hỏi về đơn hàng → response_type: "ORDER_INFO", data.orders chứa thông tin
                 - Khách hỏi chính sách → response_type: "GENERAL_ANSWER", data.policy chứa thông tin
 
-                LƯU Ý: KHÔNG được bỏ sót product_id (product_unit_id) và image_url khi parse
+                LƯU Ý:
+                - KHÔNG được bỏ sót product_id (product_unit_id) và image_url khi parse [PRODUCT]
+                - KHÔNG được bỏ sót order_id và order_code khi parse [ORDER]
 
                 ===== QUY TẮC VÀNG: KHÔNG ĐƯỢC BỊA THÔNG TIN =====
                 ⚠️ NGHIÊM CẤM tự bịa hoặc đoán:
