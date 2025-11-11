@@ -1,6 +1,8 @@
 package iuh.fit.supermarket.service.impl;
 
 import iuh.fit.supermarket.dto.report.*;
+import iuh.fit.supermarket.entity.*;
+import iuh.fit.supermarket.repository.PromotionDetailRepository;
 import iuh.fit.supermarket.repository.ReturnInvoiceHeaderRepository;
 import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.service.ReportService;
@@ -26,6 +28,7 @@ public class ReportServiceImpl implements ReportService {
 
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final ReturnInvoiceHeaderRepository returnInvoiceHeaderRepository;
+    private final PromotionDetailRepository promotionDetailRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -292,6 +295,111 @@ public class ReportServiceImpl implements ReportService {
                 returnItems,
                 grandTotalQuantity,
                 grandTotalRefundAmount
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PromotionReportResponseDTO getPromotionReport(PromotionReportRequestDTO request) {
+        log.info("Lấy báo cáo khuyến mãi từ {} đến {}, mã CTKM: {}",
+                request.fromDate(), request.toDate(), request.promotionCode());
+
+        // Lấy dữ liệu từ repository
+        List<PromotionDetail> promotionDetails = promotionDetailRepository.findPromotionDetailsForReport(
+                request.fromDate(),
+                request.toDate(),
+                request.promotionCode()
+        );
+
+        log.info("Tìm thấy {} chương trình khuyến mãi", promotionDetails.size());
+
+        // Chuyển đổi sang DTO và tính tổng
+        List<PromotionSummaryDTO> promotionList = new ArrayList<>();
+        Integer totalGiftQuantity = 0;
+        BigDecimal totalDiscountAmount = BigDecimal.ZERO;
+        Integer totalBudget = 0;
+        Integer totalUsed = 0;
+
+        for (PromotionDetail detail : promotionDetails) {
+            PromotionLine line = detail.getPromotionLine();
+            PromotionHeader header = line.getHeader();
+
+            String giftProductCode = null;
+            String giftProductName = null;
+            Integer giftQuantity = null;
+            String giftUnit = null;
+            BigDecimal discountAmount = null;
+
+            // Xử lý theo loại khuyến mãi
+            if (detail instanceof BuyXGetYDetail buyXGetY) {
+                // Loại Mua X Tặng Y
+                ProductUnit giftProduct = buyXGetY.getGiftProduct();
+                if (giftProduct != null) {
+                    giftProductCode = giftProduct.getBarcode();
+                    giftProductName = giftProduct.getProduct().getName();
+                    giftQuantity = buyXGetY.getGiftQuantity();
+                    giftUnit = giftProduct.getUnit().getName();
+
+                    if (giftQuantity != null) {
+                        totalGiftQuantity += giftQuantity;
+                    }
+                }
+            } else if (detail instanceof OrderDiscountDetail orderDiscount) {
+                // Loại Giảm Giá Đơn Hàng
+                discountAmount = orderDiscount.getOrderDiscountValue();
+                if (discountAmount != null) {
+                    totalDiscountAmount = totalDiscountAmount.add(discountAmount);
+                }
+            } else if (detail instanceof ProductDiscountDetail productDiscount) {
+                // Loại Giảm Giá Sản Phẩm
+                discountAmount = productDiscount.getProductDiscountValue();
+                if (discountAmount != null) {
+                    totalDiscountAmount = totalDiscountAmount.add(discountAmount);
+                }
+            }
+
+            // Tính ngân sách và đã sử dụng
+            Integer usageLimit = detail.getUsageLimit();
+            Integer usageCount = detail.getUsageCount() != null ? detail.getUsageCount() : 0;
+            Integer remainingCount = usageLimit != null ? usageLimit - usageCount : null;
+
+            if (usageLimit != null) {
+                totalBudget += usageLimit;
+            }
+            totalUsed += usageCount;
+
+            // Tạo DTO
+            PromotionSummaryDTO summaryDTO = new PromotionSummaryDTO(
+                    detail.getPromotionCode(),
+                    line.getLineName(),
+                    line.getStartDate(),
+                    line.getEndDate(),
+                    line.getPromotionType(),
+                    giftProductCode,
+                    giftProductName,
+                    giftQuantity,
+                    giftUnit,
+                    discountAmount,
+                    usageLimit,
+                    usageCount,
+                    remainingCount
+            );
+
+            promotionList.add(summaryDTO);
+        }
+
+        Integer totalRemaining = totalBudget - totalUsed;
+
+        log.info("Tổng hợp báo cáo khuyến mãi: {} CTKM, tổng SL tặng: {}, tổng tiền CK: {}, tổng ngân sách: {}",
+                promotionList.size(), totalGiftQuantity, totalDiscountAmount, totalBudget);
+
+        return new PromotionReportResponseDTO(
+                promotionList,
+                totalGiftQuantity,
+                totalDiscountAmount,
+                totalBudget,
+                totalUsed,
+                totalRemaining
         );
     }
 }

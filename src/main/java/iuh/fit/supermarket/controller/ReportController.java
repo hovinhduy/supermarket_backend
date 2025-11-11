@@ -3,6 +3,8 @@ package iuh.fit.supermarket.controller;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportRequestDTO;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportResponseDTO;
+import iuh.fit.supermarket.dto.report.PromotionReportRequestDTO;
+import iuh.fit.supermarket.dto.report.PromotionReportResponseDTO;
 import iuh.fit.supermarket.dto.report.ReturnReportRequestDTO;
 import iuh.fit.supermarket.dto.report.ReturnReportResponseDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
@@ -97,5 +99,32 @@ public class ReportController {
                 response.returnItems().size(), response.totalRefundAmount());
 
         return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo trả hàng thành công", response));
+    }
+
+    /**
+     * API lấy báo cáo tổng kết chương trình khuyến mãi
+     * - Hiển thị thông tin các chương trình khuyến mãi
+     * - Bao gồm ngày bắt đầu, kết thúc, loại khuyến mãi
+     * - Thông tin sản phẩm tặng (nếu là loại Mua X Tặng Y)
+     * - Số tiền chiết khấu (nếu là loại giảm giá)
+     * - Ngân sách tổng, đã sử dụng, còn lại
+     * - Filter: từ ngày - đến ngày, mã CTKM (optional)
+     *
+     * @param request thông tin filter báo cáo
+     * @return dữ liệu báo cáo khuyến mãi đã tổng hợp
+     */
+    @PostMapping("/promotions")
+    public ResponseEntity<ApiResponse<PromotionReportResponseDTO>> getPromotionReport(
+            @Valid @RequestBody PromotionReportRequestDTO request) {
+
+        log.info("Nhận yêu cầu báo cáo khuyến mãi từ {} đến {}, mã CTKM: {}",
+                request.fromDate(), request.toDate(), request.promotionCode());
+
+        PromotionReportResponseDTO response = reportService.getPromotionReport(request);
+
+        log.info("Trả về báo cáo khuyến mãi: {} CTKM, tổng ngân sách: {}",
+                response.promotionList().size(), response.totalBudget());
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo khuyến mãi thành công", response));
     }
 }

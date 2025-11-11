@@ -2,6 +2,8 @@ package iuh.fit.supermarket.service;
 
 import iuh.fit.supermarket.dto.report.CustomerSalesReportRequestDTO;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportResponseDTO;
+import iuh.fit.supermarket.dto.report.PromotionReportRequestDTO;
+import iuh.fit.supermarket.dto.report.PromotionReportResponseDTO;
 import iuh.fit.supermarket.dto.report.ReturnReportRequestDTO;
 import iuh.fit.supermarket.dto.report.ReturnReportResponseDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
@@ -39,4 +41,13 @@ public interface ReportService {
      * @return dữ liệu báo cáo trả hàng đã được tổng hợp
      */
     ReturnReportResponseDTO getReturnReport(ReturnReportRequestDTO request);
+
+    /**
+     * Lấy báo cáo tổng kết chương trình khuyến mãi
+     * Hiển thị thông tin các chương trình khuyến mãi, ngân sách và tình hình sử dụng
+     *
+     * @param request thông tin filter báo cáo (từ ngày - đến ngày, mã CTKM)
+     * @return dữ liệu báo cáo khuyến mãi đã được tổng hợp
+     */
+    PromotionReportResponseDTO getPromotionReport(PromotionReportRequestDTO request);
 }

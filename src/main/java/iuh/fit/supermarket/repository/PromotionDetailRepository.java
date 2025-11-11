@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,9 +67,34 @@ public interface PromotionDetailRepository extends JpaRepository<PromotionDetail
     
     /**
      * Đếm số lượng chi tiết của một promotion line
-     * 
+     *
      * @param promotionLineId ID của PromotionLine
      * @return số lượng chi tiết
      */
     long countByPromotionLine_PromotionLineId(Long promotionLineId);
+
+    /**
+     * Lấy danh sách promotion detail cho báo cáo khuyến mãi
+     * Filter theo khoảng thời gian (startDate và endDate của PromotionLine)
+     * và mã khuyến mãi (nếu có)
+     *
+     * @param fromDate ngày bắt đầu khoảng thời gian báo cáo
+     * @param toDate ngày kết thúc khoảng thời gian báo cáo
+     * @param promotionCode mã khuyến mãi (optional)
+     * @return danh sách PromotionDetail
+     */
+    @Query("""
+            SELECT pd
+            FROM PromotionDetail pd
+            JOIN FETCH pd.promotionLine pl
+            JOIN FETCH pl.header ph
+            WHERE (pl.startDate <= :toDate AND pl.endDate >= :fromDate)
+            AND (:promotionCode IS NULL OR pd.promotionCode = :promotionCode)
+            ORDER BY pd.promotionCode
+            """)
+    List<PromotionDetail> findPromotionDetailsForReport(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate,
+            @Param("promotionCode") String promotionCode
+    );
 }
