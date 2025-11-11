@@ -1,10 +1,12 @@
 package iuh.fit.supermarket.service.impl;
 
+import iuh.fit.supermarket.dto.ChatData;
 import iuh.fit.supermarket.dto.chat.ChatRequest;
 import iuh.fit.supermarket.dto.chat.ChatResponse;
 import iuh.fit.supermarket.dto.chat.ConversationResponse;
 import iuh.fit.supermarket.dto.chat.MessageResponse;
 import iuh.fit.supermarket.dto.chat.structured.AIStructuredResponse;
+import iuh.fit.supermarket.dto.chat.structured.ResponseData;
 import iuh.fit.supermarket.entity.ChatConversation;
 import iuh.fit.supermarket.entity.ChatMessage;
 import iuh.fit.supermarket.entity.Customer;
@@ -161,8 +163,9 @@ public class ChatServiceImpl implements ChatService {
             );
         }
 
-        // Lưu AI response (lưu dạng text message)
-        ChatMessage aiMessage = saveMessage(conversation, SenderType.AI, structuredResponse.message());
+        // Lưu AI response với structured data
+        ChatData chatData = convertToChatData(structuredResponse.data());
+        ChatMessage aiMessage = saveMessage(conversation, SenderType.AI, structuredResponse.message(), chatData);
 
         // Cập nhật conversation title nếu là message đầu tiên
         if (recentMessages.size() <= 2) {
@@ -251,13 +254,55 @@ public class ChatServiceImpl implements ChatService {
      * Lưu message vào database
      */
     private ChatMessage saveMessage(ChatConversation conversation, SenderType senderType, String content) {
+        return saveMessage(conversation, senderType, content, null);
+    }
+
+    /**
+     * Lưu message với data vào database
+     */
+    private ChatMessage saveMessage(ChatConversation conversation, SenderType senderType, String content, ChatData data) {
         ChatMessage message = new ChatMessage();
         message.setConversation(conversation);
         message.setSenderType(senderType);
         message.setContent(content);
+        message.setData(data);
         message.setTimestamp(LocalDateTime.now());
 
         return messageRepository.save(message);
+    }
+
+    /**
+     * Convert ResponseData từ AI sang ChatData để lưu vào database
+     */
+    private ChatData convertToChatData(ResponseData responseData) {
+        if (responseData == null) {
+            return null;
+        }
+
+        ChatData chatData = new ChatData();
+
+        // Convert các typed lists sang List<Object> để lưu dạng JSON
+        if (responseData.products() != null) {
+            chatData.setProducts(new ArrayList<>(responseData.products()));
+        }
+
+        if (responseData.orders() != null) {
+            chatData.setOrders(new ArrayList<>(responseData.orders()));
+        }
+
+        if (responseData.promotions() != null) {
+            chatData.setPromotions(new ArrayList<>(responseData.promotions()));
+        }
+
+        if (responseData.stock() != null) {
+            chatData.setStock(List.of(responseData.stock()));
+        }
+
+        if (responseData.policy() != null) {
+            chatData.setPolicy(List.of(responseData.policy()));
+        }
+
+        return chatData;
     }
 
     /**
@@ -505,6 +550,7 @@ public class ChatServiceImpl implements ChatService {
                 message.getId(),
                 message.getSenderType(),
                 message.getContent(),
+                message.getData(),
                 message.getTimestamp());
     }
 }

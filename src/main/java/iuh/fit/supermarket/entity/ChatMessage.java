@@ -1,5 +1,7 @@
 package iuh.fit.supermarket.entity;
 
+import iuh.fit.supermarket.converter.ChatDataConverter;
+import iuh.fit.supermarket.dto.ChatData;
 import iuh.fit.supermarket.enums.SenderType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -46,6 +48,14 @@ public class ChatMessage {
      */
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
+
+    /**
+     * Dữ liệu bổ sung trong cuộc trò chuyện
+     * Lưu trữ thông tin về sản phẩm, đơn hàng, khuyến mãi, kho hàng và chính sách
+     */
+    @Convert(converter = ChatDataConverter.class)
+    @Column(name = "data", columnDefinition = "JSON")
+    private ChatData data;
 
     /**
      * Thời gian gửi tin nhắn
