@@ -74,4 +74,41 @@ public interface ReturnInvoiceHeaderRepository extends JpaRepository<ReturnInvoi
     @EntityGraph(attributePaths = {"originalInvoice", "customer", "employee", "returnDetails", "returnDetails.productUnit", "returnDetails.productUnit.product", "returnDetails.productUnit.unit"})
     @Query("SELECT r FROM ReturnInvoiceHeader r WHERE r.returnId = :returnId")
     Optional<ReturnInvoiceHeader> findByIdWithDetails(@Param("returnId") Integer returnId);
+
+    /**
+     * Lấy dữ liệu báo cáo trả hàng chi tiết theo khoảng thời gian
+     * Trả về: hóa đơn mua, ngày mua, hóa đơn trả, ngày trả, nhóm SP, mã SP, tên SP, đơn vị, số lượng, đơn giá, thành tiền
+     *
+     * @param fromDate từ ngày
+     * @param toDate đến ngày
+     * @return danh sách Object[] chứa thông tin báo cáo
+     */
+    @Query("""
+            SELECT
+                inv.invoiceNumber,
+                inv.invoiceDate,
+                rh.returnCode,
+                rh.returnDate,
+                cat.name,
+                p.code,
+                p.name,
+                u.name,
+                rd.quantity,
+                rd.priceAtReturn,
+                rd.refundAmount
+            FROM ReturnInvoiceHeader rh
+            JOIN rh.originalInvoice inv
+            JOIN rh.returnDetails rd
+            JOIN rd.productUnit pu
+            JOIN pu.product p
+            JOIN pu.unit u
+            LEFT JOIN p.category cat
+            WHERE DATE(rh.returnDate) >= :fromDate
+            AND DATE(rh.returnDate) <= :toDate
+            ORDER BY rh.returnDate DESC, rh.returnCode
+            """)
+    List<Object[]> getReturnReportRaw(
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
 }

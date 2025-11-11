@@ -3,6 +3,8 @@ package iuh.fit.supermarket.controller;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportRequestDTO;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportResponseDTO;
+import iuh.fit.supermarket.dto.report.ReturnReportRequestDTO;
+import iuh.fit.supermarket.dto.report.ReturnReportResponseDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportResponseDTO;
 import iuh.fit.supermarket.service.ReportService;
@@ -71,5 +73,29 @@ public class ReportController {
                 response.customerSalesList().size(), response.grandTotalRevenueAfterDiscount());
 
         return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo doanh số khách hàng thành công", response));
+    }
+
+    /**
+     * API lấy báo cáo trả hàng
+     * - Hiển thị chi tiết hóa đơn trả hàng (bao gồm thông tin hóa đơn mua)
+     * - Hiển thị mã sản phẩm, tên sản phẩm, nhóm sản phẩm, số lượng, đơn giá, thành tiền
+     * - Filter: từ ngày - đến ngày
+     *
+     * @param request thông tin filter báo cáo
+     * @return dữ liệu báo cáo trả hàng đã tổng hợp
+     */
+    @PostMapping("/returns")
+    public ResponseEntity<ApiResponse<ReturnReportResponseDTO>> getReturnReport(
+            @Valid @RequestBody ReturnReportRequestDTO request) {
+
+        log.info("Nhận yêu cầu báo cáo trả hàng từ {} đến {}",
+                request.fromDate(), request.toDate());
+
+        ReturnReportResponseDTO response = reportService.getReturnReport(request);
+
+        log.info("Trả về báo cáo trả hàng: {} sản phẩm, tổng tiền: {}",
+                response.returnItems().size(), response.totalRefundAmount());
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo trả hàng thành công", response));
     }
 }

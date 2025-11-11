@@ -2,6 +2,8 @@ package iuh.fit.supermarket.service;
 
 import iuh.fit.supermarket.dto.report.CustomerSalesReportRequestDTO;
 import iuh.fit.supermarket.dto.report.CustomerSalesReportResponseDTO;
+import iuh.fit.supermarket.dto.report.ReturnReportRequestDTO;
+import iuh.fit.supermarket.dto.report.ReturnReportResponseDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportResponseDTO;
 
@@ -28,4 +30,13 @@ public interface ReportService {
      * @return dữ liệu báo cáo doanh số khách hàng đã được tổng hợp
      */
     CustomerSalesReportResponseDTO getCustomerSalesReport(CustomerSalesReportRequestDTO request);
+
+    /**
+     * Lấy báo cáo trả hàng chi tiết
+     * Hiển thị chi tiết hóa đơn trả hàng bao gồm thông tin hóa đơn mua
+     *
+     * @param request thông tin filter báo cáo (từ ngày - đến ngày)
+     * @return dữ liệu báo cáo trả hàng đã được tổng hợp
+     */
+    ReturnReportResponseDTO getReturnReport(ReturnReportRequestDTO request);
 }
