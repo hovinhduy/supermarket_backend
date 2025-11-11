@@ -117,4 +117,46 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
             java.time.LocalDate toDate,
             Integer employeeId
     );
+
+    /**
+     * Lấy dữ liệu báo cáo doanh số theo khách hàng và nhóm sản phẩm
+     * Chỉ tính các hóa đơn đã thanh toán (PAID)
+     * Nhóm theo khách hàng và danh mục sản phẩm
+     *
+     * @param fromDate từ ngày (bao gồm cả ngày này)
+     * @param toDate đến ngày (bao gồm cả ngày này)
+     * @param customerId ID khách hàng (null để lấy tất cả khách hàng)
+     * @return danh sách dữ liệu doanh số theo khách hàng và nhóm sản phẩm
+     */
+    @Query("""
+            SELECT new iuh.fit.supermarket.dto.report.CustomerCategorySalesProjection(
+                c.customerId,
+                c.customerCode,
+                u.name,
+                c.address,
+                CAST(c.customerType AS string),
+                cat.name,
+                SUM(d.unitPrice * d.quantity),
+                SUM(d.discountAmount),
+                SUM(d.lineTotal)
+            )
+            FROM SaleInvoiceHeader i
+            JOIN i.customer c
+            JOIN c.user u
+            JOIN i.invoiceDetails d
+            JOIN d.productUnit pu
+            JOIN pu.product p
+            LEFT JOIN p.category cat
+            WHERE i.status = 'PAID'
+            AND FUNCTION('DATE', i.invoiceDate) >= :fromDate
+            AND FUNCTION('DATE', i.invoiceDate) <= :toDate
+            AND (:customerId IS NULL OR c.customerId = :customerId)
+            GROUP BY c.customerId, c.customerCode, u.name, c.address, c.customerType, cat.name
+            ORDER BY c.customerCode, cat.name
+            """)
+    List<iuh.fit.supermarket.dto.report.CustomerCategorySalesProjection> findCustomerSalesReport(
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate,
+            @Param("customerId") Integer customerId
+    );
 }

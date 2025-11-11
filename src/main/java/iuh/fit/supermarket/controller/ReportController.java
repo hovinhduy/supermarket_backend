@@ -1,6 +1,8 @@
 package iuh.fit.supermarket.controller;
 
 import iuh.fit.supermarket.dto.common.ApiResponse;
+import iuh.fit.supermarket.dto.report.CustomerSalesReportRequestDTO;
+import iuh.fit.supermarket.dto.report.CustomerSalesReportResponseDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
 import iuh.fit.supermarket.dto.report.SalesDailyReportResponseDTO;
 import iuh.fit.supermarket.service.ReportService;
@@ -44,5 +46,30 @@ public class ReportController {
                 response.employeeSalesList().size(), response.grandTotalRevenueAfterDiscount());
 
         return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo doanh số thành công", response));
+    }
+
+    /**
+     * API lấy báo cáo doanh số theo khách hàng
+     * - Nhóm theo khách hàng và nhóm sản phẩm (category)
+     * - Hiển thị chiết khấu, doanh số trước/sau chiết khấu
+     * - Chỉ tính hóa đơn PAID
+     * - Filter: từ ngày - đến ngày, khách hàng (optional)
+     *
+     * @param request thông tin filter báo cáo
+     * @return dữ liệu báo cáo doanh số khách hàng đã tổng hợp
+     */
+    @PostMapping("/customer-sales")
+    public ResponseEntity<ApiResponse<CustomerSalesReportResponseDTO>> getCustomerSalesReport(
+            @Valid @RequestBody CustomerSalesReportRequestDTO request) {
+
+        log.info("Nhận yêu cầu báo cáo doanh số khách hàng từ {} đến {}, khách hàng ID: {}",
+                request.fromDate(), request.toDate(), request.customerId());
+
+        CustomerSalesReportResponseDTO response = reportService.getCustomerSalesReport(request);
+
+        log.info("Trả về báo cáo doanh số khách hàng: {} khách hàng, tổng: {}",
+                response.customerSalesList().size(), response.grandTotalRevenueAfterDiscount());
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy báo cáo doanh số khách hàng thành công", response));
     }
 }

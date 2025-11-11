@@ -1,9 +1,6 @@
 package iuh.fit.supermarket.service.impl;
 
-import iuh.fit.supermarket.dto.report.EmployeeDailySalesDTO;
-import iuh.fit.supermarket.dto.report.EmployeeSalesSummaryDTO;
-import iuh.fit.supermarket.dto.report.SalesDailyReportRequestDTO;
-import iuh.fit.supermarket.dto.report.SalesDailyReportResponseDTO;
+import iuh.fit.supermarket.dto.report.*;
 import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.service.ReportService;
 import lombok.RequiredArgsConstructor;
@@ -107,6 +104,96 @@ public class ReportServiceImpl implements ReportService {
                 request.fromDate(),
                 request.toDate(),
                 employeeSalesList,
+                grandTotalDiscount,
+                grandTotalRevenueBeforeDiscount,
+                grandTotalRevenueAfterDiscount
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerSalesReportResponseDTO getCustomerSalesReport(CustomerSalesReportRequestDTO request) {
+        log.info("Lấy báo cáo doanh số theo khách hàng từ {} đến {}, khách hàng ID: {}",
+                request.fromDate(), request.toDate(), request.customerId());
+
+        // Lấy dữ liệu thô từ repository
+        List<CustomerCategorySalesProjection> rawResults = saleInvoiceHeaderRepository.findCustomerSalesReport(
+                request.fromDate(),
+                request.toDate(),
+                request.customerId()
+        );
+
+        log.info("Tìm thấy {} bản ghi doanh số theo khách hàng và nhóm sản phẩm", rawResults.size());
+
+        // Nhóm dữ liệu theo customer
+        Map<Integer, List<CustomerCategorySalesProjection>> groupedByCustomer = new LinkedHashMap<>();
+        for (CustomerCategorySalesProjection record : rawResults) {
+            groupedByCustomer
+                    .computeIfAbsent(record.customerId(), k -> new ArrayList<>())
+                    .add(record);
+        }
+
+        // Xây dựng danh sách CustomerSalesSummaryDTO
+        List<CustomerSalesSummaryDTO> customerSalesList = new ArrayList<>();
+        BigDecimal grandTotalDiscount = BigDecimal.ZERO;
+        BigDecimal grandTotalRevenueBeforeDiscount = BigDecimal.ZERO;
+        BigDecimal grandTotalRevenueAfterDiscount = BigDecimal.ZERO;
+
+        for (Map.Entry<Integer, List<CustomerCategorySalesProjection>> entry : groupedByCustomer.entrySet()) {
+            List<CustomerCategorySalesProjection> customerRecords = entry.getValue();
+
+            // Lấy thông tin khách hàng từ record đầu tiên
+            CustomerCategorySalesProjection firstRecord = customerRecords.get(0);
+
+            // Tạo danh sách CategorySalesDTO cho khách hàng này
+            List<CategorySalesDTO> categorySalesList = new ArrayList<>();
+            BigDecimal customerTotalDiscount = BigDecimal.ZERO;
+            BigDecimal customerTotalRevenueBeforeDiscount = BigDecimal.ZERO;
+            BigDecimal customerTotalRevenueAfterDiscount = BigDecimal.ZERO;
+
+            for (CustomerCategorySalesProjection record : customerRecords) {
+                CategorySalesDTO categorySales = new CategorySalesDTO(
+                        record.categoryName() != null ? record.categoryName() : "Chưa phân loại",
+                        record.revenueBeforeDiscount(),
+                        record.discount(),
+                        record.revenueAfterDiscount()
+                );
+                categorySalesList.add(categorySales);
+
+                // Cộng dồn tổng cho khách hàng
+                customerTotalDiscount = customerTotalDiscount.add(record.discount());
+                customerTotalRevenueBeforeDiscount = customerTotalRevenueBeforeDiscount.add(record.revenueBeforeDiscount());
+                customerTotalRevenueAfterDiscount = customerTotalRevenueAfterDiscount.add(record.revenueAfterDiscount());
+            }
+
+            // Tạo CustomerSalesSummaryDTO
+            CustomerSalesSummaryDTO customerSummary = new CustomerSalesSummaryDTO(
+                    firstRecord.customerId(),
+                    firstRecord.customerCode(),
+                    firstRecord.customerName(),
+                    firstRecord.address(),
+                    firstRecord.customerType(),
+                    categorySalesList,
+                    customerTotalDiscount,
+                    customerTotalRevenueBeforeDiscount,
+                    customerTotalRevenueAfterDiscount
+            );
+
+            customerSalesList.add(customerSummary);
+
+            // Cộng dồn grand total
+            grandTotalDiscount = grandTotalDiscount.add(customerTotalDiscount);
+            grandTotalRevenueBeforeDiscount = grandTotalRevenueBeforeDiscount.add(customerTotalRevenueBeforeDiscount);
+            grandTotalRevenueAfterDiscount = grandTotalRevenueAfterDiscount.add(customerTotalRevenueAfterDiscount);
+        }
+
+        log.info("Tổng hợp báo cáo: {} khách hàng, tổng doanh số: {}",
+                customerSalesList.size(), grandTotalRevenueAfterDiscount);
+
+        return new CustomerSalesReportResponseDTO(
+                request.fromDate(),
+                request.toDate(),
+                customerSalesList,
                 grandTotalDiscount,
                 grandTotalRevenueBeforeDiscount,
                 grandTotalRevenueAfterDiscount
