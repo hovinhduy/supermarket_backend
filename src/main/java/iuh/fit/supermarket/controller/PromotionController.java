@@ -154,33 +154,6 @@ public class PromotionController {
         return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse.success(details));
     }
 
-    /**
-     * Tạo mới chương trình khuyến mãi (API cũ - bao gồm header, lines và details)
-     * 
-     * @param requestDTO thông tin chương trình khuyến mãi cần tạo
-     * @return ResponseEntity chứa thông tin chương trình đã tạo
-     */
-    @PostMapping
-    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
-    @Operation(summary = "Tạo chương trình khuyến mãi mới (Full)", description = "Tạo một chương trình khuyến mãi mới với đầy đủ thông tin header, lines và details. Đây là API tổng hợp, bạn cũng có thể tạo từng phần riêng biệt bằng các API /headers, /lines, /details.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Tạo chương trình khuyến mãi thành công"),
-            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
-            @ApiResponse(responseCode = "409", description = "Tên chương trình hoặc mã khuyến mãi đã tồn tại"),
-            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
-    })
-    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> createPromotion(
-            @Valid @RequestBody PromotionHeaderRequestDTO requestDTO) {
-
-        log.info("API: Tạo chương trình khuyến mãi mới (full) - {}", requestDTO.getPromotionName());
-
-        PromotionHeaderResponseDTO responseDTO = promotionService.createPromotion(requestDTO);
-
-        log.info("API: Đã tạo thành công chương trình khuyến mãi ID: {}", responseDTO.getPromotionId());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(iuh.fit.supermarket.dto.common.ApiResponse.success("Tạo chương trình khuyến mãi thành công",
-                        responseDTO));
-    }
 
     /**
      * Cập nhật thông tin promotion header (chỉ cập nhật header, không cập nhật
@@ -325,40 +298,6 @@ public class PromotionController {
                 .ok(iuh.fit.supermarket.dto.common.ApiResponse.success("Xóa promotion detail thành công", null));
     }
 
-    /**
-     * Cập nhật toàn bộ chương trình khuyến mãi (API cũ - bao gồm header, lines và
-     * details)
-     * 
-     * @param promotionId ID của chương trình cần cập nhật
-     * @param requestDTO  thông tin cập nhật đầy đủ
-     * @return ResponseEntity chứa thông tin đã cập nhật
-     * @deprecated Nên sử dụng các API cập nhật riêng biệt cho header, line và
-     *             detail
-     */
-    @PutMapping("/{promotionId}")
-    @RequireRole({ EmployeeRole.ADMIN, EmployeeRole.MANAGER })
-    @Operation(summary = "Cập nhật toàn bộ chương trình khuyến mãi (Full)", description = "Cập nhật toàn bộ thông tin của chương trình khuyến mãi bao gồm header, lines và details. Đây là API tổng hợp, nên sử dụng các API cập nhật riêng biệt để cập nhật từng phần.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Cập nhật chương trình khuyến mãi thành công"),
-            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ"),
-            @ApiResponse(responseCode = "404", description = "Không tìm thấy chương trình khuyến mãi"),
-            @ApiResponse(responseCode = "409", description = "Tên chương trình hoặc mã khuyến mãi đã tồn tại"),
-            @ApiResponse(responseCode = "403", description = "Không có quyền thực hiện thao tác này")
-    })
-    @Deprecated
-    public ResponseEntity<iuh.fit.supermarket.dto.common.ApiResponse<PromotionHeaderResponseDTO>> updatePromotion(
-            @Parameter(description = "ID của chương trình khuyến mãi", required = true) @PathVariable Long promotionId,
-            @Valid @RequestBody PromotionHeaderRequestDTO requestDTO) {
-
-        log.info("API: Cập nhật toàn bộ chương trình khuyến mãi ID: {} - {}", promotionId,
-                requestDTO.getPromotionName());
-
-        PromotionHeaderResponseDTO responseDTO = promotionService.updatePromotion(promotionId, requestDTO);
-
-        log.info("API: Đã cập nhật thành công chương trình khuyến mãi ID: {}", promotionId);
-        return ResponseEntity.ok(iuh.fit.supermarket.dto.common.ApiResponse
-                .success("Cập nhật chương trình khuyến mãi thành công", responseDTO));
-    }
 
     /**
      * Xóa chương trình khuyến mãi

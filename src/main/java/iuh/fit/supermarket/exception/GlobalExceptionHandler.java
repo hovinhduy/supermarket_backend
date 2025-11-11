@@ -407,6 +407,8 @@ public class GlobalExceptionHandler {
 
         /**
          * Xử lý validation errors
+         * - Nếu chỉ có 1 lỗi: hiển thị message trực tiếp ở trường message
+         * - Nếu có nhiều lỗi: hiển thị tất cả trong data với message generic
          */
         @ExceptionHandler(MethodArgumentNotValidException.class)
         public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
@@ -421,6 +423,14 @@ public class GlobalExceptionHandler {
 
                 log.warn("Validation error: {}", errors);
 
+                // Nếu chỉ có 1 lỗi, hiển thị message trực tiếp
+                if (errors.size() == 1) {
+                        String singleErrorMessage = errors.values().iterator().next();
+                        return ResponseEntity.badRequest()
+                                        .body(ApiResponse.error(singleErrorMessage));
+                }
+
+                // Nếu có nhiều lỗi, hiển thị tất cả trong data
                 return ResponseEntity.badRequest()
                                 .body(ApiResponse.error("Dữ liệu không hợp lệ", errors));
         }

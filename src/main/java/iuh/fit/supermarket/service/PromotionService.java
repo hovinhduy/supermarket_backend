@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,7 +33,6 @@ public class PromotionService {
     private final PromotionLineRepository promotionLineRepository;
     private final PromotionDetailRepository promotionDetailRepository;
     private final ProductUnitRepository productUnitRepository;
-    private final CategoryRepository categoryRepository;
     private final PromotionDetailFactory promotionDetailFactory;
 
     /**
@@ -103,7 +101,8 @@ public class PromotionService {
         // Kiểm tra trùng mã khuyến mãi (giờ kiểm tra ở detail level)
         if (requestDTO.getDetail() != null && requestDTO.getDetail().getPromotionCode() != null) {
             if (promotionDetailRepository.existsByPromotionCodeIgnoreCase(requestDTO.getDetail().getPromotionCode())) {
-                throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + requestDTO.getDetail().getPromotionCode());
+                throw new DuplicatePromotionException(
+                        "Mã khuyến mãi đã tồn tại: " + requestDTO.getDetail().getPromotionCode());
             }
         }
 
@@ -123,7 +122,7 @@ public class PromotionService {
         if (requestDTO.getDetail() != null) {
             PromotionDetail detail = createPromotionDetailFromDTO(requestDTO.getDetail(), line);
             detail = promotionDetailRepository.save(detail);
-            
+
             // Khởi tạo list nếu chưa có
             if (line.getDetails() == null) {
                 line.setDetails(new ArrayList<>());
@@ -202,7 +201,7 @@ public class PromotionService {
         // Tạo detail
         PromotionDetail detail = createPromotionDetailFromDTO(requestDTO, line);
         detail = promotionDetailRepository.save(detail);
-        
+
         // Khởi tạo list nếu chưa có và thêm detail mới
         if (line.getDetails() == null) {
             line.setDetails(new ArrayList<>());
@@ -212,123 +211,6 @@ public class PromotionService {
 
         log.info("Đã tạo thành công promotion detail ID: {}", detail.getDetailId());
         return convertToDetailResponseDTO(detail);
-    }
-
-    /**
-     * Tạo mới chương trình khuyến mãi (API cũ - bao gồm header, lines và details)
-     * 
-     * @param requestDTO thông tin chương trình khuyến mãi cần tạo
-     * @return PromotionHeaderResponseDTO chứa thông tin chương trình đã tạo
-     * @throws PromotionValidationException nếu dữ liệu không hợp lệ
-     * @throws DuplicatePromotionException  nếu tên chương trình đã tồn tại
-     */
-    @Transactional
-    public PromotionHeaderResponseDTO createPromotion(PromotionHeaderRequestDTO requestDTO) {
-        log.info("Bắt đầu tạo chương trình khuyến mãi: {}", requestDTO.getPromotionName());
-
-        // Validation cơ bản
-        validatePromotionHeaderRequest(requestDTO);
-
-        // Kiểm tra trùng lặp tên chương trình
-        if (promotionHeaderRepository.findByPromotionNameIgnoreCase(requestDTO.getPromotionName()).isPresent()) {
-            throw new DuplicatePromotionException(
-                    "Tên chương trình khuyến mãi đã tồn tại: " + requestDTO.getPromotionName());
-        }
-
-        // Kiểm tra trùng lặp mã khuyến mãi trong các details
-        validateUniquePromotionCodesInDetails(requestDTO.getPromotionLines());
-
-        // Tạo PromotionHeader
-        PromotionHeader header = createPromotionHeaderFromDTO(requestDTO);
-        header = promotionHeaderRepository.save(header);
-
-        // Tạo các PromotionLines và PromotionDetails
-        List<PromotionLine> lines = new ArrayList<>();
-        
-        for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
-            // Tạo và lưu PromotionLine
-            PromotionLine line = createPromotionLineFromDTO(lineDTO, header);
-            line = promotionLineRepository.save(line);
-
-            // Tạo và lưu detail cho line nếu có
-            if (lineDTO.getDetail() != null) {
-                PromotionDetail detail = createPromotionDetailFromDTO(lineDTO.getDetail(), line);
-                detail = promotionDetailRepository.save(detail);
-                
-                line.setDetails(List.of(detail));
-            }
-            
-            lines.add(line);
-        }
-
-        header.setPromotionLines(lines);
-
-        log.info("Đã tạo thành công chương trình khuyến mãi ID: {}", header.getPromotionId());
-        return convertToHeaderResponseDTO(header);
-    }
-
-    /**
-     * Cập nhật thông tin chương trình khuyến mãi
-     * 
-     * @param promotionId ID của chương trình cần cập nhật
-     * @param requestDTO  thông tin cập nhật
-     * @return PromotionHeaderResponseDTO chứa thông tin đã cập nhật
-     * @throws PromotionNotFoundException   nếu không tìm thấy chương trình
-     * @throws PromotionValidationException nếu dữ liệu không hợp lệ
-     */
-    @Transactional
-    public PromotionHeaderResponseDTO updatePromotion(Long promotionId, PromotionHeaderRequestDTO requestDTO) {
-        log.info("Bắt đầu cập nhật chương trình khuyến mãi ID: {}", promotionId);
-
-        // Tìm chương trình hiện tại
-        PromotionHeader existingHeader = promotionHeaderRepository.findById(promotionId)
-                .orElseThrow(() -> new PromotionNotFoundException(
-                        "Không tìm thấy chương trình khuyến mãi với ID: " + promotionId));
-
-        // Validation cơ bản
-        validatePromotionHeaderRequest(requestDTO);
-
-        // Kiểm tra trùng lặp tên (trừ chương trình hiện tại)
-        if (promotionHeaderRepository.existsByPromotionNameIgnoreCaseAndPromotionIdNot(
-                requestDTO.getPromotionName(), promotionId)) {
-            throw new DuplicatePromotionException(
-                    "Tên chương trình khuyến mãi đã tồn tại: " + requestDTO.getPromotionName());
-        }
-
-        // Kiểm tra xem có thể cập nhật không (chỉ cho phép cập nhật khi chưa bắt đầu
-        // hoặc đang tạm dừng)
-        validatePromotionCanBeUpdated(existingHeader);
-
-        // Xóa các lines và details cũ
-        deleteExistingLinesAndDetails(promotionId);
-
-        // Cập nhật thông tin header
-        updatePromotionHeaderFromDTO(existingHeader, requestDTO);
-        existingHeader = promotionHeaderRepository.save(existingHeader);
-
-        // Tạo lại các lines và details mới
-        List<PromotionLine> newLines = new ArrayList<>();
-        
-        for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
-            // Tạo và lưu PromotionLine
-            PromotionLine line = createPromotionLineFromDTO(lineDTO, existingHeader);
-            line = promotionLineRepository.save(line);
-
-            // Tạo và lưu detail cho line nếu có
-            if (lineDTO.getDetail() != null) {
-                PromotionDetail detail = createPromotionDetailFromDTO(lineDTO.getDetail(), line);
-                detail = promotionDetailRepository.save(detail);
-                
-                line.setDetails(List.of(detail));
-            }
-            
-            newLines.add(line);
-        }
-
-        existingHeader.setPromotionLines(newLines);
-
-        log.info("Đã cập nhật thành công chương trình khuyến mãi ID: {}", promotionId);
-        return convertToHeaderResponseDTO(existingHeader);
     }
 
     /**
@@ -345,9 +227,6 @@ public class PromotionService {
         PromotionHeader header = promotionHeaderRepository.findById(promotionId)
                 .orElseThrow(() -> new PromotionNotFoundException(
                         "Không tìm thấy chương trình khuyến mãi với ID: " + promotionId));
-
-        // Kiểm tra xem có thể xóa không (chỉ cho phép xóa khi chưa bắt đầu)
-        validatePromotionCanBeDeleted(header);
 
         // Xóa tất cả details và lines trước
         deleteExistingLinesAndDetails(promotionId);
@@ -442,7 +321,7 @@ public class PromotionService {
 
         log.info("Đã xóa thành công promotion line ID: {}", lineId);
     }
-    
+
     /**
      * Xóa một promotion detail cụ thể
      * 
@@ -458,12 +337,6 @@ public class PromotionService {
         PromotionDetail detail = promotionDetailRepository.findById(detailId)
                 .orElseThrow(() -> new PromotionNotFoundException(
                         "Không tìm thấy promotion detail với ID: " + detailId));
-
-        // Lấy promotion line để kiểm tra
-        PromotionLine line = detail.getPromotionLine();
-        
-        // Kiểm tra xem có thể xóa không (dựa vào header và trạng thái line)
-        validatePromotionCanBeUpdated(line.getHeader());
 
         // Xóa detail
         promotionDetailRepository.delete(detail);
@@ -486,9 +359,6 @@ public class PromotionService {
                 now.isBefore(line.getEndDate())) {
             throw new PromotionValidationException("Không thể xóa promotion line đang hoạt động");
         }
-
-        // Kiểm tra header có thể cập nhật không (tương tự như khi cập nhật)
-        validatePromotionCanBeUpdated(line.getHeader());
     }
 
     /**
@@ -612,29 +482,72 @@ public class PromotionService {
     // =====================================================
 
     /**
+     * Validation chung cho ngày tháng và trạng thái (được tái sử dụng bởi các
+     * validation khác)
+     *
+     * @param startDate ngày bắt đầu
+     * @param endDate   ngày kết thúc
+     * @param status    trạng thái
+     * @param context   ngữ cảnh để custom error message (vd: "header", "line")
+     * @throws PromotionValidationException nếu validation không hợp lệ
+     */
+    private void validateDateRangeAndStatus(LocalDate startDate, LocalDate endDate,
+            PromotionStatus status, String context) {
+        // Validation 1: startDate < endDate
+        if (startDate.isAfter(endDate)) {
+            String message = context.isEmpty()
+                    ? "Ngày bắt đầu phải trước ngày kết thúc"
+                    : String.format("Ngày bắt đầu %s phải trước ngày kết thúc %s", context, context);
+            throw new PromotionValidationException(message);
+        }
+
+        // Validation 2: endDate > now
+        LocalDate now = LocalDate.now();
+        if (!endDate.isAfter(now)) {
+            String message = context.isEmpty()
+                    ? "Ngày kết thúc phải lớn hơn ngày hiện tại"
+                    : String.format("Ngày kết thúc %s phải lớn hơn ngày hiện tại", context);
+            throw new PromotionValidationException(message);
+        }
+
+        // Validation 3: status chỉ được ACTIVE hoặc PAUSED
+        if (status != PromotionStatus.ACTIVE && status != PromotionStatus.PAUSED) {
+            String message = context.isEmpty()
+                    ? "Trạng thái chỉ được phép là ACTIVE hoặc PAUSED"
+                    : String.format("Trạng thái %s chỉ được phép là ACTIVE hoặc PAUSED", context);
+            throw new PromotionValidationException(message);
+        }
+    }
+
+    /**
      * Validation cho PromotionHeaderOnlyRequestDTO (chỉ header, không có lines)
      */
     private void validatePromotionHeaderOnlyRequest(PromotionHeaderOnlyRequestDTO requestDTO) {
-        if (requestDTO.getStartDate().isAfter(requestDTO.getEndDate())) {
-            throw new PromotionValidationException("Ngày bắt đầu phải trước ngày kết thúc");
-        }
-
-        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
-            throw new PromotionValidationException("Ngày bắt đầu không được là thời điểm trong quá khứ");
-        }
+        validateDateRangeAndStatus(requestDTO.getStartDate(), requestDTO.getEndDate(),
+                requestDTO.getStatus(), "");
     }
 
     /**
      * Validation cho PromotionLineOnlyRequestDTO (chỉ line, không có detail)
      */
     private void validatePromotionLineOnlyRequest(PromotionLineOnlyRequestDTO requestDTO) {
-        if (requestDTO.getStartDate().isAfter(requestDTO.getEndDate())) {
-            throw new PromotionValidationException("Ngày bắt đầu line phải trước ngày kết thúc line");
+        validateDateRangeAndStatus(requestDTO.getStartDate(), requestDTO.getEndDate(),
+                requestDTO.getStatus(), "line");
+    }
+
+    /**
+     * Validation cho PromotionLineRequestDTO (có cả detail)
+     */
+    private void validatePromotionLineRequest(PromotionLineRequestDTO lineDTO) {
+        validateDateRangeAndStatus(lineDTO.getStartDate(), lineDTO.getEndDate(),
+                lineDTO.getStatus(), "line");
+
+        if (lineDTO.getDetail() == null) {
+            throw new PromotionValidationException("Chi tiết khuyến mãi không được để trống");
         }
 
-        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
-            throw new PromotionValidationException("Ngày bắt đầu line không được là thời điểm trong quá khứ");
-        }
+        // Validate chi tiết theo loại khuyến mãi
+        validatePromotionDetailRequest(lineDTO.getDetail(), lineDTO.getPromotionType());
     }
 
     /**
@@ -643,71 +556,24 @@ public class PromotionService {
      * @param lineStartDate ngày bắt đầu của line
      * @param lineEndDate   ngày kết thúc của line
      * @param header        promotion header cha
-     * @throws PromotionValidationException nếu ngày tháng của line nằm ngoài khoảng của header
+     * @throws PromotionValidationException nếu ngày tháng của line nằm ngoài khoảng
+     *                                      của header
      */
-    private void validatePromotionLineDateRangeWithinHeader(LocalDate lineStartDate, LocalDate lineEndDate, PromotionHeader header) {
+    private void validatePromotionLineDateRangeWithinHeader(LocalDate lineStartDate, LocalDate lineEndDate,
+            PromotionHeader header) {
         if (lineStartDate.isBefore(header.getStartDate())) {
             throw new PromotionValidationException(
-                    String.format("Ngày bắt đầu của line (%s) phải lớn hơn hoặc bằng ngày bắt đầu của chương trình khuyến mãi (%s)",
+                    String.format(
+                            "Ngày bắt đầu của line (%s) phải lớn hơn hoặc bằng ngày bắt đầu của chương trình khuyến mãi (%s)",
                             lineStartDate, header.getStartDate()));
         }
 
         if (lineEndDate.isAfter(header.getEndDate())) {
             throw new PromotionValidationException(
-                    String.format("Ngày kết thúc của line (%s) phải nhỏ hơn hoặc bằng ngày kết thúc của chương trình khuyến mãi (%s)",
+                    String.format(
+                            "Ngày kết thúc của line (%s) phải nhỏ hơn hoặc bằng ngày kết thúc của chương trình khuyến mãi (%s)",
                             lineEndDate, header.getEndDate()));
         }
-    }
-
-    /**
-     * Validation cho PromotionHeaderRequestDTO
-     */
-    private void validatePromotionHeaderRequest(PromotionHeaderRequestDTO requestDTO) {
-        if (requestDTO.getStartDate().isAfter(requestDTO.getEndDate())) {
-            throw new PromotionValidationException("Ngày bắt đầu phải trước ngày kết thúc");
-        }
-
-        if (requestDTO.getStartDate().isBefore(LocalDate.now())) {
-            throw new PromotionValidationException("Ngày bắt đầu không được là thời điểm trong quá khứ");
-        }
-
-        if (requestDTO.getPromotionLines() == null || requestDTO.getPromotionLines().isEmpty()) {
-            throw new PromotionValidationException("Chương trình khuyến mãi phải có ít nhất một line");
-        }
-
-        // Validate từng line
-        for (PromotionLineRequestDTO lineDTO : requestDTO.getPromotionLines()) {
-            validatePromotionLineRequest(lineDTO);
-
-            // Validate ngày tháng của line phải nằm trong khoảng của header
-            if (lineDTO.getStartDate().isBefore(requestDTO.getStartDate())) {
-                throw new PromotionValidationException(
-                        String.format("Ngày bắt đầu của line (%s) phải lớn hơn hoặc bằng ngày bắt đầu của chương trình khuyến mãi (%s)",
-                                lineDTO.getStartDate(), requestDTO.getStartDate()));
-            }
-
-            if (lineDTO.getEndDate().isAfter(requestDTO.getEndDate())) {
-                throw new PromotionValidationException(
-                        String.format("Ngày kết thúc của line (%s) phải nhỏ hơn hoặc bằng ngày kết thúc của chương trình khuyến mãi (%s)",
-                                lineDTO.getEndDate(), requestDTO.getEndDate()));
-            }
-        }
-    }
-
-    /**
-     * Validation cho PromotionLineRequestDTO
-     */
-    private void validatePromotionLineRequest(PromotionLineRequestDTO lineDTO) {
-        if (lineDTO.getStartDate().isAfter(lineDTO.getEndDate())) {
-            throw new PromotionValidationException("Ngày bắt đầu line phải trước ngày kết thúc line");
-        }
-
-        if (lineDTO.getDetail() == null) {
-            throw new PromotionValidationException("Chi tiết khuyến mãi không được để trống");
-        }
-
-        // Validate chi tiết theo loại khuyến mãi
-        validatePromotionDetailRequest(lineDTO.getDetail(), lineDTO.getPromotionType());
     }
 
     /**
@@ -812,100 +678,6 @@ public class PromotionService {
         }
     }
 
-    /**
-     * Kiểm tra tính duy nhất của mã khuyến mãi trong danh sách details
-     */
-    private void validateUniquePromotionCodesInDetails(List<PromotionLineRequestDTO> lines) {
-        List<String> codes = lines.stream()
-                .filter(line -> line.getDetail() != null && line.getDetail().getPromotionCode() != null)
-                .map(line -> line.getDetail().getPromotionCode())
-                .collect(Collectors.toList());
-
-        // Kiểm tra trùng lặp trong danh sách
-        if (codes.size() != codes.stream().distinct().count()) {
-            throw new PromotionValidationException("Mã khuyến mãi trong các detail không được trùng lặp");
-        }
-
-        // Kiểm tra trùng lặp với database
-        for (String code : codes) {
-            if (promotionDetailRepository.existsByPromotionCodeIgnoreCase(code)) {
-                throw new DuplicatePromotionException("Mã khuyến mãi đã tồn tại: " + code);
-            }
-        }
-    }
-
-    /**
-     * Kiểm tra xem chương trình có thể cập nhật không
-     */
-    private void validatePromotionCanBeUpdated(PromotionHeader header) {
-        LocalDate now = LocalDate.now();
-
-        if (header.getStatus() == PromotionStatus.ACTIVE && now.isAfter(header.getStartDate())) {
-            throw new PromotionValidationException("Không thể cập nhật chương trình khuyến mãi đang hoạt động");
-        }
-
-        if (header.getStatus() == PromotionStatus.EXPIRED) {
-            throw new PromotionValidationException("Không thể cập nhật chương trình khuyến mãi đã hết hạn");
-        }
-
-        if (header.getStatus() == PromotionStatus.CANCELLED) {
-            throw new PromotionValidationException("Không thể cập nhật chương trình khuyến mãi đã hủy");
-        }
-    }
-
-    /**
-     * Kiểm tra xem chương trình có thể xóa không
-     */
-    private void validatePromotionCanBeDeleted(PromotionHeader header) {
-        LocalDate now = LocalDate.now();
-
-        if (header.getStatus() == PromotionStatus.ACTIVE) {
-            throw new PromotionValidationException("Không thể xóa chương trình khuyến mãi đang hoạt động");
-        }
-
-        if (now.isAfter(header.getStartDate())) {
-            throw new PromotionValidationException("Không thể xóa chương trình khuyến mãi đã bắt đầu");
-        }
-    }
-
-    /**
-     * Tạo PromotionHeader từ DTO
-     */
-    private PromotionHeader createPromotionHeaderFromDTO(PromotionHeaderRequestDTO requestDTO) {
-        PromotionHeader header = new PromotionHeader();
-        header.setPromotionName(requestDTO.getPromotionName());
-        header.setDescription(requestDTO.getDescription());
-        header.setStartDate(requestDTO.getStartDate());
-        header.setEndDate(requestDTO.getEndDate());
-        header.setStatus(requestDTO.getStatus());
-        return header;
-    }
-
-    /**
-     * Cập nhật PromotionHeader từ DTO
-     */
-    private void updatePromotionHeaderFromDTO(PromotionHeader header, PromotionHeaderRequestDTO requestDTO) {
-        header.setPromotionName(requestDTO.getPromotionName());
-        header.setDescription(requestDTO.getDescription());
-        header.setStartDate(requestDTO.getStartDate());
-        header.setEndDate(requestDTO.getEndDate());
-        header.setStatus(requestDTO.getStatus());
-    }
-
-    /**
-     * Tạo PromotionLine từ DTO (không bao gồm details)
-     */
-    private PromotionLine createPromotionLineFromDTO(PromotionLineRequestDTO lineDTO, PromotionHeader header) {
-        PromotionLine line = new PromotionLine();
-        line.setLineName(lineDTO.getLineName());
-        line.setPromotionType(lineDTO.getPromotionType());
-        line.setDescription(lineDTO.getDescription());
-        line.setStartDate(lineDTO.getStartDate());
-        line.setEndDate(lineDTO.getEndDate());
-        line.setStatus(lineDTO.getStatus());
-        line.setHeader(header);
-        return line;
-    }
 
     /**
      * Tạo PromotionDetail từ DTO sử dụng Factory Pattern
@@ -917,7 +689,7 @@ public class PromotionService {
         // Set các trường mới: promotionCode, usageLimit, usageCount
         detail.setPromotionCode(detailDTO.getPromotionCode());
         detail.setUsageLimit(detailDTO.getUsageLimit());
-        detail.setUsageCount(detailDTO.getUsageCount() != null ? detailDTO.getUsageCount() : 0);
+        detail.setUsageCount(0); // Tự động set = 0 khi tạo mới, không cho client truyền
 
         return detail;
     }
@@ -1069,8 +841,6 @@ public class PromotionService {
         return info;
     }
 
-
-
     // =====================================================
     // NEW UPDATE METHODS - SEPARATED BY ENTITY
     // =====================================================
@@ -1103,9 +873,6 @@ public class PromotionService {
             throw new DuplicatePromotionException(
                     "Tên chương trình khuyến mãi đã tồn tại: " + requestDTO.getPromotionName());
         }
-
-        // Kiểm tra xem có thể cập nhật không
-        validatePromotionCanBeUpdated(existingHeader);
 
         // Cập nhật thông tin header (không động chạm đến lines)
         existingHeader.setPromotionName(requestDTO.getPromotionName());
@@ -1143,10 +910,8 @@ public class PromotionService {
         validatePromotionLineOnlyRequest(requestDTO);
 
         // Validation ngày tháng của line phải nằm trong khoảng của header
-        validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(), existingLine.getHeader());
-
-        // Kiểm tra xem có thể cập nhật không (dựa vào header)
-        validatePromotionCanBeUpdated(existingLine.getHeader());
+        validatePromotionLineDateRangeWithinHeader(requestDTO.getStartDate(), requestDTO.getEndDate(),
+                existingLine.getHeader());
 
         // Cập nhật thông tin line (không động chạm đến details)
         existingLine.setLineName(requestDTO.getLineName());
@@ -1164,12 +929,13 @@ public class PromotionService {
 
     /**
      * Cập nhật promotion detail
-     * 
+     *
      * @param detailId   ID của promotion detail cần cập nhật
      * @param requestDTO thông tin detail cập nhật
      * @return PromotionDetailResponseDTO chứa thông tin đã cập nhật
      * @throws PromotionNotFoundException   nếu không tìm thấy promotion detail
      * @throws PromotionValidationException nếu dữ liệu không hợp lệ
+     * @throws DuplicatePromotionException  nếu mã khuyến mãi đã tồn tại
      */
     @Transactional
     public PromotionDetailResponseDTO updatePromotionDetail(Long detailId, PromotionDetailRequestDTO requestDTO) {
@@ -1186,10 +952,27 @@ public class PromotionService {
         // Validation theo loại khuyến mãi
         validatePromotionDetailRequest(requestDTO, line.getPromotionType());
 
-        // Kiểm tra xem có thể cập nhật không (dựa vào header)
-        validatePromotionCanBeUpdated(line.getHeader());
+        // Kiểm tra và cập nhật promotionCode nếu có thay đổi
+        if (requestDTO.getPromotionCode() != null &&
+            !requestDTO.getPromotionCode().equals(existingDetail.getPromotionCode())) {
+            // Kiểm tra trùng lặp mã khuyến mãi (trừ detail hiện tại)
+            if (promotionDetailRepository.existsByPromotionCodeIgnoreCaseAndDetailIdNot(
+                    requestDTO.getPromotionCode(), detailId)) {
+                throw new DuplicatePromotionException(
+                        "Mã khuyến mãi đã tồn tại: " + requestDTO.getPromotionCode());
+            }
+            existingDetail.setPromotionCode(requestDTO.getPromotionCode());
+            log.info("Đã cập nhật promotionCode từ '{}' sang '{}'",
+                    existingDetail.getPromotionCode(), requestDTO.getPromotionCode());
+        }
 
-        // Cập nhật thông tin detail
+        // Cập nhật usageLimit (cho phép null - không giới hạn)
+        existingDetail.setUsageLimit(requestDTO.getUsageLimit());
+        log.info("Đã cập nhật usageLimit sang: {}", requestDTO.getUsageLimit());
+
+        // LƯU Ý: KHÔNG cập nhật usageCount - đây là counter chỉ được system quản lý
+
+        // Cập nhật các thông tin detail khác dựa trên loại khuyến mãi
         updateDetailFromDTO(existingDetail, requestDTO, line.getPromotionType());
 
         existingDetail = promotionDetailRepository.save(existingDetail);
@@ -1209,6 +992,5 @@ public class PromotionService {
             PromotionType promotionType) {
         promotionDetailFactory.updateDetail(detail, detailDTO);
     }
-
 
 }

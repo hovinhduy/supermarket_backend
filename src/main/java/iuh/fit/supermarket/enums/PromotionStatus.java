@@ -15,10 +15,6 @@ public enum PromotionStatus {
     PAUSED("paused"),
 
     /**
-     * Chưa áp dụng
-     */
-    UPCOMING("upcoming"),
-    /**
      * Đã hết hiệu lực
      */
     EXPIRED("expired"),

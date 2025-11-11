@@ -77,4 +77,28 @@ public class PromotionHeaderOnlyRequestDTO {
         }
         return startDate.plusDays(1).isBefore(endDate) || startDate.plusDays(1).isEqual(endDate);
     }
+
+    /**
+     * Validation để đảm bảo ngày kết thúc phải lớn hơn ngày hiện tại
+     */
+    @AssertTrue(message = "Ngày kết thúc phải lớn hơn ngày hiện tại")
+    @JsonIgnore
+    public boolean isEndDateAfterToday() {
+        if (endDate == null) {
+            return true; // Để validation @NotNull xử lý
+        }
+        return endDate.isAfter(LocalDate.now());
+    }
+
+    /**
+     * Validation để đảm bảo trạng thái chỉ được phép là ACTIVE hoặc PAUSED
+     */
+    @AssertTrue(message = "Trạng thái chỉ được phép là ACTIVE hoặc PAUSED")
+    @JsonIgnore
+    public boolean isStatusValid() {
+        if (status == null) {
+            return true; // Để validation @NotNull xử lý
+        }
+        return status == PromotionStatus.ACTIVE || status == PromotionStatus.PAUSED;
+    }
 }

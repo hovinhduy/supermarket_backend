@@ -33,15 +33,10 @@ public class PromotionDetailRequestDTO {
 
     /**
      * Giới hạn số lần sử dụng (null = không giới hạn)
+     * Nếu null: không giới hạn số lần sử dụng
+     * Nếu có giá trị: phải là số dương >= 1
      */
-    @Min(value = 1, message = "Giới hạn số lần sử dụng phải là số dương")
     private Integer usageLimit;
-
-    /**
-     * Số lần đã sử dụng (mặc định là 0 khi tạo mới)
-     */
-    @Min(value = 0, message = "Số lần đã sử dụng không được âm")
-    private Integer usageCount;
 
     // =====================================================
     // LOẠI 1: MUA X TẶNG Y (BUY_X_GET_Y)
@@ -176,6 +171,18 @@ public class PromotionDetailRequestDTO {
      */
     @Min(value = 1, message = "Số lượng sản phẩm khuyến mãi tối thiểu phải là số dương")
     private Integer productMinPromotionQuantity;
+
+    /**
+     * Validation cho usageLimit: nếu có giá trị thì phải >= 1
+     */
+    @AssertTrue(message = "Giới hạn số lần sử dụng phải là số dương")
+    @JsonIgnore
+    public boolean isValidUsageLimit() {
+        if (usageLimit != null && usageLimit < 1) {
+            return false;
+        }
+        return true;
+    }
 
     /**
      * Validation tùy chỉnh cho loại giảm giá phần trăm

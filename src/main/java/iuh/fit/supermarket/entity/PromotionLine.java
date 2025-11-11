@@ -2,6 +2,7 @@ package iuh.fit.supermarket.entity;
 
 import iuh.fit.supermarket.enums.PromotionStatus;
 import iuh.fit.supermarket.enums.PromotionType;
+import iuh.fit.supermarket.validation.ValidPromotionDates;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,12 +16,16 @@ import java.util.List;
 
 /**
  * Entity đại diện cho từng line khuyến mãi thuộc một PromotionHeader
+ * Validation:
+ * - Ngày kết thúc phải lớn hơn ngày bắt đầu
+ * - Ngày kết thúc phải lớn hơn ngày hiện tại
  */
 @Entity
 @Table(name = "promotion_line")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ValidPromotionDates
 public class PromotionLine {
 
     @Id
