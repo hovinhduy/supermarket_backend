@@ -29,25 +29,23 @@ public class ReturnInvoiceController {
     private final ReturnInvoiceService returnInvoiceService;
 
     /**
-     * Tính toán preview số tiền hoàn trước khi tạo phiếu trả
+     * Tính toán preview số tiền hoàn toàn bộ hóa đơn trước khi tạo phiếu trả
      *
-     * @param request Request tính toán
+     * @param invoiceId ID hóa đơn cần trả
      * @return Response với thông tin tính toán
      */
-    @PostMapping("/calculate")
+    @GetMapping("/calculate/{invoiceId}")
     public ResponseEntity<ApiResponse<RefundCalculationResponse>> calculateRefund(
-            @Valid @RequestBody CreateRefundRequest request) {
-        log.info("Nhận request tính toán preview trả hàng cho invoice: {}", request.invoiceId());
+            @PathVariable Integer invoiceId) {
+        log.info("Nhận request tính toán preview trả toàn bộ hóa đơn: {}", invoiceId);
 
-        RefundCalculationResponse response = returnInvoiceService.calculateRefund(
-                request.invoiceId(),
-                request.refundLineItems());
+        RefundCalculationResponse response = returnInvoiceService.calculateRefund(invoiceId);
 
         return ResponseEntity.ok(ApiResponse.success("Tính toán trả hàng thành công", response));
     }
 
     /**
-     * Tạo phiếu trả hàng thực tế (lưu DB + cộng kho + hoàn tiền)
+     * Tạo phiếu trả hàng toàn bộ (lưu DB + cộng kho + hoàn tiền + cập nhật trạng thái)
      *
      * @param request Request tạo phiếu trả
      * @return Response với thông tin phiếu trả đã tạo
@@ -55,12 +53,12 @@ public class ReturnInvoiceController {
     @PostMapping
     public ResponseEntity<ApiResponse<CreateRefundResponse>> createRefund(
             @Valid @RequestBody CreateRefundRequest request) {
-        log.info("Nhận request tạo phiếu trả hàng cho invoice: {}", request.invoiceId());
+        log.info("Nhận request tạo phiếu trả toàn bộ hóa đơn: {}", request.invoiceId());
 
         CreateRefundResponse response = returnInvoiceService.createRefund(request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Tạo phiếu trả hàng thành công", response));
+                .body(ApiResponse.success("Tạo phiếu trả hàng toàn bộ thành công", response));
     }
 
     /**
@@ -139,19 +137,4 @@ public class ReturnInvoiceController {
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết phiếu trả thành công", response));
     }
 
-    /**
-     * Kiểm tra số lượng còn lại có thể trả của mỗi hóa đơn bán
-     *
-     * @param invoiceId ID hóa đơn bán
-     * @return Response với thông tin số lượng có thể trả
-     */
-    @GetMapping("/invoice/{invoiceId}/available-quantity")
-    public ResponseEntity<ApiResponse<AvailableReturnQuantityResponse>> getAvailableReturnQuantity(
-            @PathVariable Integer invoiceId) {
-        log.info("Nhận request kiểm tra số lượng có thể trả cho hóa đơn: {}", invoiceId);
-
-        AvailableReturnQuantityResponse response = returnInvoiceService.getAvailableReturnQuantity(invoiceId);
-
-        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin số lượng có thể trả thành công", response));
-    }
 }

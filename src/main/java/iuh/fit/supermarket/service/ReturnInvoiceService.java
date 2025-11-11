@@ -13,16 +13,15 @@ import java.util.List;
 public interface ReturnInvoiceService {
 
     /**
-     * Tính toán preview số tiền hoàn (không lưu DB)
+     * Tính toán preview số tiền hoàn toàn bộ hóa đơn (không lưu DB)
      *
      * @param invoiceId ID hóa đơn gốc
-     * @param refundLineItems Danh sách sản phẩm muốn trả
      * @return Thông tin tính toán
      */
-    RefundCalculationResponse calculateRefund(Integer invoiceId, List<RefundLineItemRequest> refundLineItems);
+    RefundCalculationResponse calculateRefund(Integer invoiceId);
 
     /**
-     * Tạo phiếu trả hàng thực tế (lưu DB + cộng kho + hoàn tiền)
+     * Tạo phiếu trả hàng toàn bộ (lưu DB + cộng kho + hoàn tiền + cập nhật trạng thái hóa đơn)
      *
      * @param request Request tạo phiếu trả
      * @return Thông tin phiếu trả đã tạo
@@ -67,11 +66,4 @@ public interface ReturnInvoiceService {
             Pageable pageable
     );
 
-    /**
-     * Kiểm tra số lượng còn lại có thể trả của mỗi hóa đơn bán
-     *
-     * @param invoiceId ID hóa đơn
-     * @return Thông tin chi tiết số lượng có thể trả
-     */
-    AvailableReturnQuantityResponse getAvailableReturnQuantity(Integer invoiceId);
 }

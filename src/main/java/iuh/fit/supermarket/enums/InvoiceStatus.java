@@ -13,8 +13,13 @@ public enum InvoiceStatus {
     /**
      * Hóa đơn đã thanh toán (tiền mặt hoặc chuyển khoản đã xác nhận)
      */
-    PAID("Paid");
-    
+    PAID("Paid"),
+
+    /**
+     * Hóa đơn đã bị trả hàng
+     */
+    RETURNED("Returned");
+
     private final String value;
     
     /**

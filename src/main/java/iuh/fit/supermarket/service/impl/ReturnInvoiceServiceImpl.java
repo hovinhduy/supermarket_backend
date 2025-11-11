@@ -3,7 +3,6 @@ package iuh.fit.supermarket.service.impl;
 import iuh.fit.supermarket.dto.return_invoice.*;
 import iuh.fit.supermarket.entity.*;
 import iuh.fit.supermarket.enums.InvoiceStatus;
-import iuh.fit.supermarket.enums.ReturnStatus;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.ReturnInvoiceService;
@@ -23,7 +22,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Implementation của ReturnInvoiceService
+ * Implementation của ReturnInvoiceService - xử lý trả hàng toàn bộ hóa đơn
  */
 @Service
 @RequiredArgsConstructor
@@ -34,124 +33,84 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
     private final SaleInvoiceDetailRepository invoiceDetailRepository;
     private final ReturnInvoiceHeaderRepository returnInvoiceHeaderRepository;
     private final ReturnInvoiceDetailRepository returnInvoiceDetailRepository;
-    private final AppliedPromotionRepository appliedPromotionRepository;
-    private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
     private final WarehouseService warehouseService;
 
     @Override
     @Transactional(readOnly = true)
-    public RefundCalculationResponse calculateRefund(Integer invoiceId, List<RefundLineItemRequest> refundLineItems) {
-        log.info("Bắt đầu tính toán preview trả hàng cho invoice ID: {}", invoiceId);
+    public RefundCalculationResponse calculateRefund(Integer invoiceId) {
+        log.info("Bắt đầu tính toán preview trả toàn bộ hóa đơn ID: {}", invoiceId);
 
         SaleInvoiceHeader invoice = validateInvoice(invoiceId);
-        Map<Integer, Integer> alreadyReturnedQuantities = getAlreadyReturnedQuantities(invoiceId);
+        List<SaleInvoiceDetail> invoiceDetails = invoiceDetailRepository.findByInvoice_InvoiceId(invoiceId);
+
+        if (invoiceDetails.isEmpty()) {
+            throw new InvalidSaleDataException("Hóa đơn không có sản phẩm nào để trả");
+        }
+
+        // Số tiền hoàn = số tiền khách đã thanh toán
+        BigDecimal refundAmount = getRefundAmount(invoice);
 
         List<RefundLineItemResponse> lineItemResponses = new ArrayList<>();
-        BigDecimal totalRefundAmount = BigDecimal.ZERO;
 
-        for (RefundLineItemRequest refundRequest : refundLineItems) {
-            SaleInvoiceDetail invoiceDetail = invoiceDetailRepository.findById(refundRequest.lineItemId())
-                    .orElseThrow(() -> new InvalidSaleDataException(
-                            "Không tìm thấy chi tiết hóa đơn với ID: " + refundRequest.lineItemId()));
-
-            if (!invoiceDetail.getInvoice().getInvoiceId().equals(invoiceId)) {
-                throw new InvalidSaleDataException("Dòng sản phẩm không thuộc hóa đơn này");
-            }
-
-            int alreadyReturned = alreadyReturnedQuantities.getOrDefault(refundRequest.lineItemId(), 0);
-            int maxRefundable = invoiceDetail.getQuantity() - alreadyReturned;
-
-            if (refundRequest.quantity() > maxRefundable) {
-                throw new InvalidSaleDataException(
-                        "Số lượng trả vượt quá số lượng có thể trả. Tối đa: " + maxRefundable);
-            }
-
-            List<AppliedPromotion> appliedPromotions = appliedPromotionRepository
-                    .findByInvoiceDetail_InvoiceDetailId(refundRequest.lineItemId());
-
-            BigDecimal refundForLine = calculateLineItemRefund(invoiceDetail, refundRequest.quantity(),
-                    appliedPromotions);
-
+        for (SaleInvoiceDetail invoiceDetail : invoiceDetails) {
             RefundLineItemResponse lineResponse = new RefundLineItemResponse(
-                    refundRequest.lineItemId(),
-                    refundRequest.quantity(),
+                    invoiceDetail.getInvoiceDetailId(),
+                    invoiceDetail.getQuantity(),
                     invoiceDetail.getUnitPrice(),
-                    invoiceDetail.getUnitPrice().multiply(BigDecimal.valueOf(refundRequest.quantity())),
+                    invoiceDetail.getLineTotal(),  // Tổng tiền trước thuế
                     invoiceDetail.getUnitPrice(),
-                    invoiceDetail.getUnitPrice().subtract(
-                            invoiceDetail.getDiscountAmount().divide(BigDecimal.valueOf(invoiceDetail.getQuantity()),
-                                    2, java.math.RoundingMode.HALF_UP)),
-                    refundForLine,
-                    maxRefundable,
+                    invoiceDetail.getUnitPrice(),
+                    invoiceDetail.getLineTotal(),  // Số tiền hoàn = thành tiền (lineTotal)
+                    invoiceDetail.getQuantity(),
                     BigDecimal.ZERO);
 
             lineItemResponses.add(lineResponse);
-            totalRefundAmount = totalRefundAmount.add(refundForLine);
         }
-
-        BigDecimal reclaimedDiscount = calculateReclaimedOrderDiscount(invoice, refundLineItems);
-        BigDecimal finalRefundAmount = totalRefundAmount.subtract(reclaimedDiscount);
 
         TransactionInfo transactionInfo = new TransactionInfo(
                 invoiceId,
-                finalRefundAmount,
-                finalRefundAmount);
+                refundAmount,
+                refundAmount);
 
-        log.info("Tính toán preview hoàn tất. Tổng hoàn: {}, Thu hồi KM: {}, Thực hoàn: {}",
-                totalRefundAmount, reclaimedDiscount, finalRefundAmount);
+        log.info("Tính toán preview hoàn tất. Số tiền hoàn: {}", refundAmount);
 
-        return new RefundCalculationResponse(finalRefundAmount, lineItemResponses, transactionInfo);
+        return new RefundCalculationResponse(refundAmount, lineItemResponses, transactionInfo);
     }
 
     @Override
     @Transactional
     public CreateRefundResponse createRefund(CreateRefundRequest request) {
-        log.info("Bắt đầu tạo phiếu trả hàng cho invoice ID: {}", request.invoiceId());
+        log.info("Bắt đầu tạo phiếu trả toàn bộ hóa đơn ID: {}", request.invoiceId());
 
         SaleInvoiceHeader invoice = validateInvoice(request.invoiceId());
-        Map<Integer, Integer> alreadyReturnedQuantities = getAlreadyReturnedQuantities(request.invoiceId());
+        List<SaleInvoiceDetail> invoiceDetails = invoiceDetailRepository.findByInvoice_InvoiceId(request.invoiceId());
 
-        BigDecimal totalRefundAmount = BigDecimal.ZERO;
+        if (invoiceDetails.isEmpty()) {
+            throw new InvalidSaleDataException("Hóa đơn không có sản phẩm nào để trả");
+        }
+
+        // Số tiền hoàn = số tiền khách đã thanh toán
+        BigDecimal refundAmount = getRefundAmount(invoice);
+
         List<ReturnInvoiceDetail> returnDetails = new ArrayList<>();
 
-        for (RefundLineItemRequest refundRequest : request.refundLineItems()) {
-            SaleInvoiceDetail invoiceDetail = invoiceDetailRepository.findById(refundRequest.lineItemId())
-                    .orElseThrow(() -> new InvalidSaleDataException(
-                            "Không tìm thấy chi tiết hóa đơn với ID: " + refundRequest.lineItemId()));
-
-            int alreadyReturned = alreadyReturnedQuantities.getOrDefault(refundRequest.lineItemId(), 0);
-            int maxRefundable = invoiceDetail.getQuantity() - alreadyReturned;
-
-            if (refundRequest.quantity() > maxRefundable) {
-                throw new InvalidSaleDataException(
-                        "Số lượng trả vượt quá số lượng có thể trả. Tối đa: " + maxRefundable);
-            }
-
-            List<AppliedPromotion> appliedPromotions = appliedPromotionRepository
-                    .findByInvoiceDetail_InvoiceDetailId(refundRequest.lineItemId());
-
-            BigDecimal refundForLine = calculateLineItemRefund(invoiceDetail, refundRequest.quantity(),
-                    appliedPromotions);
-            totalRefundAmount = totalRefundAmount.add(refundForLine);
-
+        for (SaleInvoiceDetail invoiceDetail : invoiceDetails) {
             ReturnInvoiceDetail returnDetail = new ReturnInvoiceDetail();
-            returnDetail.setQuantity(refundRequest.quantity());
+            returnDetail.setQuantity(invoiceDetail.getQuantity());
             returnDetail.setPriceAtReturn(invoiceDetail.getUnitPrice());
-            returnDetail.setRefundAmount(refundForLine);
+            // Lấy giá từ lineTotal (thành tiền trước thuế)
+            returnDetail.setRefundAmount(invoiceDetail.getLineTotal());
             returnDetail.setProductUnit(invoiceDetail.getProductUnit());
             returnDetails.add(returnDetail);
         }
-
-        BigDecimal reclaimedDiscount = calculateReclaimedOrderDiscount(invoice, request.refundLineItems());
-        BigDecimal finalRefundAmount = totalRefundAmount.subtract(reclaimedDiscount);
 
         String returnCode = generateReturnCode();
         ReturnInvoiceHeader returnHeader = new ReturnInvoiceHeader();
         returnHeader.setReturnCode(returnCode);
         returnHeader.setReturnDate(LocalDateTime.now());
-        returnHeader.setTotalRefundAmount(totalRefundAmount);
-        returnHeader.setReclaimedDiscountAmount(reclaimedDiscount);
-        returnHeader.setFinalRefundAmount(finalRefundAmount);
+        returnHeader.setTotalRefundAmount(refundAmount);
+        returnHeader.setReclaimedDiscountAmount(BigDecimal.ZERO);
+        returnHeader.setFinalRefundAmount(refundAmount);
         returnHeader.setReasonNote(request.reasonNote());
         returnHeader.setOriginalInvoice(invoice);
         returnHeader.setCustomer(invoice.getCustomer());
@@ -168,19 +127,23 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
                     detail.getProductUnit().getId(),
                     detail.getQuantity(),
                     returnCode,
-                    "Trả hàng - Phiếu: " + returnCode);
+                    "Trả hàng toàn bộ - Phiếu: " + returnCode);
             log.info("Đã cộng kho {} sản phẩm {} - Mã: {}", detail.getQuantity(),
                     detail.getProductUnit().getProduct().getName(), returnCode);
         }
 
-        log.info("Hoàn tất tạo phiếu trả. Tổng hoàn: {}, Thu hồi KM: {}, Thực hoàn: {}",
-                totalRefundAmount, reclaimedDiscount, finalRefundAmount);
+        // Cập nhật trạng thái hóa đơn sang RETURNED
+        invoice.setStatus(InvoiceStatus.RETURNED);
+        invoiceHeaderRepository.save(invoice);
+        log.info("Đã cập nhật trạng thái hóa đơn {} sang RETURNED", invoice.getInvoiceNumber());
+
+        log.info("Hoàn tất tạo phiếu trả. Số tiền hoàn: {}", refundAmount);
 
         return new CreateRefundResponse(
                 returnHeader.getReturnId(),
                 returnCode,
-                finalRefundAmount,
-                reclaimedDiscount);
+                refundAmount,
+                BigDecimal.ZERO);
     }
 
     @Override
@@ -282,9 +245,18 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
                 header.getReasonNote()));
     }
 
+    /**
+     * Validate hóa đơn trước khi trả hàng
+     * @param invoiceId ID hóa đơn
+     * @return Hóa đơn hợp lệ
+     */
     private SaleInvoiceHeader validateInvoice(Integer invoiceId) {
         SaleInvoiceHeader invoice = invoiceHeaderRepository.findById(invoiceId)
                 .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy hóa đơn với ID: " + invoiceId));
+
+        if (invoice.getStatus() == InvoiceStatus.RETURNED) {
+            throw new InvalidSaleDataException("Hóa đơn này đã được trả hàng rồi");
+        }
 
         if (invoice.getStatus() != InvoiceStatus.PAID) {
             throw new InvalidSaleDataException("Hóa đơn phải ở trạng thái PAID mới có thể trả hàng");
@@ -293,172 +265,24 @@ public class ReturnInvoiceServiceImpl implements ReturnInvoiceService {
         return invoice;
     }
 
-    private Map<Integer, Integer> getAlreadyReturnedQuantities(Integer invoiceId) {
-        List<ReturnInvoiceHeader> existingReturns = returnInvoiceHeaderRepository
-                .findByOriginalInvoice_InvoiceId(invoiceId);
-
-        Map<Integer, Integer> returnedQuantities = new HashMap<>();
-        for (ReturnInvoiceHeader returnHeader : existingReturns) {
-            List<ReturnInvoiceDetail> returnDetails = returnInvoiceDetailRepository
-                    .findByReturnInvoice_ReturnId(returnHeader.getReturnId());
-
-            for (ReturnInvoiceDetail returnDetail : returnDetails) {
-                List<SaleInvoiceDetail> invoiceDetails = invoiceDetailRepository
-                        .findByInvoice_InvoiceId(invoiceId);
-                for (SaleInvoiceDetail invoiceDetail : invoiceDetails) {
-                    if (invoiceDetail.getProductUnit().getId().equals(returnDetail.getProductUnit().getId())) {
-                        returnedQuantities.merge(invoiceDetail.getInvoiceDetailId(),
-                                returnDetail.getQuantity(), Integer::sum);
-                    }
-                }
-            }
+    /**
+     * Lấy số tiền hoàn lại = số tiền khách đã thanh toán
+     * @param invoice Hóa đơn gốc
+     * @return Số tiền hoàn lại
+     */
+    private BigDecimal getRefundAmount(SaleInvoiceHeader invoice) {
+        // Ưu tiên lấy paidAmount, nếu không có thì lấy totalAmount
+        BigDecimal refundAmount = invoice.getPaidAmount();
+        if (refundAmount == null || refundAmount.compareTo(BigDecimal.ZERO) == 0) {
+            refundAmount = invoice.getTotalAmount();
         }
-
-        return returnedQuantities;
+        return refundAmount;
     }
 
-    private BigDecimal calculateLineItemRefund(SaleInvoiceDetail invoiceDetail, Integer quantity,
-            List<AppliedPromotion> appliedPromotions) {
-        BigDecimal pricePerItem = invoiceDetail.getUnitPrice();
-
-        if (!appliedPromotions.isEmpty()) {
-            for (AppliedPromotion promotion : appliedPromotions) {
-                if ("FREE".equalsIgnoreCase(promotion.getDiscountType())) {
-                    return BigDecimal.ZERO;
-                }
-
-                if (promotion.getDiscountValue() != null) {
-                    BigDecimal discountPerItem = promotion.getDiscountValue()
-                            .divide(BigDecimal.valueOf(invoiceDetail.getQuantity()), 2,
-                                    java.math.RoundingMode.HALF_UP);
-                    pricePerItem = pricePerItem.subtract(discountPerItem);
-                }
-            }
-        } else {
-            BigDecimal discountPerItem = invoiceDetail.getDiscountAmount()
-                    .divide(BigDecimal.valueOf(invoiceDetail.getQuantity()), 2, java.math.RoundingMode.HALF_UP);
-            pricePerItem = pricePerItem.subtract(discountPerItem);
-        }
-
-        return pricePerItem.multiply(BigDecimal.valueOf(quantity));
-    }
-
-    private BigDecimal calculateReclaimedOrderDiscount(SaleInvoiceHeader invoice,
-            List<RefundLineItemRequest> refundLineItems) {
-        List<AppliedOrderPromotion> orderPromotions = appliedOrderPromotionRepository
-                .findByInvoice_InvoiceId(invoice.getInvoiceId());
-
-        if (orderPromotions.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-
-        BigDecimal originalTotal = invoice.getSubtotal();
-        BigDecimal returningTotal = BigDecimal.ZERO;
-
-        for (RefundLineItemRequest refundRequest : refundLineItems) {
-            SaleInvoiceDetail detail = invoiceDetailRepository.findById(refundRequest.lineItemId())
-                    .orElseThrow(() -> new InvalidSaleDataException(
-                            "Không tìm thấy chi tiết hóa đơn: " + refundRequest.lineItemId()));
-            returningTotal = returningTotal
-                    .add(detail.getUnitPrice().multiply(BigDecimal.valueOf(refundRequest.quantity())));
-        }
-
-        BigDecimal remainingTotal = originalTotal.subtract(returningTotal);
-
-        BigDecimal totalOrderDiscount = BigDecimal.ZERO;
-        for (AppliedOrderPromotion orderPromotion : orderPromotions) {
-            if (orderPromotion.getDiscountValue() != null) {
-                totalOrderDiscount = totalOrderDiscount.add(orderPromotion.getDiscountValue());
-            }
-        }
-
-        BigDecimal minOrderValue = invoice.getTotalAmount().add(invoice.getTotalDiscount());
-        if (remainingTotal.compareTo(minOrderValue) < 0 && totalOrderDiscount.compareTo(BigDecimal.ZERO) > 0) {
-            log.info("Thu hồi khuyến mãi order: {} vì giá trị còn lại {} < điều kiện tối thiểu {}",
-                    totalOrderDiscount, remainingTotal, minOrderValue);
-            return totalOrderDiscount;
-        }
-
-        return BigDecimal.ZERO;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public AvailableReturnQuantityResponse getAvailableReturnQuantity(Integer invoiceId) {
-        log.info("Kiểm tra số lượng có thể trả cho hóa đơn ID: {}", invoiceId);
-
-        SaleInvoiceHeader invoice = validateInvoice(invoiceId);
-        List<SaleInvoiceDetail> invoiceDetails = invoiceDetailRepository.findByInvoice_InvoiceId(invoiceId);
-        Map<Integer, Integer> alreadyReturnedQuantities = getAlreadyReturnedQuantities(invoiceId);
-
-        int totalOriginalQuantity = 0;
-        int totalReturnedQuantity = 0;
-        int totalAvailableQuantity = 0;
-
-        List<AvailableReturnQuantityResponse.LineItemQuantity> lineItems = new ArrayList<>();
-
-        for (SaleInvoiceDetail detail : invoiceDetails) {
-            int returnedQuantity = alreadyReturnedQuantities.getOrDefault(detail.getInvoiceDetailId(), 0);
-            int availableQuantity = detail.getQuantity() - returnedQuantity;
-            boolean isFullyReturned = availableQuantity == 0;
-
-            List<AppliedPromotion> appliedPromotions = appliedPromotionRepository
-                    .findByInvoiceDetail_InvoiceDetailId(detail.getInvoiceDetailId());
-
-            BigDecimal priceAfterDiscount = detail.getUnitPrice();
-            if (!appliedPromotions.isEmpty()) {
-                for (AppliedPromotion promotion : appliedPromotions) {
-                    if (!"FREE".equalsIgnoreCase(promotion.getDiscountType()) && promotion.getDiscountValue() != null) {
-                        BigDecimal discountPerItem = promotion.getDiscountValue()
-                                .divide(BigDecimal.valueOf(detail.getQuantity()), 2, java.math.RoundingMode.HALF_UP);
-                        priceAfterDiscount = priceAfterDiscount.subtract(discountPerItem);
-                    }
-                }
-            } else {
-                BigDecimal discountPerItem = detail.getDiscountAmount()
-                        .divide(BigDecimal.valueOf(detail.getQuantity()), 2, java.math.RoundingMode.HALF_UP);
-                priceAfterDiscount = priceAfterDiscount.subtract(discountPerItem);
-            }
-
-            AvailableReturnQuantityResponse.LineItemQuantity lineItem = 
-                    new AvailableReturnQuantityResponse.LineItemQuantity(
-                            detail.getInvoiceDetailId(),
-                            detail.getProductUnit().getProduct().getName(),
-                            detail.getProductUnit().getUnit().getName(),
-                            detail.getQuantity(),
-                            returnedQuantity,
-                            availableQuantity,
-                            detail.getUnitPrice(),
-                            priceAfterDiscount,
-                            isFullyReturned
-                    );
-
-            lineItems.add(lineItem);
-
-            totalOriginalQuantity += detail.getQuantity();
-            totalReturnedQuantity += returnedQuantity;
-            totalAvailableQuantity += availableQuantity;
-        }
-
-        String customerName = invoice.getCustomer() != null ? invoice.getCustomer().getUser().getName() : null;
-        String customerPhone = invoice.getCustomer() != null ? invoice.getCustomer().getUser().getPhone() : null;
-
-        log.info("Hoàn tất kiểm tra. Tổng ban đầu: {}, Đã trả: {}, Còn lại: {}",
-                totalOriginalQuantity, totalReturnedQuantity, totalAvailableQuantity);
-
-        return new AvailableReturnQuantityResponse(
-                invoice.getInvoiceId(),
-                invoice.getInvoiceNumber(),
-                invoice.getInvoiceDate(),
-                customerName,
-                customerPhone,
-                lineItems,
-                totalOriginalQuantity,
-                totalReturnedQuantity,
-                totalAvailableQuantity
-        );
-    }
-
+    /**
+     * Tạo mã phiếu trả hàng duy nhất
+     * @return Mã phiếu trả
+     */
     private String generateReturnCode() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
         String random = String.format("%04d", new Random().nextInt(10000));
