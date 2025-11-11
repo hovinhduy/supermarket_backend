@@ -176,59 +176,70 @@ public class CartLookupServiceImpl implements CartLookupService {
     }
 
     /**
-     * Format cart summary cho AI
+     * Format cart summary cho AI với đầy đủ thông tin để parse thành structured data
      */
     private String formatCartSummary(CartResponse cart) {
         StringBuilder result = new StringBuilder();
 
-        result.append("🛒 GIỎ HÀNG CỦA BẠN\n");
-        result.append("━━━━━━━━━━━━━━━━━━━━\n\n");
+        result.append("[CART]\n");
+        result.append(String.format("Cart ID: %d\n", cart.cartId()));
+        result.append(String.format("Updated At: %s\n", cart.updatedAt()));
+        result.append("---\n");
 
         int itemCount = 0;
         for (CartItemResponse item : cart.items()) {
             itemCount++;
-            // Combine product name and unit name
-            String displayName = item.productName() + " (" + item.unitName() + ")";
-
-            result.append(String.format("%d. %s x%d\n",
-                    itemCount,
-                    displayName,
-                    item.quantity()));
-
-            result.append(String.format("   💰 Giá: %,.0fđ x %d = %,.0fđ\n",
+            result.append(String.format("[%d] %s\n", itemCount, item.productName()));
+            result.append(String.format("    - Product Unit ID: %d\n", item.productUnitId()));
+            result.append(String.format("    - Unit Name: %s\n", item.unitName()));
+            result.append(String.format("    - Số lượng: %d\n", item.quantity()));
+            result.append(String.format("    - Giá: %,.0f₫ x %d = %,.0f₫\n",
                     item.unitPrice(),
                     item.quantity(),
-                    item.finalTotal()));
+                    item.originalTotal()));
 
             // Show promotion if has
             if (item.hasPromotion() != null && item.hasPromotion()) {
-                result.append(String.format("   🎁 Đã áp dụng khuyến mãi (Gốc: %,.0fđ)\n",
-                        item.originalTotal()));
+                result.append(String.format("    - Giá sau KM: %,.0f₫\n", item.finalTotal()));
+                result.append("    - Tồn kho: ").append(item.stockQuantity() != null ? item.stockQuantity() : "N/A").append("\n");
+                String promotionName = item.promotionApplied() != null && item.promotionApplied().promotionName() != null 
+                        ? item.promotionApplied().promotionName() 
+                        : "Khuyến mãi";
+                result.append(String.format("    - Khuyến mãi: %s\n", promotionName));
+            } else {
+                result.append("    - Tồn kho: ").append(item.stockQuantity() != null ? item.stockQuantity() : "N/A").append("\n");
+                result.append("    - Không có khuyến mãi\n");
+            }
+
+            // Image URL
+            if (item.imageUrl() != null && !item.imageUrl().isEmpty()) {
+                result.append(String.format("    - Image URL: %s\n", item.imageUrl()));
+            } else {
+                result.append("    - Image URL: N/A\n");
             }
 
             result.append("\n");
         }
 
-        result.append("━━━━━━━━━━━━━━━━━━━━\n");
-        result.append(String.format("📦 Tổng số lượng: %d sản phẩm\n", cart.totalItems()));
-        result.append(String.format("💵 Tổng tiền: %,.0fđ\n", cart.subTotal()));
+        result.append("---\n");
+        result.append(String.format("Tổng items: %d\n", cart.totalItems()));
+        result.append(String.format("Tổng tiền trước KM: %,.0f₫\n", cart.subTotal()));
 
-        // Thông tin khuyến mãi (nếu có)
-        double totalDiscount = (cart.lineItemDiscount() != null ? cart.lineItemDiscount() : 0)
-                + (cart.orderDiscount() != null ? cart.orderDiscount() : 0);
+        // Thông tin khuyến mãi
+        double lineDiscount = cart.lineItemDiscount() != null ? cart.lineItemDiscount() : 0;
+        double orderDiscount = cart.orderDiscount() != null ? cart.orderDiscount() : 0;
 
-        if (totalDiscount > 0) {
-            result.append(String.format("🎁 Tổng giảm giá: -%,.0fđ\n", totalDiscount));
-            result.append(String.format("💰 Thành tiền: %,.0fđ\n", cart.totalPayable()));
-        }
+        result.append(String.format("Giảm giá sản phẩm: %,.0f₫\n", lineDiscount));
+        result.append(String.format("Giảm giá đơn hàng: %,.0f₫\n", orderDiscount));
+        result.append(String.format("Tổng cần thanh toán: %,.0f₫\n", cart.totalPayable()));
 
-        // Thông tin miễn phí ship
+        // Thông tin miễn phí ship (chỉ để hiển thị, không cần parse)
         double payableAmount = cart.totalPayable() != null ? cart.totalPayable() : cart.subTotal();
         if (payableAmount >= 200000) {
-            result.append("\n🚚 MIỄN PHÍ GIAO HÀNG!");
+            result.append("\n💡 Đơn hàng được MIỄN PHÍ GIAO HÀNG!\n");
         } else {
             double remaining = 200000 - payableAmount;
-            result.append(String.format("\n📍 Mua thêm %,.0fđ để được MIỄN PHÍ SHIP!", remaining));
+            result.append(String.format("\n💡 Mua thêm %,.0f₫ để được MIỄN PHÍ SHIP!\n", remaining));
         }
 
         return result.toString();

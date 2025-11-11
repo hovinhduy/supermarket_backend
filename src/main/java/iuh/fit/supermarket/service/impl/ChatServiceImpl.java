@@ -302,6 +302,10 @@ public class ChatServiceImpl implements ChatService {
             chatData.setPolicy(List.of(responseData.policy()));
         }
 
+        if (responseData.cart() != null) {
+            chatData.setCart(List.of(responseData.cart()));
+        }
+
         return chatData;
     }
 
@@ -384,6 +388,32 @@ public class ChatServiceImpl implements ChatService {
 
                 6. addToCartTool: Thêm sản phẩm vào giỏ hàng
                    → Dùng khi khách muốn: thêm vào giỏ, mua, đặt mua
+                   → ⚠️ BẮT BUỘC: PHẢI gọi productSearchTool TRƯỚC để tìm đúng sản phẩm
+                   → Chỉ dùng product_unit_id từ kết quả productSearchTool, KHÔNG ĐƯỢC tự bịa
+
+                   → ⚠️ QUY TRÌNH BẮT BUỘC:
+                      Bước 1: Gọi productSearchTool để tìm sản phẩm
+                      Bước 2: Kiểm tra kết quả:
+                         • Nếu KHÔNG TÌM THẤY (0 kết quả):
+                           → response_type: "ERROR"
+                           → message: "Xin lỗi, tôi không tìm thấy [tên sản phẩm] trong cửa hàng. Bạn có thể thử tìm sản phẩm khác hoặc liên hệ nhân viên."
+                           → DỪNG LẠI, KHÔNG ĐƯỢC thêm sản phẩm bất kỳ
+
+                         • Nếu TÌM THẤY NHIỀU KẾT QUẢ (>1 sản phẩm với đơn vị khác nhau):
+                           → response_type: "PRODUCT_INFO"
+                           → message: "Chúng tôi có [tên sản phẩm] với các loại: [liệt kê]. Bạn muốn thêm loại nào vào giỏ hàng?"
+                           → data.products: [danh sách các sản phẩm tìm được]
+                           → DỪNG LẠI, CHỜ khách hàng chọn rõ ràng
+
+                         • Nếu TÌM THẤY ĐÚNG 1 KẾT QUẢ:
+                           → Tiếp tục Bước 3
+
+                      Bước 3: Gọi addToCartTool(productUnitId=X, quantity=Y) - CHỈ 1 LẦN
+
+                   → ⚠️ QUAN TRỌNG: CHỈ gọi 1 lần với đúng số lượng khách yêu cầu
+                   → KHÔNG BAO GIỜ gọi addToCart nhiều lần cho cùng một yêu cầu
+                   → KHÔNG BAO GIỜ thêm sản phẩm khác với yêu cầu của khách
+                   → KHÔNG BAO GIỜ tự ý chọn sản phẩm khi có nhiều lựa chọn
 
                 7. updateCartItemTool: Cập nhật số lượng trong giỏ
                    → Dùng khi khách muốn: thay đổi số lượng, update
@@ -399,14 +429,84 @@ public class ChatServiceImpl implements ChatService {
 
                 ===== QUY TẮC SỬ DỤNG TOOLS =====
                 ✅ LUÔN gọi tool phù hợp khi khách hỏi về thông tin cần tra cứu
-                ✅ Có thể gọi nhiều tools nếu cần thiết
+                ✅ Có thể gọi nhiều tools KHÁC NHAU nếu cần thiết (VD: productSearchTool + addToCartTool)
                 ✅ Dựa vào kết quả từ tools để trả lời chính xác
                 ❌ KHÔNG bịa thông tin nếu tool không trả về kết quả
+                ❌ NGHIÊM CẤM gọi cùng một tool nhiều lần cho một yêu cầu đơn lẻ
+
+                ⚠️ QUY TẮC VÀNG VỀ SỐ LƯỢNG:
+                - "thêm 1 lon coca" = addToCartTool(quantity=1) - GỌI 1 LẦN DUY NHẤT
+                - "thêm 5 hộp sữa" = addToCartTool(quantity=5) - GỌI 1 LẦN DUY NHẤT
+                - Số lượng đã được truyền vào parameter quantity, KHÔNG gọi tool nhiều lần
+                - Tool addToCartTool đã tự động xử lý số lượng bên trong
+
+                VÍ DỤ ĐÚNG:
+
+                Trường hợp 1 - Tìm thấy ĐÚNG 1 sản phẩm:
+                - User: "thêm 2 lon coca vào giỏ"
+                - AI:
+                  Bước 1: [Gọi productSearchTool("coca")]
+                          → tìm thấy 1 kết quả: "Coca Cola lon", product_unit_id=3
+                  Bước 2: [Gọi addToCartTool(productUnitId=3, quantity=2)] - CHỈ 1 LẦN
+                  Bước 3: Parse kết quả [CART] từ tool
+                  Bước 4: Trả về CART_INFO với message "Đã thêm 2 lon Coca Cola vào giỏ hàng."
+
+                Trường hợp 2 - Tìm thấy NHIỀU sản phẩm:
+                - User: "thêm coca vào giỏ"
+                - AI:
+                  Bước 1: [Gọi productSearchTool("coca")]
+                          → tìm thấy 3 kết quả:
+                            1. Coca Cola lon 330ml (product_unit_id=3)
+                            2. Coca Cola lốc 6 lon (product_unit_id=15)
+                            3. Coca Cola thùng 24 lon (product_unit_id=28)
+                  Bước 2: DỪNG LẠI, trả về response:
+                          response_type: "PRODUCT_INFO"
+                          message: "Chúng tôi có Coca Cola với các loại: lon 330ml (12,000₫), lốc 6 lon (70,000₫), thùng 24 lon (270,000₫). Bạn muốn thêm loại nào vào giỏ hàng?"
+                          data.products: [3 sản phẩm trên]
+                  Bước 3: CHỜ khách hàng trả lời rõ ràng (VD: "thêm lon" hoặc "thêm lốc")
+
+                Trường hợp 3 - KHÔNG tìm thấy sản phẩm:
+                - User: "thêm pepsi vào giỏ"
+                - AI:
+                  Bước 1: [Gọi productSearchTool("pepsi")]
+                          → không tìm thấy kết quả nào
+                  Bước 2: Trả về response:
+                          response_type: "ERROR"
+                          message: "Xin lỗi, tôi không tìm thấy Pepsi trong cửa hàng. Bạn có thể thử tìm sản phẩm khác hoặc liên hệ nhân viên."
+                  Bước 3: KHÔNG GỌI addToCartTool, KHÔNG thêm sản phẩm bất kỳ
+
+                VÍ DỤ SAI (KHÔNG ĐƯỢC LÀM):
+                ❌ SAI 1 - Gọi tool nhiều lần:
+                - User: "thêm 2 lon coca vào giỏ"
+                - AI: [Gọi addToCartTool(productUnitId=3, quantity=1)] - Lần 1
+                - AI: [Gọi addToCartTool(productUnitId=3, quantity=1)] - Lần 2 ❌ SAI
+
+                ❌ SAI 2 - Không tìm kiếm sản phẩm hoặc thêm sản phẩm sai:
+                - User: "thêm coca vào giỏ"
+                - AI: [Gọi addToCartTool(productUnitId=1, quantity=1)] ❌ SAI - product_unit_id=1 là sữa, không phải coca
+                - AI phải gọi productSearchTool("coca") trước để lấy đúng product_unit_id
+
+                ❌ SAI 4 - Tự ý chọn khi có nhiều kết quả:
+                - User: "thêm coca vào giỏ"
+                - AI: [Gọi productSearchTool("coca")] → tìm thấy 3 loại (lon, lốc, thùng)
+                - AI: [Gọi addToCartTool(productUnitId=3)] ❌ SAI - tự ý chọn lon mà không hỏi khách
+                - AI phải HỎI khách chọn loại nào
+
+                ❌ SAI 5 - Thêm sản phẩm khác khi không tìm thấy:
+                - User: "thêm pepsi vào giỏ"
+                - AI: [Gọi productSearchTool("pepsi")] → không tìm thấy
+                - AI: [Gọi addToCartTool(productUnitId=3)] ❌ SAI - thêm Coca thay vì báo không có Pepsi
+                - AI phải báo "Không tìm thấy Pepsi", KHÔNG được thêm sản phẩm khác
+
+                ❌ SAI 3 - Tự bịa thông tin không có trong tool results:
+                - Tool trả về: "Tổng cần thanh toán: 105,000₫"
+                - AI suggestions: "Mua thêm 110,000₫ để được MIỄN PHÍ SHIP!" ❌ SAI - con số 110,000 không có trong tool output
+                - AI CHỈ ĐƯỢC dùng thông tin từ tool results, KHÔNG tự tính toán hoặc bịa
 
                 ===== FORMAT OUTPUT (QUAN TRỌNG) =====
                 Response của bạn PHẢI là một JSON object với cấu trúc sau:
                 {
-                  "response_type": "PRODUCT_INFO" | "ORDER_INFO" | "PROMOTION_INFO" | "STOCK_INFO" | "GENERAL_ANSWER" | "ERROR",
+                  "response_type": "PRODUCT_INFO" | "ORDER_INFO" | "PROMOTION_INFO" | "STOCK_INFO" | "CART_INFO" | "GENERAL_ANSWER" | "ERROR",
                   "message": "Câu trả lời văn bản thân thiện cho khách hàng",
                   "data": {
                     // Tùy thuộc response_type:
@@ -414,6 +514,7 @@ public class ChatServiceImpl implements ChatService {
                     // - ORDER_INFO: {"orders": [...]}
                     // - PROMOTION_INFO: {"promotions": [...]}
                     // - STOCK_INFO: {"stock": {...}}
+                    // - CART_INFO: {"cart": {...}}
                     // - GENERAL_ANSWER: {"policy": {...}}
                   },
                   "suggestions": ["Câu hỏi gợi ý 1", "Câu hỏi gợi ý 2"],
@@ -459,7 +560,7 @@ public class ChatServiceImpl implements ChatService {
                      "status": "ACTIVE" | "UPCOMING" | "EXPIRED",
                      "usage_limit": number | null,
                      "usage_count": number,
-                     
+
                      // Chỉ 1 trong 3 detail sau được điền, 2 cái còn lại là null
                      "buy_x_get_y_detail": {
                        "buy_product_name": "Sản phẩm phải mua",
@@ -488,9 +589,9 @@ public class ChatServiceImpl implements ChatService {
                        "min_promotion_quantity": number
                      }
                    }
-                   
+
                    Parse CHÍNH XÁC theo cấu trúc trên, giữ nguyên các field name và structure.
-                   
+
                    ⚠️ KHI TRẢ LỜI VỀ KHUYẾN MÃI:
                    - Sử dụng field "summary" để tạo message văn bản ngắn gọn, dễ hiểu cho khách
                    - VD: "Hiện có chương trình Mua 5 tặng 1 cho Sữa tươi Vinamilk"
@@ -501,13 +602,80 @@ public class ChatServiceImpl implements ChatService {
                 - Khách hỏi về sản phẩm → response_type: "PRODUCT_INFO", data.products chứa thông tin
                 - Khách hỏi về đơn hàng → response_type: "ORDER_INFO", data.orders chứa thông tin
                 - Khách hỏi về khuyến mãi → response_type: "PROMOTION_INFO", data.promotions chứa thông tin, message dùng "summary"
+                - Khách thao tác giỏ hàng → response_type: "CART_INFO", data.cart chứa thông tin
                 - Khách hỏi chính sách → response_type: "GENERAL_ANSWER", data.policy chứa thông tin
+
+                4. Khi nhận được tool results dạng [CART], parse thành CartInfo:
+                   Tool trả về plain text mô tả giỏ hàng, ví dụ:
+
+                   [CART]
+                   Cart ID: 123
+                   ---
+                   [1] Sữa tươi Vinamilk 1L
+                       - Product Unit ID: 456
+                       - Số lượng: 2
+                       - Giá: 25,000₫ x 2 = 50,000₫
+                       - Giá sau KM: 45,000₫
+                       - Tồn kho: 100
+                       - Khuyến mãi: Giảm 10%
+                   [2] Bánh mì sandwich
+                       - Product Unit ID: 789
+                       - Số lượng: 1
+                       - Giá: 15,000₫
+                       - Không có khuyến mãi
+                   ---
+                   Tổng items: 2
+                   Tổng tiền trước KM: 65,000₫
+                   Giảm giá sản phẩm: 5,000₫
+                   Giảm giá đơn hàng: 0₫
+                   Tổng cần thanh toán: 60,000₫
+
+                   Parse thành CartInfo object với cấu trúc:
+                   {
+                     "cart_id": 123,
+                     "items": [
+                       {
+                         "product_unit_id": 456 (QUAN TRỌNG: numeric, để frontend dùng),
+                         "product_name": "Sữa tươi Vinamilk 1L",
+                         "unit_name": "Hộp",
+                         "quantity": 2,
+                         "unit_price": 25000.0,
+                         "original_total": 50000.0,
+                         "final_total": 45000.0,
+                         "image_url": "URL" (nếu có, null nếu N/A),
+                         "stock_quantity": 100,
+                         "has_promotion": true,
+                         "promotion_name": "Giảm 10%"
+                       },
+                       ...
+                     ],
+                     "total_items": 2,
+                     "sub_total": 65000.0,
+                     "line_item_discount": 5000.0,
+                     "order_discount": 0.0,
+                     "total_payable": 60000.0,
+                     "updated_at": "2025-11-11T10:30:00" (ISO datetime)
+                   }
+
+                   ⚠️ KHI TRẢ LỜI VỀ GIỎ HÀNG:
+                   - response_type phải là "CART_INFO"
+                   - message văn bản ngắn gọn, ví dụ: "Đã thêm 2 hộp Sữa tươi Vinamilk vào giỏ hàng. Giỏ hàng của bạn hiện có 2 sản phẩm, tổng cần thanh toán là 60,000₫"
+                   - Không liệt kê chi tiết từng item trong message - chỉ tổng quan
+                   - Structured data sẽ chứa đầy đủ thông tin chi tiết từng item
+                   - suggestions:
+                     + PHẢI lấy thông tin free ship TỪ TOOL OUTPUT (dòng cuối cùng của [CART])
+                     + KHÔNG tự tính toán con số free ship
+                     + VD đúng: Tool output có "💡 Mua thêm 95,000₫ để được MIỄN PHÍ SHIP!" → suggestions: ["Mua thêm 95,000₫ để được MIỄN PHÍ SHIP!"]
+                     + VD sai: Tự tính 200000 - 105000 = 95000 rồi ghi "Mua thêm 110,000₫..." ❌ SAI CON SỐ
+                     + Các gợi ý khác: "Xem chi tiết giỏ hàng", "Tiến hành thanh toán"
 
                 LƯU Ý:
                 - KHÔNG được bỏ sót product_id (product_unit_id) và image_url khi parse [PRODUCT]
                 - KHÔNG được bỏ sót order_id và order_code khi parse [ORDER]
                 - KHÔNG được bỏ sót promotion_line_id và detail objects khi parse [PROMOTIONS]
                 - Khi parse [PROMOTIONS], PHẢI kiểm tra type và điền đúng detail object tương ứng
+                - KHÔNG được bỏ sót product_unit_id, cart_id khi parse [CART]
+                - Khi parse [CART], số tiền phải là numeric (double), không phải string
 
                 ===== QUY TẮC VÀNG: KHÔNG ĐƯỢC BỊA THÔNG TIN =====
                 ⚠️ NGHIÊM CẤM tự bịa hoặc đoán:
@@ -515,6 +683,56 @@ public class ChatServiceImpl implements ChatService {
                 - Khuyến mãi không có trong kết quả tool
                 - Đơn hàng không tồn tại
                 - Giá cả, chi tiết không rõ ràng
+                - Số tiền free ship, con số khuyến mãi
+                - Bất kỳ con số nào không có trong tool results
+
+                ⚠️ ĐẶC BIỆT VỀ THÔNG TIN FREE SHIP:
+                - Tool [CART] đã có dòng free ship ở cuối (VD: "💡 Mua thêm 95,000₫ để được MIỄN PHÍ SHIP!")
+                - AI CHỈ ĐƯỢC lấy thông tin free ship TỪ DÒNG NÀY, không tự tính
+                - KHÔNG được tự tính: 200000 - total_payable
+                - PHẢI copy CHÍNH XÁC con số từ tool output
+
+                ⚠️ ĐẶC BIỆT VỀ THÊM SẢN PHẨM VÀO GIỎ (QUAN TRỌNG NHẤT):
+
+                1. LUÔN LUÔN gọi productSearchTool trước:
+                   - User nói "thêm coca" → PHẢI gọi productSearchTool("coca") trước
+                   - CHỈ dùng product_unit_id từ kết quả tìm kiếm
+                   - KHÔNG ĐƯỢC dùng product_unit_id random hoặc sản phẩm khác
+
+                2. Khi productSearchTool trả về 0 kết quả:
+                   - response_type: "ERROR"
+                   - message: "Xin lỗi, không tìm thấy [tên sản phẩm] trong cửa hàng."
+                   - TUYỆT ĐỐI KHÔNG gọi addToCartTool
+                   - TUYỆT ĐỐI KHÔNG thêm sản phẩm thay thế
+
+                3. Khi productSearchTool trả về NHIỀU kết quả (>1):
+                   - response_type: "PRODUCT_INFO"
+                   - message: Hỏi khách chọn rõ loại nào (lon, lốc, thùng, kg, gói...)
+                   - data.products: danh sách các sản phẩm
+                   - CHỜ khách hàng trả lời cụ thể
+                   - TUYỆT ĐỐI KHÔNG tự ý chọn 1 trong số đó
+
+                4. Chỉ gọi addToCartTool khi:
+                   - Tìm thấy ĐÚNG 1 sản phẩm phù hợp
+                   - HOẶC khách đã chọn rõ ràng từ danh sách
+
+                VÍ DỤ CỤ THỂ:
+                ✅ ĐÚNG:
+                - User: "thêm coca vào giỏ"
+                - Tool: tìm thấy 3 loại
+                - AI: "Chúng tôi có Coca Cola lon, lốc 6 lon, và thùng 24 lon. Bạn muốn thêm loại nào?"
+                - User: "thêm lon"
+                - AI: [Gọi addToCartTool với product_unit_id của lon]
+
+                ❌ SAI:
+                - User: "thêm coca vào giỏ"
+                - Tool: tìm thấy 3 loại
+                - AI: [Tự ý chọn lon và gọi addToCartTool] ❌ NGHIÊM CẤM
+
+                ❌ SAI:
+                - User: "thêm pepsi vào giỏ"
+                - Tool: không tìm thấy
+                - AI: [Thêm coca thay thế] ❌ NGHIÊM CẤM
 
                 ✅ NẾU TOOL KHÔNG TRẢ VỀ KẾT QUẢ:
                 → response_type: "ERROR"
@@ -523,6 +741,7 @@ public class ChatServiceImpl implements ChatService {
                 ===== CHÍNH SÁCH SIÊU THỊ (Thông tin cố định) =====
                 Bạn có thể trả lời TRỰC TIẾP (không cần gọi tool) về:
                 - Đổi trả trong 7 ngày với sản phẩm còn nguyên vẹn
+                - Hiện tại siêu thị không miễn phí giao hàng
                 - Thanh toán: mua hàng trên app phải thành toán mới được mua hàng, không cho nợ
                 - Giờ mở cửa: 7:00 - 22:00 hàng ngày
                 → Dùng response_type: "GENERAL_ANSWER"

@@ -53,6 +53,7 @@ public record AIStructuredResponse(
         ORDER_INFO,         // Thông tin đơn hàng
         PROMOTION_INFO,     // Thông tin khuyến mãi
         STOCK_INFO,         // Thông tin tồn kho
+        CART_INFO,          // Thông tin giỏ hàng
         GENERAL_ANSWER,     // Câu trả lời chung (chính sách, giờ mở cửa, etc.)
         ERROR              // Lỗi hoặc không tìm thấy thông tin
     }

@@ -39,41 +39,54 @@ public record ResponseData(
          * Thông tin chính sách/chung (khi responseType = GENERAL_ANSWER)
          */
         @JsonProperty(value = "policy")
-        PolicyInfo policy
+        PolicyInfo policy,
+
+        /**
+         * Thông tin giỏ hàng (khi responseType = CART_INFO)
+         */
+        @JsonProperty(value = "cart")
+        CartInfo cart
 ) {
 
     /**
      * Factory method để tạo ResponseData chỉ chứa products
      */
     public static ResponseData withProducts(List<ProductInfo> products) {
-        return new ResponseData(products, null, null, null, null);
+        return new ResponseData(products, null, null, null, null, null);
     }
 
     /**
      * Factory method để tạo ResponseData chỉ chứa orders
      */
     public static ResponseData withOrders(List<OrderInfo> orders) {
-        return new ResponseData(null, orders, null, null, null);
+        return new ResponseData(null, orders, null, null, null, null);
     }
 
     /**
      * Factory method để tạo ResponseData chỉ chứa promotions
      */
     public static ResponseData withPromotions(List<PromotionInfo> promotions) {
-        return new ResponseData(null, null, promotions, null, null);
+        return new ResponseData(null, null, promotions, null, null, null);
     }
 
     /**
      * Factory method để tạo ResponseData chỉ chứa stock
      */
     public static ResponseData withStock(StockInfo stock) {
-        return new ResponseData(null, null, null, stock, null);
+        return new ResponseData(null, null, null, stock, null, null);
     }
 
     /**
      * Factory method để tạo ResponseData chỉ chứa policy
      */
     public static ResponseData withPolicy(PolicyInfo policy) {
-        return new ResponseData(null, null, null, null, policy);
+        return new ResponseData(null, null, null, null, policy, null);
+    }
+
+    /**
+     * Factory method để tạo ResponseData chỉ chứa cart
+     */
+    public static ResponseData withCart(CartInfo cart) {
+        return new ResponseData(null, null, null, null, null, cart);
     }
 }

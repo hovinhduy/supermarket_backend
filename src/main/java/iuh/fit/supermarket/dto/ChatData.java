@@ -41,4 +41,9 @@ public class ChatData {
      * Danh sách thông tin chính sách liên quan
      */
     private List<Object> policy;
+
+    /**
+     * Danh sách thông tin giỏ hàng liên quan
+     */
+    private List<Object> cart;
 }
