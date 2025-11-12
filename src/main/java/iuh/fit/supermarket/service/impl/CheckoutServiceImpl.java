@@ -873,6 +873,27 @@ public class CheckoutServiceImpl implements CheckoutService {
                         }
                     }
 
+                    // Lấy URL hình ảnh chính của ProductUnit
+                    String imageUrl = null;
+                    ProductUnit productUnit = detail.getProductUnit();
+                    if (productUnit.getProductUnitImages() != null && !productUnit.getProductUnitImages().isEmpty()) {
+                        // Tìm hình ảnh chính (isPrimary = true)
+                        imageUrl = productUnit.getProductUnitImages().stream()
+                                .filter(pui -> pui.getIsPrimary() != null && pui.getIsPrimary() && pui.getIsActive())
+                                .findFirst()
+                                .map(pui -> pui.getProductImage().getImageUrl())
+                                .orElse(null);
+
+                        // Nếu không có hình ảnh chính, lấy hình ảnh đầu tiên
+                        if (imageUrl == null) {
+                            imageUrl = productUnit.getProductUnitImages().stream()
+                                    .filter(pui -> pui.getIsActive())
+                                    .findFirst()
+                                    .map(pui -> pui.getProductImage().getImageUrl())
+                                    .orElse(null);
+                        }
+                    }
+
                     return new OrderItemDTO(
                             detail.getProductUnit().getId(),
                             detail.getProductUnit().getProduct().getName(),
@@ -883,7 +904,8 @@ public class CheckoutServiceImpl implements CheckoutService {
                             detail.getPriceAtPurchase().subtract(detail.getDiscount()),
                             detail.getDiscount(),
                             detail.getLineTotal(),
-                            promotionInfo);
+                            promotionInfo,
+                            imageUrl);
                 })
                 .collect(Collectors.toList());
 

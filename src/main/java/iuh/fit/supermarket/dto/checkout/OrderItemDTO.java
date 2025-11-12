@@ -54,5 +54,10 @@ public record OrderItemDTO(
         /**
          * Thông tin khuyến mãi áp dụng (nếu có)
          */
-        String promotionInfo
+        String promotionInfo,
+
+        /**
+         * URL hình ảnh chính của product unit
+         */
+        String imageUrl
 ) {}
