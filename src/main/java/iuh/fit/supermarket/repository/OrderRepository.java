@@ -73,4 +73,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      */
     @Query("SELECT o.orderCode FROM Order o WHERE o.orderCode LIKE CONCAT('ORD', :datePattern, '%') ORDER BY o.orderCode DESC")
     Page<String> findLastOrderCodeByDate(@Param("datePattern") String datePattern, Pageable pageable);
+
+    /**
+     * Lấy danh sách đơn hàng của khách hàng theo customerId với phân trang
+     *
+     * @param customerId ID khách hàng
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng có phân trang
+     */
+    Page<Order> findByCustomerCustomerId(Integer customerId, Pageable pageable);
 }

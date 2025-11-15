@@ -50,3 +50,5 @@ GEMINI.md
 
 .dockerignore
 docker-compose.yml
+
+.kiro

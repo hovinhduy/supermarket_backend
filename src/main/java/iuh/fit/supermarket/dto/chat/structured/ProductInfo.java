@@ -1,5 +1,6 @@
 package iuh.fit.supermarket.dto.chat.structured;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
@@ -7,6 +8,7 @@ import java.math.BigDecimal;
 /**
  * Thông tin sản phẩm trong structured response
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ProductInfo(
 
         /**
@@ -14,6 +16,12 @@ public record ProductInfo(
          */
         @JsonProperty(value = "product_id")
         Long productId,
+
+        /**
+         * ID đơn vị sản phẩm (QUAN TRỌNG: dùng để thêm vào giỏ hàng)
+         */
+        @JsonProperty(value = "product_unit_id", required = true)
+        Long productUnitId,
 
         /**
          * Tên sản phẩm

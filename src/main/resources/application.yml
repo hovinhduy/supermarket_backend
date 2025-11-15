@@ -10,8 +10,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: none
-    show-sql: true # Hiển thị SQL queries trong console
-    format-sql: true # Format SQL cho dễ đọc
+    show-sql: ${SHOW_SQL:true} # Hiển thị SQL queries trong console
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
@@ -42,6 +41,7 @@ spring:
         completions-path: /v1beta/openai/chat/completions
         options:
           model: gemini-flash-lite-latest
+          temperature: 0.5
 
 # Cấu hình logging
 logging:
