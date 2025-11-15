@@ -1,42 +1,41 @@
 package iuh.fit.supermarket.service.impl;
 
+import iuh.fit.supermarket.dto.cart.AddCartItemRequest;
+import iuh.fit.supermarket.dto.cart.CartItemResponse;
+import iuh.fit.supermarket.dto.cart.CartResponse;
+import iuh.fit.supermarket.dto.cart.UpdateCartItemRequest;
 import iuh.fit.supermarket.dto.chat.structured.CartInfo;
-import iuh.fit.supermarket.entity.*;
-import iuh.fit.supermarket.enums.PriceType;
-import iuh.fit.supermarket.repository.*;
+import iuh.fit.supermarket.dto.checkout.CheckPromotionResponseDTO;
+import iuh.fit.supermarket.dto.checkout.PromotionAppliedDTO;
 import iuh.fit.supermarket.service.CartService;
+import iuh.fit.supermarket.service.ShoppingCartService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Implementation của CartService
- * Quản lý giỏ hàng cho chatbot
+ * Quản lý giỏ hàng cho chatbot - Sử dụng ShoppingCartService để đảm bảo dữ liệu đồng nhất
  */
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class CartServiceImpl implements CartService {
 
-    private final ShoppingCartRepository shoppingCartRepository;
-    private final CartItemRepository cartItemRepository;
-    private final ProductUnitRepository productUnitRepository;
-    private final PriceDetailRepository priceDetailRepository;
-    private final CustomerRepository customerRepository;
+    private final ShoppingCartService shoppingCartService;
 
     /**
      * Thêm sản phẩm vào giỏ hàng
+     * Sử dụng ShoppingCartService để đảm bảo tính khuyến mãi chính xác
      */
     @Override
     @Transactional
     public CartInfo addToCart(Integer customerId, Long productUnitId, Integer quantity) {
-        log.info("Thêm sản phẩm vào giỏ hàng - Customer: {}, ProductUnit: {}, Quantity: {}", 
+        log.info("Thêm sản phẩm vào giỏ hàng - Customer: {}, ProductUnit: {}, Quantity: {}",
                 customerId, productUnitId, quantity);
 
         // Validate quantity
@@ -44,78 +43,39 @@ public class CartServiceImpl implements CartService {
             throw new IllegalArgumentException("Số lượng phải lớn hơn 0");
         }
 
-        // Kiểm tra customer tồn tại
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy khách hàng với ID: " + customerId));
+        // Tạo request và gọi ShoppingCartService
+        AddCartItemRequest request = new AddCartItemRequest(productUnitId, quantity);
+        CartResponse cartResponse = shoppingCartService.addItemToCart(customerId, request);
 
-        // Kiểm tra product unit tồn tại
-        ProductUnit productUnit = productUnitRepository.findById(productUnitId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với ID: " + productUnitId));
-
-        // Lấy giá hiện tại
-        PriceDetail priceDetail = priceDetailRepository
-                .findCurrentPriceByProductUnitId(productUnitId, PriceType.ACTIVE)
-                .orElseThrow(() -> new RuntimeException("Sản phẩm chưa có giá bán"));
-
-        // Tìm hoặc tạo giỏ hàng
-        ShoppingCart cart = shoppingCartRepository.findByCustomerId(customerId)
-                .orElseGet(() -> {
-                    ShoppingCart newCart = new ShoppingCart();
-                    newCart.setCustomer(customer);
-                    return shoppingCartRepository.save(newCart);
-                });
-
-        // Kiểm tra xem sản phẩm đã có trong giỏ chưa
-        CartItem cartItem = cartItemRepository
-                .findByCartIdAndProductUnitId(cart.getCartId(), productUnitId)
-                .orElse(null);
-
-        if (cartItem != null) {
-            // Cập nhật số lượng
-            cartItem.setQuantity(cartItem.getQuantity() + quantity);
-            cartItemRepository.save(cartItem);
-            log.debug("Cập nhật số lượng sản phẩm trong giỏ: {}", cartItem.getQuantity());
-        } else {
-            // Thêm mới
-            cartItem = new CartItem();
-            cartItem.setCart(cart);
-            cartItem.setProductUnit(productUnit);
-            cartItem.setQuantity(quantity);
-            cartItem.setUnitPrice(priceDetail.getSalePrice().doubleValue());
-            cartItemRepository.save(cartItem);
-            log.debug("Thêm sản phẩm mới vào giỏ");
-        }
-
-        return getCart(customerId);
+        // Convert sang CartInfo
+        return convertToCartInfo(cartResponse);
     }
 
     /**
      * Xóa sản phẩm khỏi giỏ hàng
+     * Sử dụng ShoppingCartService để đảm bảo dữ liệu đồng nhất
      */
     @Override
     @Transactional
     public CartInfo removeFromCart(Integer customerId, Long productUnitId) {
-        log.info("Xóa sản phẩm khỏi giỏ hàng - Customer: {}, ProductUnit: {}", 
+        log.info("Xóa sản phẩm khỏi giỏ hàng - Customer: {}, ProductUnit: {}",
                 customerId, productUnitId);
 
-        // Tìm giỏ hàng
-        ShoppingCart cart = shoppingCartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy giỏ hàng"));
+        // Gọi ShoppingCartService
+        CartResponse cartResponse = shoppingCartService.removeItemFromCart(customerId, productUnitId);
 
-        // Xóa cart item
-        cartItemRepository.deleteByCartIdAndProductUnitId(cart.getCartId(), productUnitId);
-        log.debug("Đã xóa sản phẩm khỏi giỏ hàng");
-
-        return getCart(customerId);
+        // Convert sang CartInfo
+        return convertToCartInfo(cartResponse);
     }
 
     /**
      * Cập nhật số lượng sản phẩm trong giỏ hàng
+     * Sử dụng ShoppingCartService để đảm bảo dữ liệu đồng nhất
      */
     @Override
     @Transactional
     public CartInfo updateQuantity(Integer customerId, Long productUnitId, Integer quantity) {
-        log.info("Cập nhật số lượng sản phẩm - Customer: {}, ProductUnit: {}, NewQuantity: {}", 
+        log.info("Cập nhật số lượng sản phẩm - Customer: {}, ProductUnit: {}, NewQuantity: {}",
                 customerId, productUnitId, quantity);
 
         // Validate quantity
@@ -128,38 +88,56 @@ public class CartServiceImpl implements CartService {
             return removeFromCart(customerId, productUnitId);
         }
 
-        // Tìm giỏ hàng
-        ShoppingCart cart = shoppingCartRepository.findByCustomerId(customerId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy giỏ hàng"));
+        // Tạo request và gọi ShoppingCartService
+        UpdateCartItemRequest request = new UpdateCartItemRequest(quantity);
+        CartResponse cartResponse = shoppingCartService.updateCartItem(customerId, productUnitId, request);
 
-        // Tìm cart item
-        CartItem cartItem = cartItemRepository
-                .findByCartIdAndProductUnitId(cart.getCartId(), productUnitId)
-                .orElseThrow(() -> new RuntimeException("Sản phẩm không có trong giỏ hàng"));
-
-        // Cập nhật số lượng
-        cartItem.setQuantity(quantity);
-        cartItemRepository.save(cartItem);
-        log.debug("Đã cập nhật số lượng sản phẩm: {}", quantity);
-
-        return getCart(customerId);
+        // Convert sang CartInfo
+        return convertToCartInfo(cartResponse);
     }
 
     /**
      * Lấy thông tin giỏ hàng
+     * Sử dụng ShoppingCartService để lấy dữ liệu với khuyến mãi đầy đủ
      */
     @Override
     @Transactional(readOnly = true)
     public CartInfo getCart(Integer customerId) {
         log.info("Lấy thông tin giỏ hàng - Customer: {}", customerId);
 
-        // Tìm giỏ hàng
-        ShoppingCart cart = shoppingCartRepository.findByCustomerId(customerId)
-                .orElse(null);
+        // Gọi ShoppingCartService để lấy dữ liệu đầy đủ (bao gồm khuyến mãi)
+        CartResponse cartResponse = shoppingCartService.getCart(customerId);
 
-        // Nếu chưa có giỏ, trả về giỏ rỗng
-        if (cart == null) {
-            log.debug("Khách hàng chưa có giỏ hàng");
+        // Convert sang CartInfo
+        return convertToCartInfo(cartResponse);
+    }
+
+    /**
+     * Xóa tất cả sản phẩm trong giỏ hàng
+     * Sử dụng ShoppingCartService để đảm bảo dữ liệu đồng nhất
+     */
+    @Override
+    @Transactional
+    public CartInfo clearCart(Integer customerId) {
+        log.info("Xóa tất cả sản phẩm trong giỏ hàng - Customer: {}", customerId);
+
+        // Gọi ShoppingCartService
+        shoppingCartService.clearCart(customerId);
+
+        // Lấy lại giỏ hàng (hiện tại sẽ rỗng)
+        return getCart(customerId);
+    }
+
+    // ========== Private Helper Methods ==========
+
+    /**
+     * Convert CartResponse (từ ShoppingCartService) sang CartInfo (cho chatbot)
+     *
+     * @param cartResponse response từ ShoppingCartService
+     * @return CartInfo cho chatbot với đầy đủ thông tin khuyến mãi
+     */
+    private CartInfo convertToCartInfo(CartResponse cartResponse) {
+        if (cartResponse == null) {
             return new CartInfo(
                     null,
                     List.of(),
@@ -168,94 +146,101 @@ public class CartServiceImpl implements CartService {
                     0.0,
                     0.0,
                     0.0,
-                    LocalDateTime.now()
+                    List.of(),
+                    null
             );
         }
 
-        // Lấy danh sách cart items
-        List<CartItem> cartItems = cartItemRepository.findByCartId(cart.getCartId());
-        log.debug("Tìm thấy {} items trong giỏ hàng", cartItems.size());
+        // Convert items
+        List<CartInfo.CartItemInfo> itemInfos = cartResponse.items().stream()
+                .map(this::convertToCartItemInfo)
+                .collect(Collectors.toList());
 
-        // Map sang CartInfo
-        List<CartInfo.CartItemInfo> itemInfos = new ArrayList<>();
-        double subTotal = 0.0;
-
-        for (CartItem item : cartItems) {
-            ProductUnit productUnit = item.getProductUnit();
-            Product product = productUnit.getProduct();
-            
-            double originalTotal = item.getUnitPrice() * item.getQuantity();
-            double finalTotal = originalTotal; // Tạm thời không tính khuyến mãi
-
-            // Lấy URL hình ảnh primary của ProductUnit (nếu có)
-            String imageUrl = null;
-            if (productUnit.getProductUnitImages() != null && !productUnit.getProductUnitImages().isEmpty()) {
-                // Tìm hình ảnh primary
-                for (ProductUnitImage unitImage : productUnit.getProductUnitImages()) {
-                    if (unitImage.getIsPrimary() != null && unitImage.getIsPrimary()) {
-                        imageUrl = unitImage.getProductImage().getImageUrl();
-                        break;
-                    }
-                }
-                // Nếu không có primary, lấy hình đầu tiên
-                if (imageUrl == null) {
-                    imageUrl = productUnit.getProductUnitImages().get(0).getProductImage().getImageUrl();
-                }
-            }
-
-            CartInfo.CartItemInfo itemInfo = new CartInfo.CartItemInfo(
-                    productUnit.getId(),
-                    product.getName(),
-                    productUnit.getUnit().getName(),
-                    item.getQuantity(),
-                    item.getUnitPrice(),
-                    originalTotal,
-                    finalTotal,
-                    imageUrl,
-                    null, // stock quantity - cần stock service
-                    false, // has promotion
-                    null  // promotion name
-            );
-
-            itemInfos.add(itemInfo);
-            subTotal += originalTotal;
-        }
-
-        // Tính tổng
-        double lineItemDiscount = 0.0; // Tạm thời không tính
-        double orderDiscount = 0.0;    // Tạm thời không tính
-        double totalPayable = subTotal - lineItemDiscount - orderDiscount;
+        // Convert order promotions
+        List<CartInfo.OrderPromotionInfo> orderPromotions = cartResponse.appliedOrderPromotions() != null
+                ? cartResponse.appliedOrderPromotions().stream()
+                        .map(this::convertToOrderPromotionInfo)
+                        .collect(Collectors.toList())
+                : List.of();
 
         return new CartInfo(
-                cart.getCartId(),
+                cartResponse.cartId(),
                 itemInfos,
-                cartItems.size(),
-                subTotal,
-                lineItemDiscount,
-                orderDiscount,
-                totalPayable,
-                cart.getUpdatedAt()
+                cartResponse.totalItems(),
+                cartResponse.subTotal(),
+                cartResponse.lineItemDiscount(),
+                cartResponse.orderDiscount(),
+                cartResponse.totalPayable(),
+                orderPromotions,
+                cartResponse.updatedAt()
         );
     }
 
     /**
-     * Xóa tất cả sản phẩm trong giỏ hàng
+     * Convert CartItemResponse sang CartItemInfo
+     *
+     * @param itemResponse item từ CartResponse
+     * @return CartItemInfo cho chatbot
      */
-    @Override
-    @Transactional
-    public CartInfo clearCart(Integer customerId) {
-        log.info("Xóa tất cả sản phẩm trong giỏ hàng - Customer: {}", customerId);
-
-        // Tìm giỏ hàng
-        ShoppingCart cart = shoppingCartRepository.findByCustomerId(customerId)
-                .orElse(null);
-
-        if (cart != null) {
-            // Xóa tất cả items
-            cartItemRepository.deleteByCartId(cart.getCartId());
-            log.debug("Đã xóa tất cả items trong giỏ hàng");
+    private CartInfo.CartItemInfo convertToCartItemInfo(CartItemResponse itemResponse) {
+        // Convert promotion applied
+        CartInfo.PromotionAppliedInfo promotionInfo = null;
+        if (itemResponse.promotionApplied() != null) {
+            promotionInfo = convertToPromotionAppliedInfo(itemResponse.promotionApplied());
         }
 
-        return getCart(customerId);
+        return new CartInfo.CartItemInfo(
+                itemResponse.lineItemId(),
+                itemResponse.productUnitId(),
+                itemResponse.productName(),
+                itemResponse.unitName(),
+                itemResponse.quantity(),
+                itemResponse.unitPrice(),
+                itemResponse.originalTotal(),
+                itemResponse.finalTotal(),
+                itemResponse.imageUrl(),
+                itemResponse.stockQuantity(),
+                itemResponse.hasPromotion(),
+                promotionInfo
+        );
+    }
+
+    /**
+     * Convert PromotionAppliedDTO sang PromotionAppliedInfo
+     *
+     * @param promotionDTO promotion từ CartItemResponse
+     * @return PromotionAppliedInfo cho chatbot
+     */
+    private CartInfo.PromotionAppliedInfo convertToPromotionAppliedInfo(PromotionAppliedDTO promotionDTO) {
+        if (promotionDTO == null) {
+            return null;
+        }
+
+        return new CartInfo.PromotionAppliedInfo(
+                promotionDTO.promotionName(),
+                promotionDTO.promotionSummary(),
+                promotionDTO.discountType(),
+                promotionDTO.discountValue() != null ? promotionDTO.discountValue().doubleValue() : null,
+                promotionDTO.sourceLineItemId()
+        );
+    }
+
+    /**
+     * Convert OrderPromotionDTO sang OrderPromotionInfo
+     *
+     * @param orderPromotion promotion từ CartResponse
+     * @return OrderPromotionInfo cho chatbot
+     */
+    private CartInfo.OrderPromotionInfo convertToOrderPromotionInfo(
+            CheckPromotionResponseDTO.OrderPromotionDTO orderPromotion) {
+        if (orderPromotion == null) {
+            return null;
+        }
+
+        return new CartInfo.OrderPromotionInfo(
+                orderPromotion.promotionName(),
+                orderPromotion.promotionSummary(),
+                orderPromotion.discountValue() != null ? orderPromotion.discountValue().doubleValue() : null
+        );
     }
 }

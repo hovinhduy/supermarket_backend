@@ -1,6 +1,7 @@
 package iuh.fit.supermarket.dto.chat.structured;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import iuh.fit.supermarket.dto.checkout.CheckPromotionResponseDTO;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,13 +19,13 @@ public record CartInfo(
         Integer cartId,
 
         /**
-         * Danh sách items trong giỏ
+         * Danh sách items trong giỏ (bao gồm cả quà tặng từ khuyến mãi)
          */
         @JsonProperty(value = "items")
         List<CartItemInfo> items,
 
         /**
-         * Tổng số lượng items (không tính quà tặng)
+         * Tổng số lượng items (chỉ tính sản phẩm mua, không tính quà tặng)
          */
         @JsonProperty(value = "total_items")
         Integer totalItems,
@@ -36,13 +37,13 @@ public record CartInfo(
         Double subTotal,
 
         /**
-         * Giảm giá từ sản phẩm
+         * Giảm giá từ sản phẩm (PRODUCT_DISCOUNT + BUY_X_GET_Y)
          */
         @JsonProperty(value = "line_item_discount")
         Double lineItemDiscount,
 
         /**
-         * Giảm giá từ đơn hàng
+         * Giảm giá từ đơn hàng (ORDER_DISCOUNT)
          */
         @JsonProperty(value = "order_discount")
         Double orderDiscount,
@@ -52,6 +53,12 @@ public record CartInfo(
          */
         @JsonProperty(value = "total_payable")
         Double totalPayable,
+
+        /**
+         * Danh sách khuyến mãi đơn hàng đã áp dụng
+         */
+        @JsonProperty(value = "applied_order_promotions")
+        List<OrderPromotionInfo> appliedOrderPromotions,
 
         /**
          * Thời gian cập nhật
@@ -64,6 +71,12 @@ public record CartInfo(
      * DTO cho từng item trong giỏ
      */
     public record CartItemInfo(
+            /**
+             * ID dòng item (để reference từ quà tặng)
+             */
+            @JsonProperty(value = "line_item_id")
+            Long lineItemId,
+
             /**
              * ID của product unit (QUAN TRỌNG: để frontend thao tác)
              */
@@ -125,10 +138,49 @@ public record CartInfo(
             Boolean hasPromotion,
 
             /**
-             * Tên khuyến mãi (nếu có)
+             * Thông tin khuyến mãi được áp dụng
              */
+            @JsonProperty(value = "promotion_applied")
+            PromotionAppliedInfo promotionApplied
+    ) {
+    }
+
+    /**
+     * DTO thông tin khuyến mãi được áp dụng cho từng item
+     */
+    public record PromotionAppliedInfo(
             @JsonProperty(value = "promotion_name")
-            String promotionName
+            String promotionName,
+
+            @JsonProperty(value = "promotion_summary")
+            String promotionSummary,
+
+            @JsonProperty(value = "discount_type")
+            String discountType,
+
+            @JsonProperty(value = "discount_value")
+            Double discountValue,
+
+            /**
+             * ID của line item gốc (cho quà tặng BUY_X_GET_Y)
+             */
+            @JsonProperty(value = "source_line_item_id")
+            Long sourceLineItemId
+    ) {
+    }
+
+    /**
+     * DTO thông tin khuyến mãi đơn hàng
+     */
+    public record OrderPromotionInfo(
+            @JsonProperty(value = "promotion_name")
+            String promotionName,
+
+            @JsonProperty(value = "promotion_summary")
+            String promotionSummary,
+
+            @JsonProperty(value = "discount_value")
+            Double discountValue
     ) {
     }
 }
