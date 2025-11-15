@@ -107,7 +107,6 @@ public class ProductSearchServiceImpl implements ProductSearchService {
                 product.getBrand() != null ? product.getBrand().getName() : null,
                 stockStatus,
                 imageUrl,
-                product.getDescription(),
                 false, // TODO: Check promotion
                 null   // TODO: Get promotion price
         );
