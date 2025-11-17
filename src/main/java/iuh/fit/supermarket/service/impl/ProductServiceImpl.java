@@ -46,6 +46,7 @@ public class ProductServiceImpl implements ProductService {
     private final iuh.fit.supermarket.repository.WarehouseRepository warehouseRepository;
     private final iuh.fit.supermarket.service.PriceService priceService;
     private final iuh.fit.supermarket.repository.ProductUnitImageRepository productUnitImageRepository;
+    private final iuh.fit.supermarket.repository.CustomerFavoriteRepository customerFavoriteRepository;
 
     /**
      * Tạo sản phẩm mới
@@ -299,10 +300,11 @@ public class ProductServiceImpl implements ProductService {
             Integer brandId,
             Boolean isActive,
             Boolean isRewardPoint,
+            Integer customerId,
             Pageable pageable) {
         log.debug(
-                "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}",
-                searchTerm, categoryId, brandId, isActive, isRewardPoint);
+                "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, customerId={}",
+                searchTerm, categoryId, brandId, isActive, isRewardPoint, customerId);
 
         // Sử dụng query với đầy đủ các filter
         String searchTermClean = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : "";
@@ -314,7 +316,7 @@ public class ProductServiceImpl implements ProductService {
                 isRewardPoint,
                 pageable);
 
-        return mapToProductListResponse(productPage);
+        return mapToProductListResponse(productPage, customerId);
     }
 
     /**
@@ -471,9 +473,24 @@ public class ProductServiceImpl implements ProductService {
     /**
      * Chuyển đổi Page<Product> sang ProductListResponse
      */
-    private ProductListResponse mapToProductListResponse(Page<Product> productPage) {
+    private ProductListResponse mapToProductListResponse(Page<Product> productPage, Integer customerId) {
+        // Lấy danh sách tất cả productUnitId của khách hàng nếu có customerId
+        Set<Long> favoriteProductUnitIds = new java.util.HashSet<>();
+        if (customerId != null) {
+            try {
+                favoriteProductUnitIds = customerFavoriteRepository.findFavoritesByCustomerId(customerId)
+                        .stream()
+                        .map(iuh.fit.supermarket.dto.favorite.CustomerFavoriteResponse::getProductUnitId)
+                        .collect(Collectors.toSet());
+                log.debug("Customer {} có {} sản phẩm yêu thích", customerId, favoriteProductUnitIds.size());
+            } catch (Exception e) {
+                log.warn("Không thể lấy danh sách yêu thích của customer {}: {}", customerId, e.getMessage());
+            }
+        }
+
+        final Set<Long> favoriteIds = favoriteProductUnitIds;
         List<ProductListResponse.ProductSummary> productSummaries = productPage.getContent().stream()
-                .map(this::mapToProductSummary)
+                .map(product -> mapToProductSummary(product, favoriteIds))
                 .collect(Collectors.toList());
 
         ProductListResponse.PageInfo pageInfo = new ProductListResponse.PageInfo();
@@ -493,8 +510,10 @@ public class ProductServiceImpl implements ProductService {
      * Chuyển đổi List<Product> sang ProductListResponse (tạm thời)
      */
     private ProductListResponse createProductListResponse(List<Product> products, Pageable pageable) {
+        // Không có customerId nên không có sản phẩm yêu thích
+        Set<Long> emptyFavoriteIds = new java.util.HashSet<>();
         List<ProductListResponse.ProductSummary> productSummaries = products.stream()
-                .map(this::mapToProductSummary)
+                .map(product -> mapToProductSummary(product, emptyFavoriteIds))
                 .collect(Collectors.toList());
 
         // Tạo PageInfo giả lập
@@ -514,7 +533,7 @@ public class ProductServiceImpl implements ProductService {
     /**
      * Chuyển đổi Product entity sang ProductSummary DTO
      */
-    private ProductListResponse.ProductSummary mapToProductSummary(Product product) {
+    private ProductListResponse.ProductSummary mapToProductSummary(Product product, Set<Long> favoriteProductUnitIds) {
         ProductListResponse.ProductSummary summary = new ProductListResponse.ProductSummary();
         summary.setId(product.getId());
         summary.setProductCode(product.getCode());
@@ -531,10 +550,10 @@ public class ProductServiceImpl implements ProductService {
         summary.setCategoryId(product.getCategory() != null ? product.getCategory().getCategoryId() : null);
         summary.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
 
-        // Load và map thông tin units
+        // Load và map thông tin units với isFavorite
         List<ProductUnit> productUnits = productUnitRepository.findActiveByProductId(product.getId());
         List<ProductListResponse.ProductUnitSummary> unitSummaries = productUnits.stream()
-                .map(this::mapToProductUnitSummary)
+                .map(pu -> mapToProductUnitSummary(pu, favoriteProductUnitIds))
                 .collect(Collectors.toList());
 
         summary.setUnits(unitSummaries);
@@ -1023,7 +1042,7 @@ public class ProductServiceImpl implements ProductService {
     /**
      * Chuyển đổi ProductUnit entity sang ProductUnitSummary DTO
      */
-    private ProductListResponse.ProductUnitSummary mapToProductUnitSummary(ProductUnit productUnit) {
+    private ProductListResponse.ProductUnitSummary mapToProductUnitSummary(ProductUnit productUnit, Set<Long> favoriteProductUnitIds) {
         ProductListResponse.ProductUnitSummary summary = new ProductListResponse.ProductUnitSummary();
         summary.setId(productUnit.getId());
         summary.setBarcode(productUnit.getBarcode());
@@ -1036,6 +1055,9 @@ public class ProductServiceImpl implements ProductService {
             summary.setUnitName(productUnit.getUnit().getName());
             summary.setUnitId(productUnit.getUnit().getId());
         }
+
+        // Set trường isFavorite
+        summary.setIsFavorite(favoriteProductUnitIds.contains(productUnit.getId()));
 
         return summary;
     }

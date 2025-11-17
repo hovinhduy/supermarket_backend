@@ -50,6 +50,8 @@ public class ProductController {
 
     private final ProductService productService;
     private final ProductExcelService productExcelService;
+    private final iuh.fit.supermarket.repository.UserRepository userRepository;
+    private final iuh.fit.supermarket.repository.CustomerRepository customerRepository;
 
     /**
      * API tạo sản phẩm mới
@@ -193,6 +195,9 @@ public class ProductController {
                 request.getIsActive(), request.getIsRewardPoint(), request.getPage(), request.getSize());
 
         try {
+            // Lấy customerId nếu user là customer (để check favorite)
+            Integer customerId = getCustomerIdIfAuthenticated();
+
             // Tạo Pageable từ request
             Pageable pageable = createPageableFromRequest(request);
 
@@ -202,6 +207,7 @@ public class ProductController {
                     request.getBrandId(),
                     request.getIsActive(),
                     request.getIsRewardPoint(),
+                    customerId,
                     pageable);
             return ResponseEntity.ok(ApiResponse.success(products));
         } catch (Exception e) {
@@ -711,6 +717,58 @@ public class ProductController {
         } catch (Exception e) {
             log.error("Lỗi khi tạo template: ", e);
             return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    /**
+     * Lấy customer ID nếu user hiện tại là customer (đã authenticated)
+     * Trả về null nếu không phải customer hoặc chưa đăng nhập
+     *
+     * @return Customer ID hoặc null
+     */
+    private Integer getCustomerIdIfAuthenticated() {
+        try {
+            org.springframework.security.core.Authentication authentication =
+                    org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return null;
+            }
+
+            Object principal = authentication.getPrincipal();
+            if (!(principal instanceof org.springframework.security.core.userdetails.UserDetails)) {
+                return null;
+            }
+
+            org.springframework.security.core.userdetails.UserDetails userDetails =
+                    (org.springframework.security.core.userdetails.UserDetails) principal;
+            String username = userDetails.getUsername();
+
+            // Chỉ xử lý nếu là customer (có prefix "CUSTOMER:")
+            if (!username.startsWith("CUSTOMER:")) {
+                return null;
+            }
+
+            // Loại bỏ prefix "CUSTOMER:"
+            final String emailOrPhone = username.substring(9);
+
+            // Tìm User từ email hoặc phone
+            iuh.fit.supermarket.entity.User user = userRepository.findByEmailAndIsDeletedFalse(emailOrPhone)
+                    .or(() -> userRepository.findByPhoneAndIsDeletedFalse(emailOrPhone))
+                    .orElse(null);
+
+            if (user == null) {
+                return null;
+            }
+
+            // Tìm Customer từ user_id
+            iuh.fit.supermarket.entity.Customer customer = customerRepository.findByUser_UserId(user.getUserId())
+                    .orElse(null);
+
+            return customer != null ? customer.getCustomerId() : null;
+        } catch (Exception e) {
+            log.warn("Không thể lấy customer ID: {}", e.getMessage());
+            return null;
         }
     }
 }

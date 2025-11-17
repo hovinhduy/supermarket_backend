@@ -185,6 +185,12 @@ public class ProductListResponse {
          */
         @Schema(description = "ID đơn vị tính", example = "1")
         private Long unitId;
+
+        /**
+         * Có phải sản phẩm yêu thích không
+         */
+        @Schema(description = "Có phải sản phẩm yêu thích không", example = "false")
+        private Boolean isFavorite;
     }
 
     /**

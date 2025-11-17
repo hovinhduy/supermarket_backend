@@ -9,7 +9,7 @@ spring:
   # Cấu hình JPA/Hibernate
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     show-sql: ${SHOW_SQL:true} # Hiển thị SQL queries trong console
     properties:
       hibernate:

@@ -63,6 +63,7 @@ public interface ProductService {
      * @param brandId       ID thương hiệu để lọc (tùy chọn)
      * @param isActive      trạng thái hoạt động để lọc (tùy chọn)
      * @param isRewardPoint có tích điểm thưởng để lọc (tùy chọn)
+     * @param customerId    ID khách hàng để xác định sản phẩm yêu thích (tùy chọn)
      * @param pageable      thông tin phân trang
      * @return danh sách sản phẩm với phân trang
      */
@@ -71,6 +72,7 @@ public interface ProductService {
             Integer brandId,
             Boolean isActive,
             Boolean isRewardPoint,
+            Integer customerId,
             Pageable pageable);
 
     /**

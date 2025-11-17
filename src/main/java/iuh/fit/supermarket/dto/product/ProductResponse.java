@@ -207,5 +207,11 @@ public class ProductResponse {
          */
         @Schema(description = "Tên đơn vị tính", example = "Kilogram")
         private String unitName;
+
+        /**
+         * Có phải sản phẩm yêu thích không (chỉ có khi customer gọi API)
+         */
+        @Schema(description = "Có phải sản phẩm yêu thích không", example = "false")
+        private Boolean isFavorite;
     }
 }
