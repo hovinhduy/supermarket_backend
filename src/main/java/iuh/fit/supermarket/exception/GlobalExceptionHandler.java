@@ -514,6 +514,32 @@ public class GlobalExceptionHandler {
         }
 
         /**
+         * Xử lý ngoại lệ không tìm thấy hóa đơn
+         */
+        @ExceptionHandler(InvoiceNotFoundException.class)
+        public ResponseEntity<ApiResponse<String>> handleInvoiceNotFoundException(
+                        InvoiceNotFoundException ex) {
+
+                log.warn("Invoice not found: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
+         * Xử lý ngoại lệ truy cập hóa đơn bị từ chối
+         */
+        @ExceptionHandler(InvoiceAccessDeniedException.class)
+        public ResponseEntity<ApiResponse<String>> handleInvoiceAccessDeniedException(
+                        InvoiceAccessDeniedException ex) {
+
+                log.warn("Invoice access denied: {}", ex.getMessage());
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(ApiResponse.error(ex.getMessage()));
+        }
+
+        /**
          * Xử lý runtime exception
          */
         @ExceptionHandler(RuntimeException.class)

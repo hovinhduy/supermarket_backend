@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
 import iuh.fit.supermarket.dto.customer.*;
+import iuh.fit.supermarket.dto.sale.SaleInvoiceFullDTO;
 import iuh.fit.supermarket.enums.CustomerType;
 import iuh.fit.supermarket.service.CustomerService;
 import jakarta.validation.Valid;
@@ -440,5 +441,68 @@ public class CustomerController {
                         log.error("Lỗi khi tạo template: ", e);
                         return ResponseEntity.internalServerError().build();
                 }
+        }
+
+        /**
+         * Khách hàng lấy danh sách hóa đơn của chính mình
+         */
+        @Operation(summary = "Lấy danh sách hóa đơn của tôi", description = "API dành cho khách hàng tra cứu danh sách hóa đơn đã mua hàng của chính mình. Thông tin khách hàng được lấy từ token đăng nhập.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy danh sách hóa đơn thành công", content = @Content(schema = @Schema(implementation = SaleInvoiceFullDTO.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Chưa đăng nhập hoặc token không hợp lệ"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy thông tin khách hàng")
+        })
+        @GetMapping("/my-invoices")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ResponseEntity<ApiResponse<Page<SaleInvoiceFullDTO>>> getMyInvoices(
+                        @Parameter(description = "Số trang (bắt đầu từ 0)") @RequestParam(defaultValue = "0") int page,
+                        @Parameter(description = "Kích thước trang") @RequestParam(defaultValue = "10") int size) {
+
+                // Lấy username từ SecurityContext
+                String username = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext()
+                                .getAuthentication()
+                                .getName();
+
+                log.info("Khách hàng {} yêu cầu lấy danh sách hóa đơn của mình, page: {}, size: {}",
+                                username, page, size);
+
+                Page<SaleInvoiceFullDTO> invoices = customerService.getMyInvoices(username, page, size);
+
+                log.info("Lấy danh sách hóa đơn thành công cho khách hàng {} - Tìm thấy {} hóa đơn trên tổng số {} hóa đơn",
+                                username, invoices.getNumberOfElements(), invoices.getTotalElements());
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy danh sách hóa đơn thành công", invoices));
+        }
+
+        /**
+         * Khách hàng lấy chi tiết hóa đơn của chính mình
+         */
+        @Operation(summary = "Lấy chi tiết hóa đơn của tôi", description = "API dành cho khách hàng tra cứu chi tiết một hóa đơn cụ thể của chính mình. Thông tin khách hàng được lấy từ token đăng nhập.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Lấy chi tiết hóa đơn thành công", content = @Content(schema = @Schema(implementation = SaleInvoiceFullDTO.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Chưa đăng nhập hoặc token không hợp lệ"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Hóa đơn không thuộc về bạn"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy hóa đơn")
+        })
+        @GetMapping("/my-invoices/{invoiceId}")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ResponseEntity<ApiResponse<SaleInvoiceFullDTO>> getMyInvoiceDetail(
+                        @Parameter(description = "ID hóa đơn") @PathVariable Integer invoiceId) {
+
+                // Lấy username từ SecurityContext
+                String username = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext()
+                                .getAuthentication()
+                                .getName();
+
+                log.info("Khách hàng {} yêu cầu lấy chi tiết hóa đơn {}", username, invoiceId);
+
+                SaleInvoiceFullDTO invoice = customerService.getMyInvoiceDetail(username, invoiceId);
+
+                log.info("Lấy chi tiết hóa đơn thành công cho khách hàng {} - Hóa đơn số: {}",
+                                username, invoice.invoiceNumber());
+
+                return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết hóa đơn thành công", invoice));
         }
 }

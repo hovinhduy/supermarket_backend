@@ -1,12 +1,18 @@
 package iuh.fit.supermarket.service;
 
 import iuh.fit.supermarket.dto.customer.*;
+import iuh.fit.supermarket.dto.sale.AppliedOrderPromotionDetailDTO;
+import iuh.fit.supermarket.dto.sale.SaleInvoiceFullDTO;
+import iuh.fit.supermarket.dto.sale.SaleInvoiceItemDetailDTO;
 import iuh.fit.supermarket.entity.Customer;
+import iuh.fit.supermarket.entity.SaleInvoiceDetail;
+import iuh.fit.supermarket.entity.SaleInvoiceHeader;
 import iuh.fit.supermarket.entity.User;
 import iuh.fit.supermarket.enums.CustomerType;
 import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.exception.*;
 import iuh.fit.supermarket.repository.CustomerRepository;
+import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.repository.UserRepository;
 import iuh.fit.supermarket.util.CustomerValidator;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +44,7 @@ public class CustomerService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CustomerValidator customerValidator;
+    private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
 
     /**
      * Lấy tất cả khách hàng chưa bị xóa
@@ -938,5 +945,214 @@ public class CustomerService {
                 throw new CustomerValidationException("customerIds", "Tất cả ID khách hàng phải là số dương");
             }
         }
+    }
+
+    /**
+     * Lấy danh sách hóa đơn của khách hàng với phân trang
+     * 
+     * @param customerId ID khách hàng
+     * @param page       số trang
+     * @param size       kích thước trang
+     * @return Page<SaleInvoiceFullDTO>
+     */
+    @Transactional(readOnly = true)
+    public Page<SaleInvoiceFullDTO> getCustomerInvoices(Integer customerId, int page, int size) {
+        log.debug("Lấy danh sách hóa đơn của khách hàng với ID: {}, page: {}, size: {}", customerId, page, size);
+
+        // Kiểm tra khách hàng có tồn tại không
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        // Tạo Pageable với sắp xếp theo ngày tạo giảm dần
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "invoiceDate"));
+
+        // Lấy danh sách hóa đơn của khách hàng
+        Page<SaleInvoiceHeader> invoices = saleInvoiceHeaderRepository.searchAndFilterInvoices(
+                null, // searchKeyword
+                null, // fromDate
+                null, // toDate
+                null, // status
+                null, // employeeId
+                customerId, // customerId
+                null, // productUnitId
+                pageable);
+
+        // Chuyển đổi sang DTO
+        return invoices.map(this::convertToSaleInvoiceFullDTO);
+    }
+
+    /**
+     * Lấy chi tiết hóa đơn của khách hàng
+     * 
+     * @param customerId ID khách hàng
+     * @param invoiceId  ID hóa đơn
+     * @return SaleInvoiceFullDTO
+     */
+    @Transactional(readOnly = true)
+    public SaleInvoiceFullDTO getCustomerInvoiceDetail(Integer customerId, Integer invoiceId) {
+        log.debug("Lấy chi tiết hóa đơn {} của khách hàng với ID: {}", invoiceId, customerId);
+
+        // Kiểm tra khách hàng có tồn tại không
+        Customer customer = customerRepository.findByCustomerIdAndUser_IsDeletedFalse(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        // Lấy hóa đơn với đầy đủ thông tin
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByIdWithDetails(invoiceId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hóa đơn với ID: " + invoiceId));
+
+        // Kiểm tra hóa đơn có thuộc về khách hàng này không
+        if (invoice.getCustomer() == null || !invoice.getCustomer().getCustomerId().equals(customerId)) {
+            throw new RuntimeException("Hóa đơn không thuộc về khách hàng này");
+        }
+
+        return convertToSaleInvoiceFullDTO(invoice);
+    }
+
+    /**
+     * Chuyển đổi SaleInvoiceHeader sang SaleInvoiceFullDTO
+     * 
+     * @param invoice entity hóa đơn
+     * @return SaleInvoiceFullDTO
+     */
+    private SaleInvoiceFullDTO convertToSaleInvoiceFullDTO(SaleInvoiceHeader invoice) {
+        // Chuyển đổi danh sách chi tiết hóa đơn
+        List<SaleInvoiceItemDetailDTO> items = invoice.getInvoiceDetails() != null
+                ? invoice.getInvoiceDetails().stream()
+                        .map(this::convertToSaleInvoiceItemDetailDTO)
+                        .collect(Collectors.toList())
+                : List.of();
+
+        // Hiện tại chưa có khuyến mãi, để danh sách rỗng
+        List<AppliedOrderPromotionDetailDTO> appliedOrderPromotions = List.of();
+
+        return new SaleInvoiceFullDTO(
+                invoice.getInvoiceId(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+                invoice.getOrder() != null ? invoice.getOrder().getOrderId() : null,
+                invoice.getCustomer() != null && invoice.getCustomer().getUser() != null
+                        ? invoice.getCustomer().getUser().getName()
+                        : null,
+                invoice.getEmployee() != null && invoice.getEmployee().getUser() != null
+                        ? invoice.getEmployee().getUser().getName()
+                        : null,
+                invoice.getPaymentMethod(),
+                invoice.getStatus(),
+                invoice.getSubtotal(),
+                invoice.getTotalDiscount(),
+                invoice.getTotalTax(),
+                invoice.getTotalAmount(),
+                invoice.getPaidAmount(),
+                items,
+                appliedOrderPromotions,
+                invoice.getCreatedAt());
+    }
+
+    /**
+     * Chuyển đổi SaleInvoiceDetail sang SaleInvoiceItemDetailDTO
+     * 
+     * @param detail entity chi tiết hóa đơn
+     * @return SaleInvoiceItemDetailDTO
+     */
+    private SaleInvoiceItemDetailDTO convertToSaleInvoiceItemDetailDTO(SaleInvoiceDetail detail) {
+        return new SaleInvoiceItemDetailDTO(
+                detail.getInvoiceDetailId(),
+                detail.getProductUnit() != null ? detail.getProductUnit().getId() : null,
+                detail.getProductUnit() != null && detail.getProductUnit().getProduct() != null
+                        ? detail.getProductUnit().getProduct().getName()
+                        : null,
+                detail.getProductUnit() != null && detail.getProductUnit().getUnit() != null
+                        ? detail.getProductUnit().getUnit().getName()
+                        : null,
+                detail.getQuantity(),
+                detail.getUnitPrice(),
+                detail.getDiscountAmount(),
+                detail.getLineTotal(),
+                List.of() // Hiện tại chưa có khuyến mãi, để danh sách rỗng
+        );
+    }
+
+    /**
+     * Khách hàng lấy danh sách hóa đơn của chính mình
+     * 
+     * @param username username (email) của khách hàng từ token (có thể có prefix
+     *                 CUSTOMER:)
+     * @param page     số trang
+     * @param size     kích thước trang
+     * @return Page<SaleInvoiceFullDTO>
+     */
+    @Transactional(readOnly = true)
+    public Page<SaleInvoiceFullDTO> getMyInvoices(String username, int page, int size) {
+        log.debug("Khách hàng {} lấy danh sách hóa đơn của mình, page: {}, size: {}", username, page, size);
+
+        // Loại bỏ prefix CUSTOMER: nếu có
+        String email = username;
+        if (username.startsWith("CUSTOMER:")) {
+            email = username.substring("CUSTOMER:".length());
+        }
+
+        // Tìm User theo email
+        User user = userRepository.findByEmailAndIsDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Lấy Customer từ user_id
+        Customer customer = customerRepository.findByUser_UserId(user.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Tạo Pageable với sắp xếp theo ngày tạo giảm dần
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "invoiceDate"));
+
+        // Lấy danh sách hóa đơn của khách hàng
+        Page<SaleInvoiceHeader> invoices = saleInvoiceHeaderRepository.searchAndFilterInvoices(
+                null, // searchKeyword
+                null, // fromDate
+                null, // toDate
+                null, // status
+                null, // employeeId
+                customer.getCustomerId(), // customerId
+                null, // productUnitId
+                pageable);
+
+        // Chuyển đổi sang DTO
+        return invoices.map(this::convertToSaleInvoiceFullDTO);
+    }
+
+    /**
+     * Khách hàng lấy chi tiết hóa đơn của chính mình
+     * 
+     * @param username  username (email) của khách hàng từ token (có thể có prefix
+     *                  CUSTOMER:)
+     * @param invoiceId ID hóa đơn
+     * @return SaleInvoiceFullDTO
+     */
+    @Transactional(readOnly = true)
+    public SaleInvoiceFullDTO getMyInvoiceDetail(String username, Integer invoiceId) {
+        log.debug("Khách hàng {} lấy chi tiết hóa đơn {}", username, invoiceId);
+
+        // Loại bỏ prefix CUSTOMER: nếu có
+        String email = username;
+        if (username.startsWith("CUSTOMER:")) {
+            email = username.substring("CUSTOMER:".length());
+        }
+
+        // Tìm User theo email
+        User user = userRepository.findByEmailAndIsDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Lấy Customer từ user_id
+        Customer customer = customerRepository.findByUser_UserId(user.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Lấy hóa đơn với đầy đủ thông tin
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByIdWithDetails(invoiceId)
+                .orElseThrow(() -> new InvoiceNotFoundException(invoiceId));
+
+        // Kiểm tra hóa đơn có thuộc về khách hàng này không
+        if (invoice.getCustomer() == null
+                || !invoice.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
+            throw new InvoiceAccessDeniedException(invoiceId);
+        }
+
+        return convertToSaleInvoiceFullDTO(invoice);
     }
 }
