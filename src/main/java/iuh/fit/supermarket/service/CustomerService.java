@@ -70,12 +70,12 @@ public class CustomerService {
         // Map các field của User cần thêm prefix "user."
         String sortField = sortBy;
         if ("name".equals(sortField) || "email".equals(sortField) ||
-            "phone".equals(sortField) || "createdAt".equals(sortField) ||
-            "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
-            "gender".equals(sortField)) {
+                "phone".equals(sortField) || "createdAt".equals(sortField) ||
+                "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
+                "gender".equals(sortField)) {
             sortField = "user." + sortField;
         } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
-                   "customerCode".equals(sortField) || "customerId".equals(sortField)) {
+                "customerCode".equals(sortField) || "customerId".equals(sortField)) {
             // Các field này thuộc Customer, giữ nguyên
         } else {
             // Mặc định sort theo user.createdAt nếu field không hợp lệ
@@ -146,7 +146,6 @@ public class CustomerService {
         User user = userRepository.findCustomerByEmailOrPhone(normalizedPhone)
                 .orElseThrow(() -> new CustomerNotFoundException("phone", phone));
 
-        // Lấy Customer từ user_id
         Customer customer = customerRepository.findByUser_UserIdAndUser_IsDeletedFalse(user.getUserId())
                 .orElseThrow(() -> new CustomerNotFoundException("phone", phone));
 
@@ -160,25 +159,41 @@ public class CustomerService {
      */
     @Transactional(readOnly = true)
     public String generateCustomerCode() {
-        Optional<Customer> lastCustomer = customerRepository.findTopByOrderByCustomerCodeDesc();
+        Optional<Customer> lastCustomer = customerRepository.findTopByCustomerCodeIsNotNullOrderByCustomerCodeDesc();
+
+        int nextNumber = 1;
 
         if (lastCustomer.isPresent() && lastCustomer.get().getCustomerCode() != null) {
             String lastCode = lastCustomer.get().getCustomerCode();
-            // Trích xuất số từ mã (KH000001 -> 1)
-            int lastNumber = Integer.parseInt(lastCode.substring(2));
-            
-            // Kiểm tra giới hạn
-            if (lastNumber >= 999999) {
-                throw new CustomerValidationException("customerCode", "Đã hết mã khách hàng có thể tạo (KH999999)");
+            log.info("Mã khách hàng lớn nhất tìm thấy: {}", lastCode);
+
+            try {
+                // Trích xuất số từ mã (KH000001 -> 1)
+                // Giả sử format luôn là KH + 6 số
+                if (lastCode.length() >= 8 && lastCode.startsWith("KH")) {
+                    int lastNumber = Integer.parseInt(lastCode.substring(2));
+                    nextNumber = lastNumber + 1;
+                }
+            } catch (NumberFormatException e) {
+                log.warn("Không thể parse mã khách hàng: {}", lastCode);
+                // Fallback: nếu không parse được, vẫn thử bắt đầu từ 1 hoặc số tiếp theo an
+                // toàn
             }
-            
-            // Tạo mã mới
-            int newNumber = lastNumber + 1;
-            return String.format("KH%06d", newNumber);
         }
 
-        // Nếu chưa có mã nào, bắt đầu từ KH000001
-        return "KH000001";
+        String newCode = String.format("KH%06d", nextNumber);
+
+        // Loop check to ensure uniqueness (handling race conditions or gaps)
+        while (customerRepository.existsByCustomerCode(newCode)) {
+            log.warn("Mã {} đã tồn tại, đang thử mã tiếp theo...", newCode);
+            nextNumber++;
+            if (nextNumber > 999999) {
+                throw new CustomerValidationException("customerCode", "Đã hết mã khách hàng có thể tạo (KH999999)");
+            }
+            newCode = String.format("KH%06d", nextNumber);
+        }
+
+        return newCode;
     }
 
     /**
@@ -240,7 +255,7 @@ public class CustomerService {
 
             // Lấy Customer từ user_id và cập nhật customerCode, address
             Customer existingCustomer = customerRepository.findByUser_UserId(savedUser.getUserId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy customer record"));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy customer record"));
 
             existingCustomer.setCustomerCode(customerCode);
             existingCustomer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
@@ -555,12 +570,12 @@ public class CustomerService {
         // Map các field của User cần thêm prefix "user."
         String sortField = request.getSortBy();
         if ("name".equals(sortField) || "email".equals(sortField) ||
-            "phone".equals(sortField) || "createdAt".equals(sortField) ||
-            "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
-            "gender".equals(sortField)) {
+                "phone".equals(sortField) || "createdAt".equals(sortField) ||
+                "updatedAt".equals(sortField) || "dateOfBirth".equals(sortField) ||
+                "gender".equals(sortField)) {
             sortField = "user." + sortField;
         } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
-                   "customerCode".equals(sortField) || "customerId".equals(sortField)) {
+                "customerCode".equals(sortField) || "customerId".equals(sortField)) {
             // Các field này thuộc Customer, giữ nguyên
         } else {
             // Mặc định sort theo user.createdAt nếu field không hợp lệ
@@ -584,7 +599,8 @@ public class CustomerService {
             }
         } else if (request.getCustomerType() != null) {
             // Filter by customer type only
-            customers = customerRepository.findByCustomerTypeAndUser_IsDeletedFalse(request.getCustomerType(), pageable);
+            customers = customerRepository.findByCustomerTypeAndUser_IsDeletedFalse(request.getCustomerType(),
+                    pageable);
         } else {
             // Get all customers
             customers = customerRepository.findAllByUser_IsDeletedFalse(pageable);
@@ -611,11 +627,11 @@ public class CustomerService {
         // Map các field của User cần thêm prefix "user."
         String sortField = request.getSortBy();
         if ("name".equals(sortField) || "email".equals(sortField) ||
-            "phone".equals(sortField) || "createdAt".equals(sortField) ||
-            "updatedAt".equals(sortField)) {
+                "phone".equals(sortField) || "createdAt".equals(sortField) ||
+                "updatedAt".equals(sortField)) {
             sortField = "user." + sortField;
         } else if ("customerType".equals(sortField) || "address".equals(sortField) ||
-                   "customerCode".equals(sortField)) {
+                "customerCode".equals(sortField)) {
             // Các field này thuộc Customer, giữ nguyên
         } else {
             // Mặc định sort theo user.createdAt nếu field không hợp lệ

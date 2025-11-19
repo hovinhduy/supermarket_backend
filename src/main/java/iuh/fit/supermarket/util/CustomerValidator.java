@@ -14,19 +14,17 @@ public class CustomerValidator {
 
     // Regex patterns
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
-        "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-    );
-    
+            "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+
     private static final Pattern PHONE_PATTERN = Pattern.compile(
-        "^[0-9+\\-\\s()]{10,20}$"
-    );
-    
+            "^\\d{10}$");
+
     private static final Pattern VIETNAMESE_PHONE_PATTERN = Pattern.compile(
-        "^(\\+84|84|0)(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9])[0-9]{7}$"
-    );
+            "^(\\+84|84|0)(3[2-9]|5[6|8|9]|7[0|6-9]|8[1-6|8|9]|9[0-4|6-9])[0-9]{7}$");
 
     /**
      * Validate email format
+     * 
      * @param email email cần validate
      * @return true nếu email hợp lệ
      */
@@ -39,19 +37,22 @@ public class CustomerValidator {
 
     /**
      * Validate phone number format
+     * 
      * @param phone số điện thoại cần validate
-     * @return true nếu số điện thoại hợp lệ
+     * @return true nếu số điện thoại hợp lệ (chỉ 10 số)
      */
     public boolean isValidPhone(String phone) {
         if (phone == null || phone.trim().isEmpty()) {
             return true; // Phone is optional
         }
-        String cleanPhone = phone.replaceAll("\\s+", "");
+        // Remove non-digit characters
+        String cleanPhone = phone.replaceAll("[^0-9]", "");
         return PHONE_PATTERN.matcher(cleanPhone).matches();
     }
 
     /**
      * Validate Vietnamese phone number format
+     * 
      * @param phone số điện thoại cần validate
      * @return true nếu số điện thoại Việt Nam hợp lệ
      */
@@ -65,6 +66,7 @@ public class CustomerValidator {
 
     /**
      * Validate customer name
+     * 
      * @param name tên khách hàng
      * @return true nếu tên hợp lệ
      */
@@ -78,6 +80,7 @@ public class CustomerValidator {
 
     /**
      * Validate date of birth
+     * 
      * @param dateOfBirth ngày sinh
      * @return true nếu ngày sinh hợp lệ
      */
@@ -85,14 +88,14 @@ public class CustomerValidator {
         if (dateOfBirth == null) {
             return true; // Date of birth is optional
         }
-        
+
         LocalDate now = LocalDate.now();
-        
+
         // Check if date is in the past
         if (!dateOfBirth.isBefore(now)) {
             return false;
         }
-        
+
         // Check if age is reasonable (between 0 and 150 years)
         int age = Period.between(dateOfBirth, now).getYears();
         return age >= 0 && age <= 150;
@@ -100,6 +103,7 @@ public class CustomerValidator {
 
     /**
      * Validate password strength
+     * 
      * @param password mật khẩu cần validate
      * @return true nếu mật khẩu đủ mạnh
      */
@@ -107,22 +111,23 @@ public class CustomerValidator {
         if (password == null || password.isEmpty()) {
             return false;
         }
-        
+
         // At least 6 characters
         if (password.length() < 6) {
             return false;
         }
-        
+
         // At most 50 characters
         if (password.length() > 50) {
             return false;
         }
-        
+
         return true;
     }
 
     /**
      * Validate password strength (advanced)
+     * 
      * @param password mật khẩu cần validate
      * @return true nếu mật khẩu đủ mạnh
      */
@@ -130,12 +135,12 @@ public class CustomerValidator {
         if (!isValidPassword(password)) {
             return false;
         }
-        
+
         boolean hasLower = false;
         boolean hasUpper = false;
         boolean hasDigit = false;
         boolean hasSpecial = false;
-        
+
         for (char c : password.toCharArray()) {
             if (Character.isLowerCase(c)) {
                 hasLower = true;
@@ -147,19 +152,24 @@ public class CustomerValidator {
                 hasSpecial = true;
             }
         }
-        
+
         // Require at least 3 out of 4 character types
         int typeCount = 0;
-        if (hasLower) typeCount++;
-        if (hasUpper) typeCount++;
-        if (hasDigit) typeCount++;
-        if (hasSpecial) typeCount++;
-        
+        if (hasLower)
+            typeCount++;
+        if (hasUpper)
+            typeCount++;
+        if (hasDigit)
+            typeCount++;
+        if (hasSpecial)
+            typeCount++;
+
         return typeCount >= 3;
     }
 
     /**
      * Validate address
+     * 
      * @param address địa chỉ cần validate
      * @return true nếu địa chỉ hợp lệ
      */
@@ -172,6 +182,7 @@ public class CustomerValidator {
 
     /**
      * Validate customer age for VIP eligibility
+     * 
      * @param dateOfBirth ngày sinh
      * @return true nếu khách hàng đủ tuổi để trở thành VIP (>= 18)
      */
@@ -179,13 +190,14 @@ public class CustomerValidator {
         if (dateOfBirth == null) {
             return false;
         }
-        
+
         int age = Period.between(dateOfBirth, LocalDate.now()).getYears();
         return age >= 18;
     }
 
     /**
      * Normalize phone number (remove spaces, dashes, parentheses)
+     * 
      * @param phone số điện thoại cần normalize
      * @return số điện thoại đã được normalize
      */
@@ -198,6 +210,7 @@ public class CustomerValidator {
 
     /**
      * Normalize email (trim and lowercase)
+     * 
      * @param email email cần normalize
      * @return email đã được normalize
      */
@@ -210,7 +223,8 @@ public class CustomerValidator {
 
     /**
      * Validate passwords match
-     * @param password mật khẩu
+     * 
+     * @param password        mật khẩu
      * @param confirmPassword xác nhận mật khẩu
      * @return true nếu hai mật khẩu khớp nhau
      */
