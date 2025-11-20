@@ -159,4 +159,93 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
             @Param("toDate") java.time.LocalDate toDate,
             @Param("customerId") Integer customerId
     );
+
+    /**
+     * Đếm số lượng hóa đơn đã thanh toán trong khoảng thời gian (dashboard)
+     *
+     * @param fromDate từ ngày
+     * @param toDate   đến ngày
+     * @return số lượng hóa đơn đã thanh toán
+     */
+    @Query("SELECT COUNT(i) FROM SaleInvoiceHeader i WHERE " +
+                    "i.status = 'PAID' " +
+                    "AND CAST(i.invoiceDate AS DATE) >= :fromDate " +
+                    "AND CAST(i.invoiceDate AS DATE) <= :toDate")
+    long countPaidInvoicesByDateRange(
+                    @Param("fromDate") java.time.LocalDate fromDate,
+                    @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * Tính tổng doanh thu từ hóa đơn đã thanh toán trong khoảng thời gian (dashboard)
+     *
+     * @param fromDate từ ngày
+     * @param toDate   đến ngày
+     * @return tổng doanh thu
+     */
+    @Query("SELECT COALESCE(SUM(i.totalAmount), 0) FROM SaleInvoiceHeader i WHERE " +
+                    "i.status = 'PAID' " +
+                    "AND CAST(i.invoiceDate AS DATE) >= :fromDate " +
+                    "AND CAST(i.invoiceDate AS DATE) <= :toDate")
+    java.math.BigDecimal sumPaidInvoicesTotalByDateRange(
+                    @Param("fromDate") java.time.LocalDate fromDate,
+                    @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * Lấy doanh thu và số lượng hóa đơn theo giờ trong ngày (dashboard chart)
+     * Trả về: [giờ (0-23), tổng doanh thu, số lượng hóa đơn]
+     *
+     * @param date ngày cần xem
+     * @return danh sách [hour, totalRevenue, invoiceCount]
+     */
+    @Query("SELECT FUNCTION('HOUR', i.invoiceDate) as hour, " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalRevenue, " +
+           "COUNT(i) as invoiceCount " +
+           "FROM SaleInvoiceHeader i " +
+           "WHERE i.status = 'PAID' " +
+           "AND CAST(i.invoiceDate AS DATE) = :date " +
+           "GROUP BY FUNCTION('HOUR', i.invoiceDate) " +
+           "ORDER BY FUNCTION('HOUR', i.invoiceDate)")
+    List<Object[]> getRevenueByHourOfDay(@Param("date") java.time.LocalDate date);
+
+    /**
+     * Lấy doanh thu và số lượng hóa đơn theo ngày trong tuần (dashboard chart)
+     * Trả về: [ngày, tổng doanh thu, số lượng hóa đơn]
+     *
+     * @param fromDate từ ngày (thứ 2)
+     * @param toDate đến ngày (hiện tại)
+     * @return danh sách [date, totalRevenue, invoiceCount]
+     */
+    @Query("SELECT CAST(i.invoiceDate AS DATE) as date, " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalRevenue, " +
+           "COUNT(i) as invoiceCount " +
+           "FROM SaleInvoiceHeader i " +
+           "WHERE i.status = 'PAID' " +
+           "AND CAST(i.invoiceDate AS DATE) >= :fromDate " +
+           "AND CAST(i.invoiceDate AS DATE) <= :toDate " +
+           "GROUP BY CAST(i.invoiceDate AS DATE) " +
+           "ORDER BY CAST(i.invoiceDate AS DATE)")
+    List<Object[]> getRevenueByDayOfWeek(
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * Lấy doanh thu và số lượng hóa đơn theo ngày trong tháng (dashboard chart)
+     * Trả về: [ngày, tổng doanh thu, số lượng hóa đơn]
+     *
+     * @param fromDate từ ngày đầu tháng
+     * @param toDate đến ngày hiện tại
+     * @return danh sách [date, totalRevenue, invoiceCount]
+     */
+    @Query("SELECT CAST(i.invoiceDate AS DATE) as date, " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalRevenue, " +
+           "COUNT(i) as invoiceCount " +
+           "FROM SaleInvoiceHeader i " +
+           "WHERE i.status = 'PAID' " +
+           "AND CAST(i.invoiceDate AS DATE) >= :fromDate " +
+           "AND CAST(i.invoiceDate AS DATE) <= :toDate " +
+           "GROUP BY CAST(i.invoiceDate AS DATE) " +
+           "ORDER BY CAST(i.invoiceDate AS DATE)")
+    List<Object[]> getRevenueByDayOfMonth(
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate);
 }

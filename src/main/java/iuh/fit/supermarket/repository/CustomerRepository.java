@@ -50,11 +50,6 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
          * 
          * @return Optional<Customer>
          */
-        /**
-         * Tìm khách hàng có mã lớn nhất để sinh mã mới
-         * 
-         * @return Optional<Customer>
-         */
         Optional<Customer> findTopByCustomerCodeIsNotNullOrderByCustomerCodeDesc();
 
         /**
@@ -215,4 +210,18 @@ public interface CustomerRepository extends JpaRepository<Customer, Integer> {
                         @Param("gender") Gender gender,
                         @Param("customerType") CustomerType customerType,
                         Pageable pageable);
+
+        /**
+         * Đếm số lượng khách hàng mới trong khoảng thời gian (dashboard)
+         *
+         * @param fromDate từ ngày
+         * @param toDate   đến ngày
+         * @return số lượng khách hàng mới
+         */
+        @Query("SELECT COUNT(c) FROM Customer c JOIN c.user u WHERE " +
+                        "u.createdAt >= :fromDate AND u.createdAt < :toDate " +
+                        "AND u.isDeleted = false")
+        long countNewCustomersByDateRange(
+                        @Param("fromDate") java.time.LocalDateTime fromDate,
+                        @Param("toDate") java.time.LocalDateTime toDate);
 }

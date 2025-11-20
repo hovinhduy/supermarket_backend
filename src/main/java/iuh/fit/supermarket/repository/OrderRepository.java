@@ -82,4 +82,32 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
      * @return danh sách đơn hàng có phân trang
      */
     Page<Order> findByCustomerCustomerId(Integer customerId, Pageable pageable);
+
+    /**
+     * Đếm số lượng đơn hàng trong khoảng thời gian (dashboard)
+     *
+     * @param fromDate từ ngày
+     * @param toDate   đến ngày
+     * @return số lượng đơn hàng
+     */
+    @Query("SELECT COUNT(o) FROM Order o WHERE " +
+                    "CAST(o.orderDate AS DATE) >= :fromDate " +
+                    "AND CAST(o.orderDate AS DATE) <= :toDate")
+    long countOrdersByDateRange(
+                    @Param("fromDate") java.time.LocalDate fromDate,
+                    @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * Tính tổng giá trị đơn hàng trong khoảng thời gian (dashboard)
+     *
+     * @param fromDate từ ngày
+     * @param toDate   đến ngày
+     * @return tổng giá trị đơn hàng
+     */
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE " +
+                    "CAST(o.orderDate AS DATE) >= :fromDate " +
+                    "AND CAST(o.orderDate AS DATE) <= :toDate")
+    java.math.BigDecimal sumOrdersTotalByDateRange(
+                    @Param("fromDate") java.time.LocalDate fromDate,
+                    @Param("toDate") java.time.LocalDate toDate);
 }

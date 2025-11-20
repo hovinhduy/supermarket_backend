@@ -111,4 +111,18 @@ public interface ReturnInvoiceHeaderRepository extends JpaRepository<ReturnInvoi
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate
     );
+
+    /**
+     * Đếm số lượng đơn trả hàng trong khoảng thời gian (dashboard)
+     *
+     * @param fromDate từ ngày
+     * @param toDate   đến ngày
+     * @return số lượng đơn trả hàng
+     */
+    @Query("SELECT COUNT(r) FROM ReturnInvoiceHeader r WHERE " +
+                    "CAST(r.returnDate AS DATE) >= :fromDate " +
+                    "AND CAST(r.returnDate AS DATE) <= :toDate")
+    long countReturnsByDateRange(
+                    @Param("fromDate") LocalDate fromDate,
+                    @Param("toDate") LocalDate toDate);
 }
