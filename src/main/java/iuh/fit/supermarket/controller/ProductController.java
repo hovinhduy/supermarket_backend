@@ -103,6 +103,30 @@ public class ProductController {
     }
 
     /**
+     * API tìm kiếm sản phẩm theo barcode
+     */
+    @GetMapping("/barcode/{barcode}")
+    @Operation(summary = "Tìm kiếm sản phẩm theo barcode", description = "Tìm kiếm và trả về thông tin sản phẩm dựa trên mã vạch của đơn vị sản phẩm")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Tìm kiếm thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Mã vạch không hợp lệ"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy sản phẩm với mã vạch này")
+    })
+    public ResponseEntity<ApiResponse<ProductResponse>> getProductByBarcode(
+            @Parameter(description = "Mã vạch sản phẩm", example = "1234567890123") @PathVariable String barcode) {
+        log.info("API tìm kiếm sản phẩm với barcode: {}", barcode);
+
+        try {
+            ProductResponse product = productService.getProductByBarcode(barcode);
+            return ResponseEntity.ok(ApiResponse.success("Tìm thấy sản phẩm", product));
+        } catch (Exception e) {
+            log.error("Lỗi khi tìm kiếm sản phẩm theo barcode: ", e);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+
+    /**
      * API cập nhật thông tin sản phẩm
      */
     @PutMapping("/{id}")

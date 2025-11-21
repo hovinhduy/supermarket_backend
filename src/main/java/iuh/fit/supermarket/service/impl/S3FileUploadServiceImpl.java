@@ -219,4 +219,41 @@ public class S3FileUploadServiceImpl implements S3FileUploadService {
             return Long.parseLong(maxSizeStr);
         }
     }
+
+    /**
+     * Upload byte array lên S3 bucket
+     */
+    @Override
+    public String uploadFile(byte[] fileBytes, String fileName, String contentType, String folder) {
+        log.info("Bắt đầu upload byte array với tên file: {} vào thư mục: {}", fileName, folder);
+
+        if (fileBytes == null || fileBytes.length == 0) {
+            throw new IllegalArgumentException("File bytes không được rỗng");
+        }
+
+        try {
+            // Tạo full path với folder nếu có
+            String fullKey = StringUtils.isEmpty(folder) ? fileName : folder + "/" + fileName;
+
+            PutObjectRequest putObjectRequest = PutObjectRequest
+                    .builder()
+                    .bucket(bucketName)
+                    .key(fullKey)
+                    .contentType(contentType)
+                    .build();
+
+            // Upload file
+            s3Client.putObject(putObjectRequest, RequestBody.fromBytes(fileBytes));
+
+            // Tạo URL công khai
+            String fileUrl = String.format("https://%s.s3.amazonaws.com/%s", bucketName, fullKey);
+
+            log.info("Upload byte array thành công: {}", fileUrl);
+            return fileUrl;
+
+        } catch (Exception e) {
+            log.error("Lỗi S3 khi upload byte array: {}", e.getMessage(), e);
+            throw new RuntimeException("Lỗi S3: " + e.getMessage());
+        }
+    }
 }

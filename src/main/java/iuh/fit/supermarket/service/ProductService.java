@@ -33,6 +33,14 @@ public interface ProductService {
     ProductResponse getProductById(Long id);
 
     /**
+     * Tìm kiếm sản phẩm theo barcode
+     * 
+     * @param barcode mã vạch sản phẩm
+     * @return thông tin sản phẩm
+     */
+    ProductResponse getProductByBarcode(String barcode);
+
+    /**
      * Cập nhật thông tin sản phẩm
      * 
      * @param id      ID sản phẩm

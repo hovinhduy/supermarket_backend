@@ -39,5 +39,16 @@ public interface S3FileUploadService {
      * @return tên file duy nhất
      */
     String generateUniqueFileName(String originalFilename);
+
+    /**
+     * Upload byte array lên S3 bucket
+     * 
+     * @param fileBytes byte array của file
+     * @param fileName tên file
+     * @param contentType loại nội dung (ví dụ: "image/png")
+     * @param folder thư mục trong S3 bucket
+     * @return URL của file đã upload
+     */
+    String uploadFile(byte[] fileBytes, String fileName, String contentType, String folder);
 }
 

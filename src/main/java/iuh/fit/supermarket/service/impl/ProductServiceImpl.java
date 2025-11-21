@@ -47,6 +47,7 @@ public class ProductServiceImpl implements ProductService {
     private final iuh.fit.supermarket.service.PriceService priceService;
     private final iuh.fit.supermarket.repository.ProductUnitImageRepository productUnitImageRepository;
     private final iuh.fit.supermarket.repository.CustomerFavoriteRepository customerFavoriteRepository;
+    private final iuh.fit.supermarket.service.BarcodeService barcodeService;
 
     /**
      * Tạo sản phẩm mới
@@ -142,6 +143,51 @@ public class ProductServiceImpl implements ProductService {
 
         return mapToProductResponse(product);
     }
+
+    /**
+     * Tìm kiếm sản phẩm theo barcode
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public ProductResponse getProductByBarcode(String barcode) {
+        log.debug("Tìm kiếm sản phẩm với barcode: {}", barcode);
+
+        // Validate barcode không được null hoặc empty
+        if (barcode == null || barcode.trim().isEmpty()) {
+            throw new ProductException("Mã vạch không được để trống");
+        }
+
+        String cleanedBarcode = barcode.trim();
+
+        // Tìm ProductUnit theo barcode
+        ProductUnit productUnit = productUnitRepository.findByBarcode(cleanedBarcode)
+                .orElseThrow(() -> new ProductException("Không tìm thấy sản phẩm với mã vạch: " + cleanedBarcode));
+
+        // Kiểm tra ProductUnit không bị xóa và đang hoạt động
+        if (productUnit.getIsDeleted()) {
+            throw new ProductException("Đơn vị sản phẩm với mã vạch này đã bị xóa");
+        }
+
+        if (!productUnit.getIsActive()) {
+            throw new ProductException("Đơn vị sản phẩm với mã vạch này không còn hoạt động");
+        }
+
+        // Lấy Product từ ProductUnit
+        Product product = productUnit.getProduct();
+        
+        // Kiểm tra Product không bị xóa và đang hoạt động
+        if (product.getIsDeleted()) {
+            throw new ProductException("Sản phẩm với mã vạch này đã bị xóa");
+        }
+
+        if (!product.getIsActive()) {
+            throw new ProductException("Sản phẩm với mã vạch này không còn hoạt động");
+        }
+
+        log.info("Tìm thấy sản phẩm ID: {} với barcode: {}", product.getId(), cleanedBarcode);
+        return mapToProductResponse(product);
+    }
+
 
     /**
      * Cập nhật thông tin sản phẩm
@@ -605,11 +651,32 @@ public class ProductServiceImpl implements ProductService {
             throw new ProductException("Không được có đơn vị tính trùng lặp");
         }
 
-        // Kiểm tra barcode không trùng lặp nếu có
+        // Kiểm tra barcode format và không trùng lặp
         for (ProductUnitRequest unitRequest : units) {
             if (unitRequest.barcode() != null && !unitRequest.barcode().trim().isEmpty()) {
-                if (productUnitRepository.existsByBarcode(unitRequest.barcode().trim())) {
-                    throw new ProductException("Mã vạch '" + unitRequest.barcode() + "' đã tồn tại trong hệ thống");
+                String barcode = unitRequest.barcode().trim();
+                
+                // Validate format: 12 hoặc 13 chữ số
+                if (barcode.length() == 12) {
+                    // 12 chữ số: chỉ cần kiểm tra tất cả là số
+                    if (!barcode.matches("\\d{12}")) {
+                        throw new ProductException("Mã vạch 12 chữ số phải chỉ chứa số: " + barcode);
+                    }
+                    // Tạo full barcode với checksum để kiểm tra trùng
+                    barcode = barcode + calculateEAN13Checksum(barcode);
+                    
+                } else if (barcode.length() == 13) {
+                    // 13 chữ số: validate checksum
+                    if (!isValidEAN13(barcode)) {
+                        throw new ProductException("Mã vạch EAN-13 không hợp lệ (checksum sai): " + barcode);
+                    }
+                } else {
+                    throw new ProductException("Mã vạch phải có 12 hoặc 13 chữ số. Nhập: " + barcode);
+                }
+                
+                // Kiểm tra trùng lặp (với full 13 digits)
+                if (productUnitRepository.existsByBarcode(barcode)) {
+                    throw new ProductException("Mã vạch '" + barcode + "' đã tồn tại trong hệ thống");
                 }
             }
         }
@@ -629,12 +696,104 @@ public class ProductServiceImpl implements ProductService {
 
             productUnit.setConversionValue(unitRequest.conversionValue());
             productUnit.setIsBaseUnit(unitRequest.isBaseUnit());
-            productUnit.setBarcode(unitRequest.barcode());
+            
+            // Xử lý barcode
+            String barcodeText = unitRequest.barcode();
+            if (barcodeText != null && !barcodeText.trim().isEmpty()) {
+                barcodeText = barcodeText.trim();
+                
+                // Kiểm tra và xử lý barcode theo độ dài
+                if (barcodeText.length() == 12) {
+                    // 12 chữ số → tự động thêm checksum
+                    if (!barcodeText.matches("\\d{12}")) {
+                        throw new ProductException("Mã vạch 12 chữ số phải chỉ chứa số: " + barcodeText);
+                    }
+                    String checksum = calculateEAN13Checksum(barcodeText);
+                    barcodeText = barcodeText + checksum;
+                    log.debug("Tự động thêm checksum cho barcode: {}", barcodeText);
+                    
+                } else if (barcodeText.length() == 13) {
+                    // 13 chữ số → validate checksum
+                    if (!isValidEAN13(barcodeText)) {
+                        throw new ProductException("Mã vạch EAN-13 không hợp lệ (checksum sai): " + barcodeText);
+                    }
+                } else {
+                    throw new ProductException("Mã vạch phải có 12 hoặc 13 chữ số. Nhập: " + barcodeText);
+                }
+                
+                productUnit.setBarcode(barcodeText);
+            } else {
+                // Không có barcode → để null
+                productUnit.setBarcode(null);
+            }
+            
             productUnit.setIsActive(true);
             productUnit.setIsDeleted(false);
 
-            productUnitRepository.save(productUnit);
+            // Lưu ProductUnit trước để có ID
+            productUnit = productUnitRepository.save(productUnit);
             log.debug("Đã tạo đơn vị sản phẩm cho sản phẩm ID: {}", product.getId());
+            
+            // Chỉ tạo và upload barcode image nếu có barcode text
+            if (barcodeText != null && !barcodeText.isEmpty()) {
+                try {
+                    String barcodeImageUrl = barcodeService.generateBarcodeUrl(
+                        barcodeText, 
+                        com.google.zxing.BarcodeFormat.EAN_13,
+                        "barcodes/products"
+                    );
+                    productUnit.setBarcodeImageUrl(barcodeImageUrl);
+                    productUnitRepository.save(productUnit);
+                    log.info("Đã tạo và upload barcode image EAN-13 cho product unit ID: {}", productUnit.getId());
+                } catch (Exception e) {
+                    log.warn("Không thể tạo barcode image cho product unit ID: {}. Lỗi: {}", 
+                        productUnit.getId(), e.getMessage());
+                    // Không throw exception, chỉ log warning để không làm fail quá trình tạo sản phẩm
+                }
+            }
+        }
+    }
+
+    /**
+     * Tính checksum cho EAN-13
+     * @param code12 12 chữ số đầu của mã EAN-13
+     * @return checksum digit (1 chữ số)
+     */
+    private String calculateEAN13Checksum(String code12) {
+        int sum = 0;
+        for (int i = 0; i < 12; i++) {
+            int digit = Character.getNumericValue(code12.charAt(i));
+            // Nhân với 1 nếu vị trí chẵn (index lẻ), nhân với 3 nếu vị trí lẻ (index chẵn)
+            sum += (i % 2 == 0) ? digit : digit * 3;
+        }
+        
+        int checksum = (10 - (sum % 10)) % 10;
+        return String.valueOf(checksum);
+    }
+
+    /**
+     * Validate EAN-13 barcode format
+     * EAN-13 phải có đúng 13 chữ số và checksum hợp lệ
+     */
+    private boolean isValidEAN13(String barcode) {
+        // Kiểm tra độ dài và chỉ chứa chữ số
+        if (barcode == null || barcode.length() != 13) {
+            return false;
+        }
+        
+        if (!barcode.matches("\\d{13}")) {
+            return false;
+        }
+        
+        // Validate checksum
+        try {
+            String code12 = barcode.substring(0, 12);
+            String expectedChecksum = calculateEAN13Checksum(code12);
+            String providedChecksum = String.valueOf(barcode.charAt(12));
+            
+            return expectedChecksum.equals(providedChecksum);
+        } catch (Exception e) {
+            return false;
         }
     }
 

@@ -38,6 +38,12 @@ public class ProductUnit {
     private String barcode;
 
     /**
+     * URL ảnh barcode trên S3
+     */
+    @Column(name = "barcode_image_url", length = 500)
+    private String barcodeImageUrl;
+
+    /**
      * Tỷ lệ quy đổi so với đơn vị cơ bản
      * Ví dụ: nếu đơn vị cơ bản là "cái" và đơn vị này là "thùng",
      * conversionValue = 24 có nghĩa là 1 thùng = 24 cái
