@@ -2,10 +2,13 @@ package iuh.fit.supermarket.dto.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import iuh.fit.supermarket.enums.CustomerType;
+import iuh.fit.supermarket.enums.Gender;
 import iuh.fit.supermarket.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
 
 /**
  * DTO cho thông tin user hiện tại từ token
@@ -63,22 +66,34 @@ public class UserInfoResponse {
     private String address;
 
     /**
+     * Giới tính
+     */
+    private Gender gender;
+
+    /**
+     * Ngày sinh
+     */
+    private LocalDate dateOfBirth;
+
+    /**
      * Constructor cho Employee
      */
-    public static UserInfoResponse forEmployee(Integer employeeId, String name, String email, UserRole userRole) {
+    public static UserInfoResponse forEmployee(Integer employeeId, String name, String email, UserRole userRole, Gender gender, LocalDate dateOfBirth) {
         UserInfoResponse response = new UserInfoResponse();
         response.setUserType("EMPLOYEE");
         response.setEmployeeId(employeeId);
         response.setName(name);
         response.setEmail(email);
         response.setUserRole(userRole);
+        response.setGender(gender);
+        response.setDateOfBirth(dateOfBirth);
         return response;
     }
 
     /**
      * Constructor cho Customer
      */
-    public static UserInfoResponse forCustomer(Integer customerId, String name, String email, String phone, CustomerType customerType, String address) {
+    public static UserInfoResponse forCustomer(Integer customerId, String name, String email, String phone, CustomerType customerType, String address, Gender gender, LocalDate dateOfBirth) {
         UserInfoResponse response = new UserInfoResponse();
         response.setUserType("CUSTOMER");
         response.setCustomerId(customerId);
@@ -88,6 +103,8 @@ public class UserInfoResponse {
         response.setUserRole(UserRole.CUSTOMER);
         response.setCustomerType(customerType);
         response.setAddress(address);
+        response.setGender(gender);
+        response.setDateOfBirth(dateOfBirth);
         return response;
     }
 }

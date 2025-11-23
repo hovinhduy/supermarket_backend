@@ -367,7 +367,9 @@ public class AuthService {
             employee.getEmployeeId(),
             user.getName(),
             user.getEmail(),
-            user.getUserRole()
+            user.getUserRole(),
+            user.getGender(),
+            user.getDateOfBirth()
         );
     }
 
@@ -396,7 +398,9 @@ public class AuthService {
             user.getEmail(),
             user.getPhone(),
             customer.getCustomerType(),
-            customer.getAddress()
+            customer.getAddress(),
+            user.getGender(),
+            user.getDateOfBirth()
         );
     }
 }
