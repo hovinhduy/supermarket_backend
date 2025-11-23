@@ -248,4 +248,25 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
     List<Object[]> getRevenueByDayOfMonth(
             @Param("fromDate") java.time.LocalDate fromDate,
             @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * Lấy doanh thu và số lượng hóa đơn theo tháng trong năm (dashboard chart)
+     * Trả về: [tháng (1-12), tổng doanh thu, số lượng hóa đơn]
+     *
+     * @param fromDate từ ngày đầu năm
+     * @param toDate đến ngày hiện tại
+     * @return danh sách [month, totalRevenue, invoiceCount]
+     */
+    @Query("SELECT FUNCTION('MONTH', i.invoiceDate) as month, " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalRevenue, " +
+           "COUNT(i) as invoiceCount " +
+           "FROM SaleInvoiceHeader i " +
+           "WHERE i.status = 'PAID' " +
+           "AND CAST(i.invoiceDate AS DATE) >= :fromDate " +
+           "AND CAST(i.invoiceDate AS DATE) <= :toDate " +
+           "GROUP BY FUNCTION('MONTH', i.invoiceDate) " +
+           "ORDER BY FUNCTION('MONTH', i.invoiceDate)")
+    List<Object[]> getRevenueByMonthOfYear(
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate);
 }

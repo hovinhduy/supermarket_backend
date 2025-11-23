@@ -146,6 +146,13 @@ public class DashboardServiceImpl implements DashboardService {
                 details = getRevenueByMonth(fromDate, toDate);
                 break;
 
+            case THIS_YEAR:
+                // Lọc theo năm -> hiển thị theo tháng (1-12)
+                fromDate = today.with(TemporalAdjusters.firstDayOfYear());
+                toDate = today;
+                details = getRevenueByYear(fromDate, toDate);
+                break;
+
             default:
                 // Mặc định là hôm nay
                 fromDate = today;
@@ -324,6 +331,49 @@ public class DashboardServiceImpl implements DashboardService {
             default:
                 return "";
         }
+    }
+
+    /**
+     * Lấy doanh thu theo tháng trong năm (từ tháng 1 đến tháng hiện tại)
+     */
+    private List<RevenueDetailDTO> getRevenueByYear(LocalDate fromDate, LocalDate toDate) {
+        List<Object[]> results = saleInvoiceHeaderRepository.getRevenueByMonthOfYear(fromDate, toDate);
+        
+        // Tạo map để lưu dữ liệu theo tháng
+        Map<Integer, RevenueDetailDTO> revenueMap = new HashMap<>();
+        
+        for (Object[] row : results) {
+            Integer month = (Integer) row[0];
+            BigDecimal revenue = (BigDecimal) row[1];
+            Long count = (Long) row[2];
+            
+            revenueMap.put(month, RevenueDetailDTO.builder()
+                    .label("Tháng " + month)
+                    .revenue(revenue)
+                    .invoiceCount(count)
+                    .build());
+        }
+        
+        // Tạo danh sách đầy đủ 12 tháng, điền 0 cho tháng không có dữ liệu
+        List<RevenueDetailDTO> yearlyRevenue = new ArrayList<>();
+        int currentMonth = toDate.getMonthValue();
+        
+        for (int month = 1; month <= 12; month++) {
+            if (revenueMap.containsKey(month)) {
+                yearlyRevenue.add(revenueMap.get(month));
+            } else {
+                // Chỉ thêm tháng nếu <= tháng hiện tại
+                if (month <= currentMonth) {
+                    yearlyRevenue.add(RevenueDetailDTO.builder()
+                            .label("Tháng " + month)
+                            .revenue(BigDecimal.ZERO)
+                            .invoiceCount(0L)
+                            .build());
+                }
+            }
+        }
+        
+        return yearlyRevenue;
     }
 
     @Override

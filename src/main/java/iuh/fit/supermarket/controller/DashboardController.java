@@ -43,8 +43,9 @@ public class DashboardController {
      * - Nếu period là TODAY hoặc YESTERDAY: trả về doanh thu theo giờ (0-23)
      * - Nếu period là THIS_WEEK: trả về doanh thu theo ngày trong tuần (Thứ 2 - CN)
      * - Nếu period là THIS_MONTH: trả về doanh thu theo ngày trong tháng (từ ngày 1 đến ngày hiện tại)
+     * - Nếu period là THIS_YEAR: trả về doanh thu theo tháng trong năm (Tháng 1-12)
      * 
-     * @param period khoảng thời gian (TODAY, YESTERDAY, THIS_WEEK, THIS_MONTH)
+     * @param period khoảng thời gian (TODAY, YESTERDAY, THIS_WEEK, THIS_MONTH, THIS_YEAR)
      * @return RevenueChartDTO
      */
     @GetMapping("/revenue-chart")

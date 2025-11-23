@@ -24,6 +24,7 @@ public interface DashboardService {
      * - Nếu period là TODAY hoặc YESTERDAY: trả về doanh thu theo giờ (0-23)
      * - Nếu period là THIS_WEEK: trả về doanh thu theo ngày trong tuần (Thứ 2 - CN)
      * - Nếu period là THIS_MONTH: trả về doanh thu theo ngày trong tháng
+     * - Nếu period là THIS_YEAR: trả về doanh thu theo tháng trong năm (Tháng 1-12)
      * 
      * @param period khoảng thời gian cần xem
      * @return RevenueChartDTO chứa dữ liệu biểu đồ
