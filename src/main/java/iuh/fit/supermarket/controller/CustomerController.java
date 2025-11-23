@@ -505,4 +505,34 @@ public class CustomerController {
 
                 return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết hóa đơn thành công", invoice));
         }
+
+        /**
+         * Khách hàng tự cập nhật thông tin cá nhân
+         */
+        @Operation(summary = "Cập nhật thông tin cá nhân", description = "API dành cho khách hàng tự cập nhật thông tin cá nhân của mình. Không cho phép thay đổi loại khách hàng (customerType). Thông tin khách hàng được lấy từ token đăng nhập.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Cập nhật thông tin thành công", content = @Content(schema = @Schema(implementation = CustomerDto.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Dữ liệu không hợp lệ"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Chưa đăng nhập hoặc token không hợp lệ"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Không tìm thấy thông tin khách hàng")
+        })
+        @PutMapping("/my-profile")
+        @PreAuthorize("hasRole('CUSTOMER')")
+        public ResponseEntity<ApiResponse<CustomerDto>> updateMyProfile(
+                        @Valid @RequestBody UpdateMyProfileRequest request) {
+
+                // Lấy username từ SecurityContext
+                String username = org.springframework.security.core.context.SecurityContextHolder
+                                .getContext()
+                                .getAuthentication()
+                                .getName();
+
+                log.info("Khách hàng {} yêu cầu cập nhật thông tin cá nhân", username);
+
+                CustomerDto customer = customerService.updateMyProfile(username, request);
+
+                log.info("Khách hàng {} đã cập nhật thông tin cá nhân thành công", username);
+
+                return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin cá nhân thành công", customer));
+        }
 }

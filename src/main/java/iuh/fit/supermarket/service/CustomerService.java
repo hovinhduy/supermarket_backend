@@ -427,6 +427,71 @@ public class CustomerService {
     }
 
     /**
+     * Khách hàng tự cập nhật thông tin cá nhân
+     * Không cho phép thay đổi customerType (chỉ admin mới được)
+     * 
+     * @param username username (email) của khách hàng từ token (có thể có prefix CUSTOMER:)
+     * @param request  thông tin cập nhật
+     * @return CustomerDto
+     */
+    @Transactional
+    public CustomerDto updateMyProfile(String username, UpdateMyProfileRequest request) {
+        log.info("Khách hàng {} tự cập nhật thông tin cá nhân", username);
+
+        // Validate dữ liệu đầu vào
+        validateUpdateMyProfileRequest(request);
+
+        // Loại bỏ prefix CUSTOMER: nếu có
+        String email = username;
+        if (username.startsWith("CUSTOMER:")) {
+            email = username.substring("CUSTOMER:".length());
+        }
+
+        // Tìm User theo email
+        User existingUser = userRepository.findByEmailAndIsDeletedFalse(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Lấy Customer từ user_id
+        Customer existingCustomer = customerRepository.findByUser_UserId(existingUser.getUserId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+
+        // Normalize dữ liệu
+        String normalizedEmail = customerValidator.normalizeEmail(request.getEmail());
+        String normalizedPhone = customerValidator.normalizePhone(request.getPhone());
+
+        // Kiểm tra email đã tồn tại chưa (ngoại trừ user hiện tại)
+        if (!existingUser.getEmail().equals(normalizedEmail) &&
+                userRepository.existsByEmailAndUserIdNot(normalizedEmail, existingUser.getUserId())) {
+            throw new DuplicateCustomerException("email", normalizedEmail);
+        }
+
+        // Kiểm tra số điện thoại đã tồn tại chưa (ngoại trừ user hiện tại)
+        if (normalizedPhone != null && !normalizedPhone.isEmpty() &&
+                !normalizedPhone.equals(existingUser.getPhone()) &&
+                userRepository.existsByPhoneAndUserIdNot(normalizedPhone, existingUser.getUserId())) {
+            throw new DuplicateCustomerException("phone", normalizedPhone);
+        }
+
+        // Cập nhật thông tin User
+        existingUser.setName(request.getName().trim());
+        existingUser.setEmail(normalizedEmail);
+        existingUser.setPhone(normalizedPhone);
+        existingUser.setGender(request.getGender());
+        existingUser.setDateOfBirth(request.getDateOfBirth());
+
+        userRepository.save(existingUser);
+
+        // Cập nhật thông tin Customer (chỉ address, KHÔNG cho phép thay đổi customerType)
+        existingCustomer.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
+
+        Customer savedCustomer = customerRepository.save(existingCustomer);
+        log.info("Khách hàng {} đã tự cập nhật thông tin cá nhân thành công", username);
+
+        return CustomerDto.fromEntity(savedCustomer);
+    }
+
+
+    /**
      * Xóa mềm khách hàng
      * Sau refactoring: xóa mềm User thay vì Customer
      *
@@ -884,6 +949,32 @@ public class CustomerService {
             throw new CustomerValidationException("address", "Địa chỉ không được vượt quá 255 ký tự");
         }
     }
+
+    /**
+     * Validate UpdateMyProfileRequest (cho khách hàng tự cập nhật)
+     */
+    private void validateUpdateMyProfileRequest(UpdateMyProfileRequest request) {
+        if (!customerValidator.isValidName(request.getName())) {
+            throw new CustomerValidationException("name", "Tên khách hàng không hợp lệ");
+        }
+
+        if (!customerValidator.isValidEmail(request.getEmail())) {
+            throw new CustomerValidationException("email", "Email không đúng định dạng");
+        }
+
+        if (request.getPhone() != null && !customerValidator.isValidPhone(request.getPhone())) {
+            throw new CustomerValidationException("phone", "Số điện thoại không đúng định dạng");
+        }
+
+        if (!customerValidator.isValidDateOfBirth(request.getDateOfBirth())) {
+            throw new CustomerValidationException("dateOfBirth", "Ngày sinh không hợp lệ");
+        }
+
+        if (!customerValidator.isValidAddress(request.getAddress())) {
+            throw new CustomerValidationException("address", "Địa chỉ không được vượt quá 255 ký tự");
+        }
+    }
+
 
     /**
      * Validate CustomerAdvancedSearchRequest

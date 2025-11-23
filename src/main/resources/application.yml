@@ -101,12 +101,14 @@ product:
     max-size: 5MB
     allowed-types: image/jpeg,image/png,image/gif,image/webp
     max-count: 5
-#Cấu hình aws
+#Cấu hình Cloudflare R2 (tương thích với S3 API)
 aws:
   accessKeyId: ${ACCESS_KEY_ID}
   secretAccessKey: ${SECRET_ACCESS_KEY}
-  region: ap-southeast-1
+  region: auto
   bucketName: ${BUCKET_NAME}
+  apiEndpoint: ${R2_API_ENDPOINT}
+  publicUrl: ${R2_PUBLIC_URL}
 
 # Cấu hình PayOS
 payos:

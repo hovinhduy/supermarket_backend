@@ -32,6 +32,10 @@ public class S3FileUploadServiceImpl implements S3FileUploadService {
     @Value("${aws.bucketName}")
     private String bucketName;
 
+    // Public URL để tạo link truy cập file (VD: https://pub-xxx.r2.dev)
+    @Value("${aws.publicUrl}")
+    private String publicUrl;
+
     @Value("${product.image.max-size:5MB}")
     private String maxFileSize;
 
@@ -69,8 +73,9 @@ public class S3FileUploadServiceImpl implements S3FileUploadService {
             // Upload file
             s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
 
-            // Tạo URL công khai
-            String fileUrl = String.format("https://%s.s3.amazonaws.com/%s", bucketName, fileName);
+            // Tạo URL công khai cho Cloudflare R2
+            // Format: https://<endpoint>/<bucket>/<key>
+            String fileUrl = generateR2PublicUrl(fileName);
 
             log.info("Upload file thành công: {}", fileUrl);
             return fileUrl;
@@ -199,6 +204,18 @@ public class S3FileUploadServiceImpl implements S3FileUploadService {
     }
 
     /**
+     * Tạo public URL cho Cloudflare R2
+     * 
+     * @param key Object key trong bucket
+     * @return Public URL để truy cập file
+     */
+    private String generateR2PublicUrl(String key) {
+        // Format: https://<r2-public-endpoint>/<key>
+        // Ví dụ: https://pub-xxx.r2.dev/product_image.png
+        return String.format("%s/%s", publicUrl, key);
+    }
+
+    /**
      * Parse max file size string thành bytes
      */
     private long parseMaxFileSize(String maxSizeStr) {
@@ -245,8 +262,8 @@ public class S3FileUploadServiceImpl implements S3FileUploadService {
             // Upload file
             s3Client.putObject(putObjectRequest, RequestBody.fromBytes(fileBytes));
 
-            // Tạo URL công khai
-            String fileUrl = String.format("https://%s.s3.amazonaws.com/%s", bucketName, fullKey);
+            // Tạo URL công khai cho Cloudflare R2
+            String fileUrl = generateR2PublicUrl(fullKey);
 
             log.info("Upload byte array thành công: {}", fileUrl);
             return fileUrl;
