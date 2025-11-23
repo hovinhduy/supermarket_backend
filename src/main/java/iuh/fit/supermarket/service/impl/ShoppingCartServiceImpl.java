@@ -55,7 +55,7 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
          * Lấy giỏ hàng của khách hàng
          */
         @Override
-        @Transactional(readOnly = true)
+        @Transactional
         public CartResponse getCart(Integer customerId) {
                 log.info("Lấy giỏ hàng cho khách hàng ID: {}", customerId);
 
