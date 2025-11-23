@@ -58,6 +58,11 @@ public class UserInfoResponse {
     private CustomerType customerType;
 
     /**
+     * Địa chỉ khách hàng - chỉ có cho customer
+     */
+    private String address;
+
+    /**
      * Constructor cho Employee
      */
     public static UserInfoResponse forEmployee(Integer employeeId, String name, String email, UserRole userRole) {
@@ -73,7 +78,7 @@ public class UserInfoResponse {
     /**
      * Constructor cho Customer
      */
-    public static UserInfoResponse forCustomer(Integer customerId, String name, String email, String phone, CustomerType customerType) {
+    public static UserInfoResponse forCustomer(Integer customerId, String name, String email, String phone, CustomerType customerType, String address) {
         UserInfoResponse response = new UserInfoResponse();
         response.setUserType("CUSTOMER");
         response.setCustomerId(customerId);
@@ -82,6 +87,7 @@ public class UserInfoResponse {
         response.setPhone(phone);
         response.setUserRole(UserRole.CUSTOMER);
         response.setCustomerType(customerType);
+        response.setAddress(address);
         return response;
     }
 }

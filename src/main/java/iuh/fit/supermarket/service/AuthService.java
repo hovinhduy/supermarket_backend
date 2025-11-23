@@ -395,7 +395,8 @@ public class AuthService {
             user.getName(),
             user.getEmail(),
             user.getPhone(),
-            customer.getCustomerType()
+            customer.getCustomerType(),
+            customer.getAddress()
         );
     }
 }
