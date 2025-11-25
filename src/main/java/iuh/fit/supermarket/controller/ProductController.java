@@ -214,9 +214,10 @@ public class ProductController {
     public ResponseEntity<ApiResponse<ProductListResponse>> getProducts(
             @Valid @RequestBody ProductPageableRequest request) {
         log.info(
-                "API lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, page={}, size={}",
+                "API lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, hasPrice={}, hasStock={}, page={}, size={}",
                 request.getSearchTerm(), request.getCategoryId(), request.getBrandId(),
-                request.getIsActive(), request.getIsRewardPoint(), request.getPage(), request.getSize());
+                request.getIsActive(), request.getIsRewardPoint(), request.getHasPrice(), request.getHasStock(),
+                request.getPage(), request.getSize());
 
         try {
             // Lấy customerId nếu user là customer (để check favorite)
@@ -231,6 +232,8 @@ public class ProductController {
                     request.getBrandId(),
                     request.getIsActive(),
                     request.getIsRewardPoint(),
+                    request.getHasPrice(),
+                    request.getHasStock(),
                     customerId,
                     pageable);
             return ResponseEntity.ok(ApiResponse.success(products));

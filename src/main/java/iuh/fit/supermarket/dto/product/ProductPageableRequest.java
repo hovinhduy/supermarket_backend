@@ -66,6 +66,18 @@ public class ProductPageableRequest {
     private Boolean isRewardPoint;
 
     /**
+     * Lọc sản phẩm có bảng giá
+     */
+    @Schema(description = "Lọc sản phẩm có bảng giá ACTIVE (true: có bảng giá, false: không có, null: tất cả)", example = "true")
+    private Boolean hasPrice;
+
+    /**
+     * Lọc sản phẩm có trong kho
+     */
+    @Schema(description = "Lọc sản phẩm có trong kho (true: có tồn kho > 0, false: không có hoặc = 0, null: tất cả)", example = "true")
+    private Boolean hasStock;
+
+    /**
      * Danh sách sắp xếp
      */
     @Schema(description = "Danh sách các trường sắp xếp")
@@ -131,6 +143,26 @@ public class ProductPageableRequest {
     @JsonIgnore
     public boolean hasRewardPointFilter() {
         return isRewardPoint != null;
+    }
+
+    /**
+     * Kiểm tra có lọc theo bảng giá không
+     *
+     * @return true nếu có lọc theo bảng giá
+     */
+    @JsonIgnore
+    public boolean hasPriceFilter() {
+        return hasPrice != null;
+    }
+
+    /**
+     * Kiểm tra có lọc theo tồn kho không
+     *
+     * @return true nếu có lọc theo tồn kho
+     */
+    @JsonIgnore
+    public boolean hasStockFilter() {
+        return hasStock != null;
     }
 
     /**

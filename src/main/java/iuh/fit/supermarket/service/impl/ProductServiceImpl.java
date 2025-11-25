@@ -346,11 +346,13 @@ public class ProductServiceImpl implements ProductService {
             Integer brandId,
             Boolean isActive,
             Boolean isRewardPoint,
+            Boolean hasPrice,
+            Boolean hasStock,
             Integer customerId,
             Pageable pageable) {
         log.debug(
-                "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, customerId={}",
-                searchTerm, categoryId, brandId, isActive, isRewardPoint, customerId);
+                "Lấy danh sách sản phẩm với filter: searchTerm={}, categoryId={}, brandId={}, isActive={}, isRewardPoint={}, hasPrice={}, hasStock={}, customerId={}",
+                searchTerm, categoryId, brandId, isActive, isRewardPoint, hasPrice, hasStock, customerId);
 
         // Sử dụng query với đầy đủ các filter
         String searchTermClean = (searchTerm != null && !searchTerm.trim().isEmpty()) ? searchTerm.trim() : "";
@@ -360,6 +362,8 @@ public class ProductServiceImpl implements ProductService {
                 brandId,
                 isActive,
                 isRewardPoint,
+                hasPrice,
+                hasStock,
                 pageable);
 
         return mapToProductListResponse(productPage, customerId);

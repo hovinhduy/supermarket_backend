@@ -37,20 +37,28 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         /**
          * Tìm kiếm sản phẩm nâng cao với filtering
          * Tìm kiếm theo tên sản phẩm hoặc mã sản phẩm
-         * Lọc theo danh mục, thương hiệu, trạng thái hoạt động và tích điểm thưởng
+         * Lọc theo danh mục, thương hiệu, trạng thái hoạt động, tích điểm thưởng, bảng giá và tồn kho
          */
-        @Query("SELECT p FROM Product p WHERE " +
+        @Query("SELECT DISTINCT p FROM Product p WHERE " +
                         "(:searchTerm = '' OR (p.name LIKE %:searchTerm% OR p.code LIKE %:searchTerm%)) AND " +
                         "(:categoryId IS NULL OR p.category.categoryId = :categoryId) AND " +
                         "(:brandId IS NULL OR p.brand.brandId = :brandId) AND " +
                         "(:isActive IS NULL OR p.isActive = :isActive) AND " +
                         "(:isRewardPoint IS NULL OR p.isRewardPoint = :isRewardPoint) AND " +
+                        "(:hasPrice IS NULL OR " +
+                        "   (:hasPrice = true AND EXISTS (SELECT 1 FROM ProductUnit pu JOIN PriceDetail pd ON pd.productUnit.id = pu.id WHERE pu.product.id = p.id AND pd.price.status = iuh.fit.supermarket.enums.PriceType.ACTIVE)) OR " +
+                        "   (:hasPrice = false AND NOT EXISTS (SELECT 1 FROM ProductUnit pu JOIN PriceDetail pd ON pd.productUnit.id = pu.id WHERE pu.product.id = p.id AND pd.price.status = iuh.fit.supermarket.enums.PriceType.ACTIVE))) AND " +
+                        "(:hasStock IS NULL OR " +
+                        "   (:hasStock = true AND EXISTS (SELECT 1 FROM ProductUnit pu JOIN Warehouse w ON w.productUnit.id = pu.id WHERE pu.product.id = p.id AND w.quantityOnHand > 0)) OR " +
+                        "   (:hasStock = false AND NOT EXISTS (SELECT 1 FROM ProductUnit pu JOIN Warehouse w ON w.productUnit.id = pu.id WHERE pu.product.id = p.id AND w.quantityOnHand > 0))) AND " +
                         "p.isDeleted = false")
         Page<Product> findProductsAdvanced(@Param("searchTerm") String searchTerm,
                         @Param("categoryId") Integer categoryId,
                         @Param("brandId") Integer brandId,
                         @Param("isActive") Boolean isActive,
                         @Param("isRewardPoint") Boolean isRewardPoint,
+                        @Param("hasPrice") Boolean hasPrice,
+                        @Param("hasStock") Boolean hasStock,
                         Pageable pageable);
 
         /**
