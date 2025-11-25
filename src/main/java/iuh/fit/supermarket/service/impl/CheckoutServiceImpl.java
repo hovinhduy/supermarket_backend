@@ -1068,14 +1068,14 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Xác định cách lấy dữ liệu dựa trên các tham số
         if (status == null && deliveryType == null) {
-            // Lấy tất cả đơn hàng
-            orderPage = orderRepository.findAll(pageable);
+            // Lấy tất cả đơn hàng trừ UNPAID (chưa thanh toán)
+            orderPage = orderRepository.findByStatusNot(OrderStatus.UNPAID, pageable);
         } else if (status != null && deliveryType == null) {
             // Lọc theo trạng thái
             orderPage = orderRepository.findByStatus(status, pageable);
         } else if (status == null && deliveryType != null) {
-            // Lọc theo loại hình nhận hàng
-            orderPage = orderRepository.findByDeliveryType(deliveryType, pageable);
+            // Lọc theo loại hình nhận hàng, loại trừ UNPAID
+            orderPage = orderRepository.findByStatusNotAndDeliveryType(OrderStatus.UNPAID, deliveryType, pageable);
         } else {
             // Lọc theo cả trạng thái và loại hình nhận hàng
             orderPage = orderRepository.findByStatusAndDeliveryType(status, deliveryType, pageable);

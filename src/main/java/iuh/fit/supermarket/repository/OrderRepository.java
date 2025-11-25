@@ -66,6 +66,25 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findByStatusAndDeliveryType(OrderStatus status, DeliveryType deliveryType, Pageable pageable);
 
     /**
+     * Lấy danh sách đơn hàng loại trừ một trạng thái với phân trang
+     *
+     * @param status trạng thái đơn hàng cần loại trừ
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng loại trừ trạng thái đã chỉ định có phân trang
+     */
+    Page<Order> findByStatusNot(OrderStatus status, Pageable pageable);
+
+    /**
+     * Lấy danh sách đơn hàng loại trừ một trạng thái và lọc theo loại hình nhận hàng với phân trang
+     *
+     * @param status trạng thái đơn hàng cần loại trừ
+     * @param deliveryType loại hình nhận hàng
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return danh sách đơn hàng có phân trang
+     */
+    Page<Order> findByStatusNotAndDeliveryType(OrderStatus status, DeliveryType deliveryType, Pageable pageable);
+
+    /**
      * Lấy mã đơn hàng cuối cùng theo ngày
      *
      * @param datePattern pattern ngày tháng (yyyyMMdd)
