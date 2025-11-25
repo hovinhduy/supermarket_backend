@@ -7,6 +7,7 @@ import iuh.fit.supermarket.enums.InvoiceStatus;
 import iuh.fit.supermarket.enums.PaymentMethod;
 import iuh.fit.supermarket.exception.InsufficientStockException;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
+import iuh.fit.supermarket.exception.NotFoundException;
 import iuh.fit.supermarket.repository.*;
 import iuh.fit.supermarket.service.InvoiceService;
 import iuh.fit.supermarket.service.InvoicePdfService;
@@ -191,19 +192,21 @@ public class SaleServiceImpl implements SaleService {
 
         BigDecimal changeAmount = isCashPayment ? request.amountPaid().subtract(totalAmount) : BigDecimal.ZERO;
 
-        // Tạo payment link nếu ONLINE
+        // Xử lý thanh toán ONLINE
+        Long paymentOrderCode = null;
         String paymentUrl = null;
         String qrCode = null;
-        Long paymentOrderCode = null;
 
-        if (isOnlinePayment) {
-            // Sử dụng invoiceId làm orderCode cho payment
-            paymentOrderCode = invoice.getInvoiceId().longValue();
+        if (!isCashPayment) {
+             // Sử dụng invoiceId làm orderCode cho payment, thêm prefix 2 tỷ để phân biệt với Order
+             // 1xxxxxxxxx: Order
+             // 2xxxxxxxxx: Invoice
+             paymentOrderCode = 2000000000L + invoice.getInvoiceId();
 
-            List<PaymentService.PaymentItemData> paymentItems = request.items().stream()
+             List<PaymentService.PaymentItemData> paymentItems = request.items().stream()
                     .map(item -> {
                         ProductUnit productUnit = productUnitRepository.findById(item.productUnitId())
-                                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy sản phẩm"));
+                                .orElseThrow(() -> new NotFoundException("Không tìm thấy sản phẩm"));
                         return new PaymentService.PaymentItemData(
                                 productUnit.getProduct().getName() + " - " + productUnit.getUnit().getName(),
                                 item.quantity(),

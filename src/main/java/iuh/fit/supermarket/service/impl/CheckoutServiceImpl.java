@@ -252,14 +252,16 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         if (order.getPaymentMethod() == PaymentMethod.ONLINE) {
             try {
-                // Sử dụng orderId làm orderCode cho payment
-                Long paymentOrderCode = order.getOrderId();
+                // Sử dụng orderId làm orderCode cho payment, thêm prefix 1 tỷ để phân biệt với Invoice
+                // 1xxxxxxxxx: Order
+                // 2xxxxxxxxx: Invoice
+                Long paymentOrderCode = 1000000000L + order.getOrderId();
 
                 // Chuyển đổi orderDetails sang PaymentItemData
                 List<iuh.fit.supermarket.service.PaymentService.PaymentItemData> paymentItems = orderDetails.stream()
                         .map(detail -> new iuh.fit.supermarket.service.PaymentService.PaymentItemData(
                                 detail.getProductUnit().getProduct().getName() + " - " +
-                                        detail.getProductUnit().getUnit().getName(),
+                                detail.getProductUnit().getUnit().getName(),
                                 detail.getQuantity(),
                                 detail.getPriceAtPurchase().intValue()))
                         .toList();
@@ -283,10 +285,6 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Tạo response
         return buildCheckoutResponse(order, orderDetails, paymentUrl, qrCode);
     }
-
-    /**
-     * Thực hiện checkout giỏ hàng và tạo đơn hàng (deprecated)
-     */
     @Override
     @Transactional
     @Deprecated

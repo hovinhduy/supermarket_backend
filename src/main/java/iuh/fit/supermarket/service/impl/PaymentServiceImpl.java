@@ -2,15 +2,12 @@ package iuh.fit.supermarket.service.impl;
 
 import iuh.fit.supermarket.config.PayOSConfig;
 import iuh.fit.supermarket.entity.Order;
-import iuh.fit.supermarket.entity.SaleInvoiceHeader;
-import iuh.fit.supermarket.enums.InvoiceStatus;
 import iuh.fit.supermarket.enums.OrderStatus;
 import iuh.fit.supermarket.exception.InvalidSaleDataException;
 import iuh.fit.supermarket.exception.NotFoundException;
 import iuh.fit.supermarket.repository.OrderRepository;
 import iuh.fit.supermarket.repository.SaleInvoiceHeaderRepository;
 import iuh.fit.supermarket.service.PaymentService;
-import iuh.fit.supermarket.service.WarehouseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,7 +33,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final PayOSConfig payOSConfig;
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final OrderRepository orderRepository;
-    private final WarehouseService warehouseService;
     
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
@@ -115,66 +111,44 @@ public class PaymentServiceImpl implements PaymentService {
     public void handlePaymentWebhook(Long orderCode, String transactionId) {
         log.info("Xử lý webhook thanh toán cho orderCode: {}, transactionId: {}", orderCode, transactionId);
         
-        // Bước 0: Extract ID gốc nếu orderCode có timestamp suffix (>= 1000000)
-        Long originalOrderCode = extractOriginalOrderCode(orderCode);
-        if (!originalOrderCode.equals(orderCode)) {
-            log.info("OrderCode {} được extract từ orderCode có timestamp suffix: {}", originalOrderCode, orderCode);
-        }
-        
-        // Bước 1: Kiểm tra xem orderCode có phải là Order không (thử cả original và modified)
-        boolean isOrder = orderRepository.existsById(orderCode) || 
-                          orderRepository.existsById(originalOrderCode);
-        
-        if (isOrder) {
-            // Xử lý như Order - ưu tiên dùng originalOrderCode
-            Long actualOrderId = orderRepository.existsById(originalOrderCode) ? originalOrderCode : orderCode;
-            log.info("OrderCode {} là Order (ID thực tế: {}), xử lý thanh toán đơn hàng", orderCode, actualOrderId);
-            handleOrderPayment(actualOrderId, transactionId);
+        // Xác định loại đơn hàng dựa trên prefix
+        if (orderCode >= 2000000000L) {
+            // Invoice
+            Long invoiceId = orderCode - 2000000000L;
+            log.info("OrderCode {} là Invoice (ID thực tế: {}), xử lý thanh toán hóa đơn", orderCode, invoiceId);
+            handleInvoicePayment(invoiceId);
+            return;
+        } else if (orderCode >= 1000000000L) {
+            // Order
+            Long orderId = orderCode - 1000000000L;
+            log.info("OrderCode {} là Order (ID thực tế: {}), xử lý thanh toán đơn hàng", orderCode, orderId);
+            handleOrderPayment(orderId, transactionId);
             return;
         }
         
-        // Bước 2: Kiểm tra xem orderCode có phải là Invoice không (thử cả original và modified)
-        boolean isInvoice = saleInvoiceHeaderRepository.existsById(orderCode.intValue()) || 
-                            saleInvoiceHeaderRepository.existsById(originalOrderCode.intValue());
+        // Fallback cho code cũ (không có prefix)
+        log.warn("OrderCode {} không có prefix chuẩn, thử tìm trong cả 2 bảng", orderCode);
         
-        if (isInvoice) {
-            // Xử lý như Invoice - ưu tiên dùng originalOrderCode
-            Long actualInvoiceId = saleInvoiceHeaderRepository.existsById(originalOrderCode.intValue()) ? 
-                                   originalOrderCode : orderCode;
-            log.info("OrderCode {} là Invoice (ID thực tế: {}), xử lý thanh toán hóa đơn", orderCode, actualInvoiceId);
-            handleInvoicePayment(actualInvoiceId);
+        // Kiểm tra xem orderCode có phải là Invoice không
+        if (saleInvoiceHeaderRepository.existsById(orderCode.intValue())) {
+             log.info("OrderCode {} tìm thấy trong Invoice, xử lý thanh toán hóa đơn", orderCode);
+             handleInvoicePayment(orderCode);
+             return;
+        }
+        
+        // Kiểm tra xem orderCode có phải là Order không
+        if (orderRepository.existsById(orderCode)) {
+            log.info("OrderCode {} tìm thấy trong Order, xử lý thanh toán đơn hàng", orderCode);
+            handleOrderPayment(orderCode, transactionId);
             return;
         }
         
         // Nếu không tìm thấy cả Order và Invoice
-        log.error("Không tìm thấy Order hoặc Invoice với orderCode: {} (original: {})", orderCode, originalOrderCode);
+        log.error("Không tìm thấy Order hoặc Invoice với orderCode: {}", orderCode);
         throw new NotFoundException("Không tìm thấy đơn hàng hoặc hóa đơn với mã: " + orderCode);
     }
 
-    /**
-     * Extract ID gốc từ orderCode có timestamp suffix
-     * Logic:
-     * - Nếu orderCode tồn tại trực tiếp trong DB => không có timestamp, trả về orderCode
-     * - Nếu không, thử extract: orderCode / 1000000 (chỉ khi orderCode > 1000000)
-     */
-    private Long extractOriginalOrderCode(Long orderCode) {
-        // Kiểm tra xem orderCode có tồn tại trực tiếp không
-        boolean existsAsOrder = orderRepository.existsById(orderCode);
-        boolean existsAsInvoice = saleInvoiceHeaderRepository.existsById(orderCode.intValue());
-        
-        if (existsAsOrder || existsAsInvoice) {
-            // OrderCode tồn tại trực tiếp => không có timestamp suffix
-            return orderCode;
-        }
-        
-        // Nếu không tồn tại và orderCode > 1000000, thử extract ID gốc
-        if (orderCode > 1000000) {
-            return orderCode / 1000000;
-        }
-        
-        // OrderCode nhỏ và không tồn tại => trả về chính nó (sẽ fail ở bước sau)
-        return orderCode;
-    }
+
 
     /**
      * Xử lý thanh toán cho Order
