@@ -451,8 +451,8 @@ public class CheckoutServiceImpl implements CheckoutService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng"));
 
-        // Chỉ cho phép hủy đơn hàng ở trạng thái PENDING hoặc PREPARED
-        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.PREPARED) {
+        // Không cho phép hủy đơn hàng ở trạng thái COMPLETED hoặc CANCELLED
+        if (order.getStatus() == OrderStatus.COMPLETED || order.getStatus() == OrderStatus.CANCELLED) {
             throw new BadRequestException("Không thể hủy đơn hàng ở trạng thái: " + order.getStatus());
         }
 

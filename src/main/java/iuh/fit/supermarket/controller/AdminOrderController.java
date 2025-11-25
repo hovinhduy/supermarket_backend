@@ -127,16 +127,16 @@ public class AdminOrderController {
         /**
          * API hủy đơn hàng
          * - Admin có thể hủy bất kỳ đơn hàng nào chưa hoàn thành
-         * - Yêu cầu lý do hủy đơn hàng
+         * - Lý do hủy đơn hàng là tùy chọn, nếu không cung cấp sẽ dùng giá trị mặc định
          *
          * @param orderId ID đơn hàng
-         * @param reason  lý do hủy đơn hàng
+         * @param reason  lý do hủy đơn hàng (optional, mặc định: "Không có lý do")
          * @return thông tin đơn hàng sau khi hủy
          */
         @PostMapping("/{orderId}/cancel")
         public ResponseEntity<ApiResponse<CheckoutResponseDTO>> cancelOrder(
                         @PathVariable Long orderId,
-                        @RequestParam String reason) {
+                        @RequestParam(required = false, defaultValue = "Không có lý do") String reason) {
 
                 log.info("Admin hủy đơn hàng ID: {}, Lý do: {}", orderId, reason);
 
