@@ -114,4 +114,14 @@ public interface SaleService {
      */
     SaleInvoiceFullDTO getCustomerInvoiceDetail(String username, Integer invoiceId);
 
+    /**
+     * Xác nhận thanh toán cho hóa đơn
+     * - Cập nhật trạng thái sang PAID
+     * - Trừ kho
+     * - Cập nhật số lượng sử dụng khuyến mãi
+     * 
+     * @param invoiceId ID của hóa đơn
+     */
+    void confirmInvoicePayment(Integer invoiceId);
+
 }

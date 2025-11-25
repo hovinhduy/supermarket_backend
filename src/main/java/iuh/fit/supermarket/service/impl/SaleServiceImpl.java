@@ -768,6 +768,102 @@ public class SaleServiceImpl implements SaleService {
         log.info("Hoàn thành cập nhật usage count cho {} promotion details", processedDetailIds.size());
     }
 
+    @Override
+    @Transactional
+    public void confirmInvoicePayment(Integer invoiceId) {
+        log.info("Xác nhận thanh toán cho Invoice ID: {}", invoiceId);
+
+        // Fetch invoice with details to ensure we have everything for stock deduction
+        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findByIdWithDetails(invoiceId)
+                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy invoice với ID: " + invoiceId));
+
+        if (invoice.getStatus() == InvoiceStatus.PAID) {
+            log.warn("Invoice {} đã ở trạng thái PAID, bỏ qua cập nhật", invoice.getInvoiceNumber());
+            return;
+        }
+
+        if (invoice.getStatus() != InvoiceStatus.UNPAID) {
+            log.warn("Invoice {} không ở trạng thái UNPAID (hiện tại: {}), bỏ qua cập nhật",
+                    invoice.getInvoiceNumber(), invoice.getStatus());
+            return;
+        }
+
+        // Cập nhật trạng thái invoice sang PAID
+        invoice.setStatus(InvoiceStatus.PAID);
+        invoice.setPaidAmount(invoice.getTotalAmount());
+        saleInvoiceHeaderRepository.save(invoice);
+        log.info("Đã cập nhật invoice {} sang PAID", invoice.getInvoiceNumber());
+
+        // Trừ kho cho các sản phẩm trong invoice
+        if (invoice.getInvoiceDetails() != null) {
+            invoice.getInvoiceDetails().forEach(detail -> {
+                try {
+                    warehouseService.stockOut(
+                            detail.getProductUnit().getId(),
+                            detail.getQuantity(),
+                            invoice.getInvoiceNumber(),
+                            "Thanh toán chuyển khoản thành công - Invoice: " + invoice.getInvoiceNumber());
+                } catch (Exception e) {
+                    log.error("Lỗi khi trừ kho cho product unit {}: {}",
+                            detail.getProductUnit().getId(), e.getMessage());
+                    throw new InvalidSaleDataException("Không thể trừ kho cho sản phẩm: " + e.getMessage());
+                }
+            });
+            log.info("Đã trừ kho cho invoice {}", invoice.getInvoiceNumber());
+        }
+
+        // Cập nhật usage count cho khuyến mãi
+        updatePromotionUsageCountForInvoice(invoice);
+    }
+
+    /**
+     * Cập nhật số lượng sử dụng khuyến mãi dựa trên thông tin invoice đã lưu
+     */
+    private void updatePromotionUsageCountForInvoice(SaleInvoiceHeader invoice) {
+        log.info("Cập nhật usage count cho các khuyến mãi của invoice {}", invoice.getInvoiceNumber());
+        java.util.Set<Long> processedDetailIds = new java.util.HashSet<>();
+
+        // 1. Cập nhật usageCount cho khuyến mãi từ items
+        if (invoice.getInvoiceDetails() != null) {
+            for (SaleInvoiceDetail detail : invoice.getInvoiceDetails()) {
+                List<AppliedPromotion> appliedPromotions = appliedPromotionRepository
+                        .findByInvoiceDetail_InvoiceDetailId(detail.getInvoiceDetailId());
+                
+                for (AppliedPromotion ap : appliedPromotions) {
+                    if (ap.getPromotionDetailId() != null && !processedDetailIds.contains(ap.getPromotionDetailId())) {
+                        promotionDetailRepository.findById(ap.getPromotionDetailId()).ifPresent(pDetail -> {
+                            Integer currentCount = pDetail.getUsageCount() != null ? pDetail.getUsageCount() : 0;
+                            pDetail.setUsageCount(currentCount + 1);
+                            promotionDetailRepository.save(pDetail);
+                            log.debug("Đã cập nhật usageCount cho promotion detail ID: {} ({}->{})",
+                                    pDetail.getDetailId(), currentCount, currentCount + 1);
+                        });
+                        processedDetailIds.add(ap.getPromotionDetailId());
+                    }
+                }
+            }
+        }
+
+        // 2. Cập nhật usageCount cho khuyến mãi đơn hàng
+        List<AppliedOrderPromotion> orderPromotions = appliedOrderPromotionRepository
+                .findByInvoice_InvoiceId(invoice.getInvoiceId());
+        
+        for (AppliedOrderPromotion aop : orderPromotions) {
+            if (aop.getPromotionDetailId() != null && !processedDetailIds.contains(aop.getPromotionDetailId())) {
+                promotionDetailRepository.findById(aop.getPromotionDetailId()).ifPresent(pDetail -> {
+                    Integer currentCount = pDetail.getUsageCount() != null ? pDetail.getUsageCount() : 0;
+                    pDetail.setUsageCount(currentCount + 1);
+                    promotionDetailRepository.save(pDetail);
+                    log.debug("Đã cập nhật usageCount cho order promotion detail ID: {} ({}->{})",
+                            pDetail.getDetailId(), currentCount, currentCount + 1);
+                });
+                processedDetailIds.add(aop.getPromotionDetailId());
+            }
+        }
+        
+        log.info("Hoàn thành cập nhật usage count cho {} promotion details (từ webhook)", processedDetailIds.size());
+    }
+
     private String getPaymentMethodText(PaymentMethod method) {
         if (method == null) {
             return "Không xác định";

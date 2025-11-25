@@ -37,6 +37,10 @@ public class PaymentServiceImpl implements PaymentService {
     private final SaleInvoiceHeaderRepository saleInvoiceHeaderRepository;
     private final OrderRepository orderRepository;
     private final WarehouseService warehouseService;
+    
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private iuh.fit.supermarket.service.SaleService saleService;
 
     @Override
     public CreatePaymentLinkResponse createPaymentLink(Long orderCode, BigDecimal amount, String description,
@@ -211,41 +215,7 @@ public class PaymentServiceImpl implements PaymentService {
     private void handleInvoicePayment(Long invoiceId) {
         log.info("Xử lý thanh toán cho Invoice ID: {}", invoiceId);
         
-        // invoiceId được dùng làm orderCode trong payment link
-        SaleInvoiceHeader invoice = saleInvoiceHeaderRepository.findById(invoiceId.intValue())
-                .orElseThrow(() -> new InvalidSaleDataException("Không tìm thấy invoice với ID: " + invoiceId));
-
-        if (invoice.getStatus() == InvoiceStatus.PAID) {
-            log.warn("Invoice {} đã ở trạng thái PAID, bỏ qua cập nhật", invoice.getInvoiceNumber());
-            return;
-        }
-
-        if (invoice.getStatus() != InvoiceStatus.UNPAID) {
-            log.warn("Invoice {} không ở trạng thái UNPAID (hiện tại: {}), bỏ qua cập nhật",
-                    invoice.getInvoiceNumber(), invoice.getStatus());
-            return;
-        }
-
-        // Cập nhật trạng thái invoice sang PAID
-        invoice.setStatus(InvoiceStatus.PAID);
-        invoice.setPaidAmount(invoice.getTotalAmount());
-        saleInvoiceHeaderRepository.save(invoice);
-        log.info("Đã cập nhật invoice {} sang PAID", invoice.getInvoiceNumber());
-
-        // Trừ kho cho các sản phẩm trong invoice
-        invoice.getInvoiceDetails().forEach(detail -> {
-            try {
-                warehouseService.stockOut(
-                        detail.getProductUnit().getId(),
-                        detail.getQuantity(),
-                        invoice.getInvoiceNumber(),
-                        "Thanh toán chuyển khoản thành công - Invoice: " + invoice.getInvoiceNumber());
-            } catch (Exception e) {
-                log.error("Lỗi khi trừ kho cho product unit {}: {}",
-                        detail.getProductUnit().getId(), e.getMessage());
-                throw new InvalidSaleDataException("Không thể trừ kho cho sản phẩm: " + e.getMessage());
-            }
-        });
-        log.info("Đã trừ kho cho invoice {}", invoice.getInvoiceNumber());
+        // Delegate to SaleService to handle business logic (update status, stock, promotions)
+        saleService.confirmInvoicePayment(invoiceId.intValue());
     }
 }
