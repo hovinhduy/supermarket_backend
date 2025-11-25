@@ -220,11 +220,10 @@ public class CheckoutServiceImpl implements CheckoutService {
             }
         }
 
-        // Tính totalAmount = subTotal - lineItemDiscount - orderDiscount + shippingFee
+        // Tính totalAmount = totalPayable + shippingFee
+        // (totalPayable đã bao gồm subTotal - lineItemDiscount - orderDiscount)
         order.setTotalAmount(
-                promotionResponse.summary().subTotal()
-                        .subtract(promotionResponse.summary().lineItemDiscount())
-                        .subtract(promotionResponse.summary().orderDiscount())
+                promotionResponse.summary().totalPayable()
                         .add(order.getShippingFee()));
 
         // Set số tiền khách trả

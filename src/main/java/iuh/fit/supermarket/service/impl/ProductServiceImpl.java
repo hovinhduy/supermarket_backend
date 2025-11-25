@@ -903,6 +903,8 @@ public class ProductServiceImpl implements ProductService {
         // Kiểm tra đã tồn tại ProductUnit với cùng product và unit chưa
         Optional<ProductUnit> existingProductUnit = productUnitRepository.findByProductIdAndUnitId(productId,
                 unit.getId());
+
+        // Nếu đã tồn tại và chưa bị xóa → báo lỗi
         if (existingProductUnit.isPresent() && !existingProductUnit.get().getIsDeleted()) {
             throw new ProductException("Đơn vị tính '" + request.unitName() + "' đã tồn tại cho sản phẩm này");
         }
@@ -915,23 +917,51 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        // Kiểm tra barcode nếu có
-        if (request.barcode() != null && !request.barcode().trim().isEmpty()) {
-            if (productUnitRepository.existsByBarcode(request.barcode().trim())) {
-                throw new ProductException("Mã vạch '" + request.barcode() + "' đã tồn tại");
+        ProductUnit productUnit;
+
+        // Nếu đã tồn tại nhưng đã bị xóa mềm → restore lại
+        if (existingProductUnit.isPresent() && existingProductUnit.get().getIsDeleted()) {
+            productUnit = existingProductUnit.get();
+            log.info("Phát hiện ProductUnit đã bị xóa mềm, đang restore lại cho sản phẩm ID: {}", productId);
+
+            // Kiểm tra barcode nếu có và khác với barcode cũ
+            if (request.barcode() != null && !request.barcode().trim().isEmpty()) {
+                String newBarcode = request.barcode().trim();
+                String oldBarcode = productUnit.getBarcode();
+
+                // Chỉ kiểm tra trùng nếu barcode mới khác barcode cũ
+                if (!newBarcode.equals(oldBarcode)) {
+                    if (productUnitRepository.existsByBarcode(newBarcode)) {
+                        throw new ProductException("Mã vạch '" + request.barcode() + "' đã tồn tại");
+                    }
+                }
             }
+
+            // Cập nhật lại các thuộc tính
+            productUnit.setConversionValue(request.conversionValue());
+            productUnit.setIsBaseUnit(request.isBaseUnit());
+            productUnit.setBarcode(request.barcode());
+            productUnit.setIsActive(true);
+            productUnit.setIsDeleted(false);
+            // Không cần set product và unit vì đã tồn tại
+        } else {
+            // Kiểm tra barcode nếu có (cho trường hợp tạo mới)
+            if (request.barcode() != null && !request.barcode().trim().isEmpty()) {
+                if (productUnitRepository.existsByBarcode(request.barcode().trim())) {
+                    throw new ProductException("Mã vạch '" + request.barcode() + "' đã tồn tại");
+                }
+            }
+
+            // Tạo ProductUnit mới
+            productUnit = new ProductUnit();
+            productUnit.setProduct(product);
+            productUnit.setUnit(unit);
+            productUnit.setConversionValue(request.conversionValue());
+            productUnit.setIsBaseUnit(request.isBaseUnit());
+            productUnit.setBarcode(request.barcode());
+            productUnit.setIsActive(true);
+            productUnit.setIsDeleted(false);
         }
-
-        // Tạo ProductUnit mới
-        ProductUnit productUnit = new ProductUnit();
-        productUnit.setProduct(product);
-        productUnit.setUnit(unit);
-
-        productUnit.setConversionValue(request.conversionValue());
-        productUnit.setIsBaseUnit(request.isBaseUnit());
-        productUnit.setBarcode(request.barcode());
-        productUnit.setIsActive(true);
-        productUnit.setIsDeleted(false);
 
         ProductUnit savedProductUnit = productUnitRepository.save(productUnit);
         log.info("Đã thêm đơn vị sản phẩm cho sản phẩm ID: {}", productId);
