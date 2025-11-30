@@ -185,6 +185,13 @@ public class Order {
     private List<SaleInvoiceHeader> saleInvoices;
 
     /**
+     * Cửa hàng nhận hàng (nếu PICKUP_AT_STORE)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pickup_store_id")
+    private Store pickupStore;
+
+    /**
      * Điểm tích lũy từ đơn hàng này
      */
     @OneToMany(mappedBy = "order", fetch = FetchType.LAZY)

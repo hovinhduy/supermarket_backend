@@ -60,6 +60,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final iuh.fit.supermarket.service.WarehouseService warehouseService;
     private final PromotionDetailRepository promotionDetailRepository;
     private final CustomerAddressRepository customerAddressRepository;
+    private final StoreRepository storeRepository;
 
     /**
      * Thực hiện checkout giỏ hàng cho khách hàng
@@ -127,6 +128,26 @@ public class CheckoutServiceImpl implements CheckoutService {
             // Tính phí vận chuyển
             BigDecimal shippingFee = calculateShippingFee(order.getDeliveryAddress());
             order.setShippingFee(shippingFee);
+        } else if (request.deliveryType() == DeliveryType.PICKUP_AT_STORE) {
+            // Lấy thông tin cửa hàng nhận hàng
+            Store pickupStore = storeRepository.findById(request.storeId())
+                    .orElseThrow(() -> new NotFoundException(
+                            "Không tìm thấy cửa hàng với ID: " + request.storeId()));
+
+            // Kiểm tra cửa hàng còn hoạt động không
+            if (!pickupStore.getIsActive()) {
+                throw new BadRequestException("Cửa hàng này hiện không hoạt động");
+            }
+
+            // Set thông tin cửa hàng nhận hàng
+            order.setPickupStore(pickupStore);
+
+            log.info("Nhận hàng tại cửa hàng: {} - {}",
+                    pickupStore.getStoreName(),
+                    pickupStore.getAddress());
+
+            // Không có phí vận chuyển khi nhận tại cửa hàng
+            order.setShippingFee(BigDecimal.ZERO);
         } else {
             order.setShippingFee(BigDecimal.ZERO);
         }
@@ -992,6 +1013,21 @@ public class CheckoutServiceImpl implements CheckoutService {
         // Tính tổng giảm giá
         BigDecimal totalDiscount = order.getLineItemDiscount().add(order.getOrderDiscount());
 
+        // Build pickup info (nếu PICKUP_AT_STORE)
+        PickupInfoDTO pickupInfo = null;
+        if (order.getDeliveryType() == DeliveryType.PICKUP_AT_STORE && order.getPickupStore() != null) {
+            Store store = order.getPickupStore();
+            pickupInfo = new PickupInfoDTO(
+                    store.getStoreId(),
+                    store.getStoreCode(),
+                    store.getStoreName(),
+                    store.getAddress(),
+                    store.getPhone(),
+                    store.getOpeningTime(),
+                    store.getClosingTime()
+            );
+        }
+
         return new CheckoutResponseDTO(
                 order.getOrderId(),
                 order.getOrderCode(), // Sử dụng orderCode từ database
@@ -1001,6 +1037,7 @@ public class CheckoutServiceImpl implements CheckoutService {
                 order.getTransactionId(),
                 customerInfo,
                 deliveryInfo,
+                pickupInfo,
                 orderItems,
                 order.getSubtotal(),
                 totalDiscount,

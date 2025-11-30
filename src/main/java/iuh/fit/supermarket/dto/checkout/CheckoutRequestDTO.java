@@ -28,6 +28,12 @@ public record CheckoutRequestDTO(
         Long addressId,
 
         /**
+         * ID cửa hàng nhận hàng
+         * Bắt buộc khi chọn nhận hàng tại cửa hàng (PICKUP_AT_STORE)
+         */
+        Long storeId,
+
+        /**
          * Ghi chú đơn hàng
          */
         String orderNote
@@ -39,6 +45,10 @@ public record CheckoutRequestDTO(
         // Validate nếu chọn giao hàng tận nơi thì bắt buộc phải có addressId
         if (deliveryType == DeliveryType.HOME_DELIVERY && addressId == null) {
             throw new IllegalArgumentException("Vui lòng chọn địa chỉ giao hàng từ danh sách địa chỉ đã lưu");
+        }
+        // Validate nếu chọn nhận tại cửa hàng thì bắt buộc phải có storeId
+        if (deliveryType == DeliveryType.PICKUP_AT_STORE && storeId == null) {
+            throw new IllegalArgumentException("Vui lòng chọn cửa hàng nhận hàng");
         }
     }
 }

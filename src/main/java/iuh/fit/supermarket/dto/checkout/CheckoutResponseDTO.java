@@ -52,6 +52,11 @@ public record CheckoutResponseDTO(
         DeliveryInfoDTO deliveryInfo,
 
         /**
+         * Thông tin cửa hàng nhận hàng (nếu PICKUP_AT_STORE)
+         */
+        PickupInfoDTO pickupInfo,
+
+        /**
          * Danh sách sản phẩm trong đơn hàng
          */
         List<OrderItemDTO> orderItems,
