@@ -16,7 +16,7 @@ import java.util.List;
 @Entity
 @Table(name = "customers")
 @Data
-@EqualsAndHashCode(exclude = {"user", "orders", "shoppingCart", "loyaltyPoints", "notifications"})
+@EqualsAndHashCode(exclude = {"user", "orders", "shoppingCart", "loyaltyPoints", "notifications", "addresses"})
 @NoArgsConstructor
 @AllArgsConstructor
 public class Customer {
@@ -86,4 +86,10 @@ public class Customer {
      */
     @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Notification> notifications;
+
+    /**
+     * Danh sách địa chỉ giao hàng của khách hàng
+     */
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<CustomerAddress> addresses;
 }

@@ -22,9 +22,10 @@ public record CheckoutRequestDTO(
         PaymentMethod paymentMethod,
 
         /**
-         * Địa chỉ nhận hàng (bắt buộc nếu chọn giao hàng tận nơi)
+         * ID địa chỉ giao hàng từ danh sách địa chỉ đã lưu của khách hàng
+         * Bắt buộc khi chọn giao hàng tận nơi (HOME_DELIVERY)
          */
-        String deliveryAddress,
+        Long addressId,
 
         /**
          * Ghi chú đơn hàng
@@ -35,11 +36,9 @@ public record CheckoutRequestDTO(
      * Constructor với validation
      */
     public CheckoutRequestDTO {
-        // Validate nếu chọn giao hàng tận nơi thì phải có địa chỉ
-        if (deliveryType == DeliveryType.HOME_DELIVERY) {
-            if (deliveryAddress == null || deliveryAddress.trim().isEmpty()) {
-                throw new IllegalArgumentException("Địa chỉ nhận hàng là bắt buộc khi chọn giao hàng tận nơi");
-            }
+        // Validate nếu chọn giao hàng tận nơi thì bắt buộc phải có addressId
+        if (deliveryType == DeliveryType.HOME_DELIVERY && addressId == null) {
+            throw new IllegalArgumentException("Vui lòng chọn địa chỉ giao hàng từ danh sách địa chỉ đã lưu");
         }
     }
 }

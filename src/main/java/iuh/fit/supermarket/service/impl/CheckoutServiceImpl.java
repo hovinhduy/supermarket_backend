@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.supermarket.dto.checkout.*;
 import iuh.fit.supermarket.entity.*;
+import iuh.fit.supermarket.entity.CustomerAddress;
 import iuh.fit.supermarket.enums.*;
 import iuh.fit.supermarket.exception.BadRequestException;
 import iuh.fit.supermarket.exception.NotFoundException;
@@ -58,6 +59,7 @@ public class CheckoutServiceImpl implements CheckoutService {
     private final AppliedOrderPromotionRepository appliedOrderPromotionRepository;
     private final iuh.fit.supermarket.service.WarehouseService warehouseService;
     private final PromotionDetailRepository promotionDetailRepository;
+    private final CustomerAddressRepository customerAddressRepository;
 
     /**
      * Thực hiện checkout giỏ hàng cho khách hàng
@@ -106,13 +108,25 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         // Set thông tin giao hàng nếu giao hàng tận nơi
         if (request.deliveryType() == DeliveryType.HOME_DELIVERY) {
-            if (request.deliveryAddress() != null) {
-                order.setDeliveryAddress(request.deliveryAddress());
+            // Lấy địa chỉ từ danh sách địa chỉ đã lưu của khách hàng
+            CustomerAddress customerAddress = customerAddressRepository
+                    .findByAddressIdAndCustomerId(request.addressId(), customer.getCustomerId())
+                    .orElseThrow(() -> new NotFoundException(
+                            "Không tìm thấy địa chỉ giao hàng với ID: " + request.addressId()));
 
-                // Tính phí vận chuyển
-                BigDecimal shippingFee = calculateShippingFee(request.deliveryAddress());
-                order.setShippingFee(shippingFee);
-            }
+            // Set thông tin người nhận từ CustomerAddress
+            order.setRecipientName(customerAddress.getRecipientName());
+            order.setDeliveryPhone(customerAddress.getRecipientPhone());
+            order.setDeliveryAddress(customerAddress.getFullAddress());
+
+            log.info("Sử dụng địa chỉ đã lưu: {} - {} - {}",
+                    customerAddress.getRecipientName(),
+                    customerAddress.getRecipientPhone(),
+                    customerAddress.getFullAddress());
+
+            // Tính phí vận chuyển
+            BigDecimal shippingFee = calculateShippingFee(order.getDeliveryAddress());
+            order.setShippingFee(shippingFee);
         } else {
             order.setShippingFee(BigDecimal.ZERO);
         }
@@ -847,14 +861,14 @@ public class CheckoutServiceImpl implements CheckoutService {
             );
         }
 
-        // Build delivery info - chỉ lưu địa chỉ đơn giản
+        // Build delivery info
         DeliveryInfoDTO deliveryInfo = null;
         if (order.getDeliveryType() == DeliveryType.HOME_DELIVERY && order.getDeliveryAddress() != null) {
             deliveryInfo = new DeliveryInfoDTO(
-                    null, // recipientName - không dùng nữa
-                    null, // deliveryPhone - không dùng nữa
+                    order.getRecipientName(),
+                    order.getDeliveryPhone(),
                     order.getDeliveryAddress(),
-                    null // deliveryNote - không dùng nữa
+                    order.getDeliveryNote()
             );
         }
 
