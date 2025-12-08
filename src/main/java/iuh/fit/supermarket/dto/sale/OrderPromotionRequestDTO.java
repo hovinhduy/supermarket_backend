@@ -9,10 +9,10 @@ import java.math.BigDecimal;
  * DTO cho thông tin khuyến mãi order level trong request bán hàng
  */
 public record OrderPromotionRequestDTO(
-        @NotBlank(message = "Mã khuyến mãi không được rỗng")
+        // @NotBlank(message = "Mã khuyến mãi không được rỗng")
         String promotionId,
 
-        @NotBlank(message = "Tên khuyến mãi không được rỗng")
+        // @NotBlank(message = "Tên khuyến mãi không được rỗng")
         String promotionName,
 
         @NotNull(message = "ID chi tiết khuyến mãi không được null")
