@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
@@ -52,6 +53,7 @@ public class ProductExcelService {
     /**
      * Export danh sách sản phẩm ra file Excel
      */
+    @Transactional(readOnly = true)
     public byte[] exportProductsToExcel(List<ProductResponse> products) throws IOException {
         log.info("Bắt đầu export {} sản phẩm ra Excel", products.size());
 
