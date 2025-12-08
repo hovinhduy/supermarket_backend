@@ -8,6 +8,7 @@ import java.util.List;
  * DTO phản hồi sau khi tạo bán hàng thành công
  */
 public record CreateSaleResponseDTO(
+        Integer invoiceId,
         String invoiceNumber,
         LocalDateTime invoiceDate,
         BigDecimal subtotal,

@@ -229,6 +229,7 @@ public class SaleServiceImpl implements SaleService {
                 invoiceNumber, totalAmount, invoice.getStatus());
 
         return new CreateSaleResponseDTO(
+                invoice.getInvoiceId(),
                 invoiceNumber,
                 invoiceDate,
                 subtotal,
