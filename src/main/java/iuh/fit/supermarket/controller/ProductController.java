@@ -17,6 +17,7 @@ import iuh.fit.supermarket.dto.product.ProductUnitUpdateRequest;
 import iuh.fit.supermarket.dto.product.ProductUnitResponse;
 import iuh.fit.supermarket.service.ProductService;
 import iuh.fit.supermarket.service.ProductExcelService;
+import iuh.fit.supermarket.service.S3FileUploadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,7 @@ public class ProductController {
 
     private final ProductService productService;
     private final ProductExcelService productExcelService;
+    private final S3FileUploadService s3FileUploadService;
     private final iuh.fit.supermarket.repository.UserRepository userRepository;
     private final iuh.fit.supermarket.repository.CustomerRepository customerRepository;
 
@@ -595,16 +597,17 @@ public class ProductController {
 
     /**
      * API export danh sách sản phẩm ra file Excel
+     * Lưu file lên R2 storage và trả về link download
      */
     @GetMapping("/export")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    @Operation(summary = "Export sản phẩm ra Excel", description = "Export danh sách sản phẩm ra file Excel")
+    @Operation(summary = "Export sản phẩm ra Excel", description = "Export danh sách sản phẩm ra file Excel và trả về link download")
     @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Export thành công"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Export thành công, trả về link download"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Lỗi server"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Không có quyền thực hiện")
     })
-    public ResponseEntity<byte[]> exportProductsToExcel() {
+    public ResponseEntity<ApiResponse<String>> exportProductsToExcel() {
         log.info("API export danh sách sản phẩm ra Excel");
 
         try {
@@ -618,22 +621,25 @@ public class ProductController {
             String fileName = "danh_sach_san_pham_" +
                     LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", fileName);
-            headers.setContentLength(excelData.length);
+            // Upload file lên R2 storage và lấy URL download
+            String downloadUrl = s3FileUploadService.uploadFile(
+                    excelData,
+                    fileName,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "exports"
+            );
 
-            log.info("Export Excel thành công với {} sản phẩm", products.size());
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(excelData);
+            log.info("Export Excel thành công với {} sản phẩm, URL: {}", products.size(), downloadUrl);
+            return ResponseEntity.ok(ApiResponse.success("Export thành công", downloadUrl));
 
         } catch (IOException e) {
             log.error("Lỗi khi export Excel: ", e);
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Lỗi khi tạo file Excel: " + e.getMessage()));
         } catch (Exception e) {
             log.error("Lỗi khi export sản phẩm: ", e);
-            return ResponseEntity.internalServerError().build();
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Lỗi khi export sản phẩm: " + e.getMessage()));
         }
     }
 
