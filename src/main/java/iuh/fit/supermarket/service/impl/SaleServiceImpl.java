@@ -360,7 +360,7 @@ public class SaleServiceImpl implements SaleService {
                 invoice.getOrder() != null ? invoice.getOrder().getOrderId() : null,
                 invoice.getCustomer() != null ? invoice.getCustomer().getUser().getName() : "Khách vãng lai",
                 invoice.getEmployee() != null ? invoice.getEmployee().getUser().getName() : "",
-                invoice.getOrder() != null ? invoice.getOrder().getPaymentMethod() : null,
+                invoice.getPaymentMethod(),
                 invoice.getStatus(),
                 invoice.getSubtotal(),
                 invoice.getTotalDiscount(),
