@@ -1,8 +1,10 @@
 package iuh.fit.supermarket.service.impl;
 
+import iuh.fit.supermarket.dto.employee.CreateEmployeeRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchResponse;
+import iuh.fit.supermarket.dto.employee.UpdateEmployeeRequest;
 import iuh.fit.supermarket.entity.Employee;
 import iuh.fit.supermarket.entity.User;
 import iuh.fit.supermarket.enums.UserRole;
@@ -113,61 +115,56 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /**
      * Tạo nhân viên mới
-     * @param employee thông tin nhân viên (phải có User object đã set sẵn)
+     * @param request thông tin nhân viên cần tạo (DTO)
      * @return EmployeeDto đã được tạo
      */
     @Override
     @Transactional
-    public EmployeeDto createEmployee(Employee employee) {
-        // Validate User object
-        if (employee.getUser() == null) {
-            throw new IllegalArgumentException("User object không được null");
+    public EmployeeDto createEmployee(CreateEmployeeRequest request) {
+        log.info("Tạo nhân viên mới với email: {}", request.getEmail());
+
+        // Kiểm tra email đã tồn tại chưa
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException("Email đã tồn tại: " + request.getEmail());
         }
 
-        User user = employee.getUser();
-        log.info("Tạo nhân viên mới với email: {}", user.getEmail());
+        // Đảm bảo role là employee role (ADMIN, MANAGER, STAFF)
+        if (request.getRole() == UserRole.CUSTOMER) {
+            throw new IllegalArgumentException("Không thể tạo Employee với role CUSTOMER");
+        }
 
         // Xử lý mã nhân viên
-        String employeeCode = employee.getEmployeeCode();
+        String employeeCode = request.getEmployeeCode();
         if (employeeCode == null || employeeCode.trim().isEmpty()) {
             employeeCode = generateEmployeeCode();
-            employee.setEmployeeCode(employeeCode);
             log.info("Tự động sinh mã nhân viên: {}", employeeCode);
         } else {
             employeeCode = employeeCode.trim();
-            employee.setEmployeeCode(employeeCode);
             // Kiểm tra mã đã tồn tại chưa
             if (employeeRepository.existsByEmployeeCode(employeeCode)) {
                 throw new IllegalArgumentException("Mã nhân viên đã tồn tại: " + employeeCode);
             }
         }
 
-        // Kiểm tra email đã tồn tại chưa (qua UserRepository)
-        if (userRepository.existsByEmail(user.getEmail())) {
-            throw new IllegalArgumentException("Email đã tồn tại: " + user.getEmail());
-        }
+        // Tạo User entity từ DTO
+        User user = new User();
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setUserRole(request.getRole());
+        user.setDateOfBirth(request.getDateOfBirth());
+        user.setGender(request.getGender());
+        user.setIsDeleted(false);
 
-        // Mã hóa password
-        if (user.getPasswordHash() != null && !user.getPasswordHash().isEmpty()) {
-            user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
-        }
-
-        // Set default values cho User
-        if (user.getIsDeleted() == null) {
-            user.setIsDeleted(false);
-        }
-
-        // Đảm bảo role là employee role (ADMIN, MANAGER, STAFF)
-        if (user.getUserRole() == UserRole.CUSTOMER) {
-            throw new IllegalArgumentException("Không thể tạo Employee với role CUSTOMER");
-        }
-
-        // Tạo User trước
+        // Lưu User trước
         User savedUser = userRepository.save(user);
         log.info("Đã tạo User mới với ID: {}", savedUser.getUserId());
 
         // Tạo Employee với user_id FK
+        Employee employee = new Employee();
         employee.setUser(savedUser);
+        employee.setEmployeeCode(employeeCode);
         Employee savedEmployee = employeeRepository.save(employee);
         log.info("Đã tạo nhân viên mới với ID: {}", savedEmployee.getEmployeeId());
 
@@ -178,56 +175,67 @@ public class EmployeeServiceImpl implements EmployeeService {
     /**
      * Cập nhật thông tin nhân viên
      * @param employeeId ID nhân viên
-     * @param updatedEmployee thông tin cập nhật (phải có User object đã set sẵn)
+     * @param request thông tin cập nhật (DTO)
      * @return EmployeeDto đã được cập nhật
      */
     @Override
     @Transactional
-    public EmployeeDto updateEmployee(Integer employeeId, Employee updatedEmployee) {
+    public EmployeeDto updateEmployee(Integer employeeId, UpdateEmployeeRequest request) {
         log.info("Cập nhật nhân viên với ID: {}", employeeId);
-
-        // Validate updated User object
-        if (updatedEmployee.getUser() == null) {
-            throw new IllegalArgumentException("User object không được null");
-        }
 
         Employee existingEmployee = employeeRepository.findByEmployeeIdAndUser_IsDeletedFalse(employeeId)
             .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên với ID: " + employeeId));
 
         User existingUser = existingEmployee.getUser();
-        User updatedUser = updatedEmployee.getUser();
 
-        // Kiểm tra email đã tồn tại chưa (ngoại trừ user hiện tại)
-        if (!existingUser.getEmail().equals(updatedUser.getEmail()) &&
-            userRepository.existsByEmailAndUserIdNot(updatedUser.getEmail(), existingUser.getUserId())) {
-            throw new IllegalArgumentException("Email đã tồn tại: " + updatedUser.getEmail());
+        // Cập nhật tên nếu có
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            existingUser.setName(request.getName());
         }
 
-        // Cập nhật thông tin User
-        existingUser.setName(updatedUser.getName());
-        existingUser.setEmail(updatedUser.getEmail());
-        existingUser.setUserRole(updatedUser.getUserRole());
-        if (updatedUser.getPhone() != null) {
-            existingUser.setPhone(updatedUser.getPhone());
-        }
-        if (updatedUser.getDateOfBirth() != null) {
-            existingUser.setDateOfBirth(updatedUser.getDateOfBirth());
-        }
-        if (updatedUser.getGender() != null) {
-            existingUser.setGender(updatedUser.getGender());
+        // Cập nhật email nếu có và khác email hiện tại
+        if (request.getEmail() != null && !request.getEmail().equals(existingUser.getEmail())) {
+            if (userRepository.existsByEmailAndUserIdNot(request.getEmail(), existingUser.getUserId())) {
+                throw new IllegalArgumentException("Email đã tồn tại: " + request.getEmail());
+            }
+            existingUser.setEmail(request.getEmail());
         }
 
-        // Cập nhật password nếu có
-        if (updatedUser.getPasswordHash() != null && !updatedUser.getPasswordHash().isEmpty()) {
-            existingUser.setPasswordHash(passwordEncoder.encode(updatedUser.getPasswordHash()));
+        // Cập nhật phone nếu có
+        if (request.getPhone() != null) {
+            existingUser.setPhone(request.getPhone());
         }
 
-        // Save User
+        // Cập nhật role nếu có
+        if (request.getRole() != null) {
+            if (request.getRole() == UserRole.CUSTOMER) {
+                throw new IllegalArgumentException("Không thể đổi Employee sang role CUSTOMER");
+            }
+            existingUser.setUserRole(request.getRole());
+        }
+
+        // Cập nhật ngày sinh nếu có
+        if (request.getDateOfBirth() != null) {
+            existingUser.setDateOfBirth(request.getDateOfBirth());
+        }
+
+        // Cập nhật giới tính nếu có
+        if (request.getGender() != null) {
+            existingUser.setGender(request.getGender());
+        }
+
+        // Lưu User
         userRepository.save(existingUser);
 
-        // Cập nhật Employee code nếu cần
-        if (updatedEmployee.getEmployeeCode() != null && !updatedEmployee.getEmployeeCode().isEmpty()) {
-            existingEmployee.setEmployeeCode(updatedEmployee.getEmployeeCode());
+        // Cập nhật Employee code nếu có
+        if (request.getEmployeeCode() != null && !request.getEmployeeCode().trim().isEmpty()) {
+            // Kiểm tra mã nhân viên mới không trùng với người khác
+            String newCode = request.getEmployeeCode().trim();
+            if (!newCode.equals(existingEmployee.getEmployeeCode()) &&
+                employeeRepository.existsByEmployeeCode(newCode)) {
+                throw new IllegalArgumentException("Mã nhân viên đã tồn tại: " + newCode);
+            }
+            existingEmployee.setEmployeeCode(newCode);
         }
 
         Employee savedEmployee = employeeRepository.save(existingEmployee);

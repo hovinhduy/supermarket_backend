@@ -8,12 +8,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import iuh.fit.supermarket.dto.common.ApiResponse;
+import iuh.fit.supermarket.dto.employee.CreateEmployeeRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchResponse;
-import iuh.fit.supermarket.entity.Employee;
+import iuh.fit.supermarket.dto.employee.UpdateEmployeeRequest;
 import iuh.fit.supermarket.enums.UserRole;
 import iuh.fit.supermarket.service.EmployeeService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -74,11 +76,12 @@ public class EmployeeController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDto>> createEmployee(
-            @Parameter(description = "Thông tin nhân viên mới", required = true) @RequestBody Employee employee) {
-        log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", employee.getUser() != null ? employee.getUser().getEmail() : "null");
+            @Parameter(description = "Thông tin nhân viên mới", required = true) 
+            @Valid @RequestBody CreateEmployeeRequest request) {
+        log.info("Nhận yêu cầu tạo nhân viên mới với email: {}", request.getEmail());
 
         try {
-            EmployeeDto employeeDto = employeeService.createEmployee(employee);
+            EmployeeDto employeeDto = employeeService.createEmployee(request);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success("Tạo nhân viên thành công", employeeDto));
         } catch (IllegalArgumentException e) {
@@ -95,15 +98,16 @@ public class EmployeeController {
     /**
      * Cập nhật thông tin nhân viên (chỉ ADMIN)
      */
+    @Operation(summary = "Cập nhật thông tin nhân viên", description = "Cập nhật thông tin nhân viên. Chỉ ADMIN mới có quyền thực hiện.")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDto>> updateEmployee(
-            @PathVariable Integer id,
-            @RequestBody Employee employee) {
+            @Parameter(description = "ID nhân viên cần cập nhật") @PathVariable Integer id,
+            @Parameter(description = "Thông tin cập nhật") @Valid @RequestBody UpdateEmployeeRequest request) {
         log.info("Nhận yêu cầu cập nhật nhân viên với ID: {}", id);
 
         try {
-            EmployeeDto employeeDto = employeeService.updateEmployee(id, employee);
+            EmployeeDto employeeDto = employeeService.updateEmployee(id, request);
             return ResponseEntity.ok(
                     ApiResponse.success("Cập nhật nhân viên thành công", employeeDto));
         } catch (IllegalArgumentException e) {

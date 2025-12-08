@@ -1,9 +1,10 @@
 package iuh.fit.supermarket.service;
 
+import iuh.fit.supermarket.dto.employee.CreateEmployeeRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeDto;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchRequest;
 import iuh.fit.supermarket.dto.employee.EmployeeSearchResponse;
-import iuh.fit.supermarket.entity.Employee;
+import iuh.fit.supermarket.dto.employee.UpdateEmployeeRequest;
 import iuh.fit.supermarket.enums.UserRole;
 
 import java.util.List;
@@ -44,18 +45,18 @@ public interface EmployeeService {
 
     /**
      * Tạo nhân viên mới
-     * @param employee thông tin nhân viên (phải có User object đã set sẵn)
+     * @param request thông tin nhân viên cần tạo (DTO)
      * @return EmployeeDto đã được tạo
      */
-    EmployeeDto createEmployee(Employee employee);
+    EmployeeDto createEmployee(CreateEmployeeRequest request);
 
     /**
      * Cập nhật thông tin nhân viên
      * @param employeeId ID nhân viên
-     * @param updatedEmployee thông tin cập nhật (phải có User object đã set sẵn)
+     * @param request thông tin cập nhật (DTO)
      * @return EmployeeDto đã được cập nhật
      */
-    EmployeeDto updateEmployee(Integer employeeId, Employee updatedEmployee);
+    EmployeeDto updateEmployee(Integer employeeId, UpdateEmployeeRequest request);
 
     /**
      * Xóa mềm nhân viên (soft delete)
