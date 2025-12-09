@@ -73,6 +73,7 @@ public interface SaleInvoiceHeaderRepository extends JpaRepository<SaleInvoiceHe
             AND (:employeeId IS NULL OR e.employeeId = :employeeId)
             AND (:customerId IS NULL OR (c IS NOT NULL AND c.customerId = :customerId))
             AND (:productUnitId IS NULL OR d.productUnit.id = :productUnitId)
+            ORDER BY i.invoiceDate DESC
             """)
     Page<SaleInvoiceHeader> searchAndFilterInvoices(
             String searchKeyword,
