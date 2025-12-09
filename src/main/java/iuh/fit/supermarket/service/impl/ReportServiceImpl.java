@@ -301,14 +301,20 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional(readOnly = true)
     public PromotionReportResponseDTO getPromotionReport(PromotionReportRequestDTO request) {
+        // Normalize promotionCode: nếu rỗng hoặc chỉ chứa khoảng trắng thì chuyển thành null
+        String promotionCode = request.promotionCode();
+        if (promotionCode != null && promotionCode.isBlank()) {
+            promotionCode = null;
+        }
+
         log.info("Lấy báo cáo khuyến mãi từ {} đến {}, mã CTKM: {}",
-                request.fromDate(), request.toDate(), request.promotionCode());
+                request.fromDate(), request.toDate(), promotionCode);
 
         // Lấy dữ liệu từ repository
         List<PromotionDetail> promotionDetails = promotionDetailRepository.findPromotionDetailsForReport(
                 request.fromDate(),
                 request.toDate(),
-                request.promotionCode()
+                promotionCode
         );
 
         log.info("Tìm thấy {} chương trình khuyến mãi", promotionDetails.size());
