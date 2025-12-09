@@ -47,10 +47,21 @@ public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
 
     /**
      * Tìm nhân viên có mã lớn nhất để sinh mã mới
-     * @return Optional<Employee>
+     * Sử dụng Pageable để giới hạn kết quả xuống 1 bản ghi
+     * @param pageable thông tin phân trang (sử dụng PageRequest.of(0, 1))
+     * @return List<Employee> chứa tối đa 1 phần tử
      */
     @Query("SELECT e FROM Employee e WHERE e.employeeCode IS NOT NULL ORDER BY e.employeeCode DESC")
-    Optional<Employee> findTopByOrderByEmployeeCodeDesc();
+    List<Employee> findTopEmployeeByEmployeeCodeDesc(Pageable pageable);
+
+    /**
+     * Helper method để lấy nhân viên có mã lớn nhất
+     * @return Optional<Employee>
+     */
+    default Optional<Employee> findTopByOrderByEmployeeCodeDesc() {
+        List<Employee> employees = findTopEmployeeByEmployeeCodeDesc(Pageable.ofSize(1));
+        return employees.isEmpty() ? Optional.empty() : Optional.of(employees.get(0));
+    }
 
     /**
      * Tìm tất cả nhân viên mà user chưa bị xóa

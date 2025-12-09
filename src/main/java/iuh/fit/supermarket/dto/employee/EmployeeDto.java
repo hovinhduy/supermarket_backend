@@ -1,10 +1,12 @@
 package iuh.fit.supermarket.dto.employee;
 
+import iuh.fit.supermarket.enums.Gender;
 import iuh.fit.supermarket.enums.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -31,6 +33,11 @@ public class EmployeeDto {
     private String email;
 
     /**
+     * Số điện thoại nhân viên
+     */
+    private String phone;
+
+    /**
      * Mã nhân viên
      */
     private String employeeCode;
@@ -39,6 +46,16 @@ public class EmployeeDto {
      * Vai trò của nhân viên (từ User.userRole)
      */
     private UserRole role;
+
+    /**
+     * Ngày sinh nhân viên
+     */
+    private LocalDate dateOfBirth;
+
+    /**
+     * Giới tính nhân viên
+     */
+    private Gender gender;
 
     /**
      * Trạng thái xóa mềm
@@ -57,7 +74,7 @@ public class EmployeeDto {
 
     /**
      * Constructor từ Employee entity
-     * Sau refactoring: lấy name, email, role, isDeleted từ User entity
+     * Lấy thông tin từ User entity liên kết
      */
     public static EmployeeDto fromEntity(iuh.fit.supermarket.entity.Employee employee) {
         if (employee == null) {
@@ -71,8 +88,11 @@ public class EmployeeDto {
             employee.getEmployeeId(),
             user.getName(),           // Từ User
             user.getEmail(),          // Từ User
+            user.getPhone(),          // Từ User
             employee.getEmployeeCode(),
-            user.getUserRole(),       // Từ User (was employee.getRole())
+            user.getUserRole(),       // Từ User
+            user.getDateOfBirth(),    // Từ User
+            user.getGender(),         // Từ User
             user.getIsDeleted(),      // Từ User
             user.getCreatedAt(),      // Từ User
             user.getUpdatedAt()       // Từ User
