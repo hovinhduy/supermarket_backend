@@ -37,14 +37,18 @@ public class ProductExcelService {
     }
 
     // Định nghĩa các cột trong Excel cho Export
+    // Lưu ý: 11 cột đầu tiên đồng bộ với IMPORT_HEADERS để có thể import lại file export
+    // 2 cột cuối (Ngày tạo, Ngày cập nhật) chỉ có trong export và sẽ được bỏ qua khi import
     private static final String[] EXPORT_HEADERS = {
             "Mã sản phẩm", "Tên sản phẩm", "Mô tả", "Tên Thương hiệu",
-            "Danh mục", "Trạng thái", "Tích điểm",
+            "Tên Danh mục", "Trạng thái", "Tích điểm",
             "Tên đơn vị", "Tỷ lệ quy đổi", "Đơn vị cơ bản", "Mã vạch",
             "Ngày tạo", "Ngày cập nhật"
     };
 
     // Định nghĩa các cột trong Excel cho Import
+    // Đồng bộ với EXPORT_HEADERS (không bao gồm 2 cột cuối)
+    // File export có thể được import lại trực tiếp
     private static final String[] IMPORT_HEADERS = {
             "Mã sản phẩm", "Tên sản phẩm", "Mô tả", "Tên Thương hiệu", "Tên Danh mục",
             "Trạng thái", "Tích điểm", "Tên đơn vị", "Tỷ lệ quy đổi", "Đơn vị cơ bản", "Mã vạch"
@@ -415,6 +419,9 @@ public class ProductExcelService {
 
     /**
      * Lấy giá trị cell dưới dạng Boolean
+     * Xử lý các giá trị tiếng Việt từ file export:
+     * - Trạng thái: "Hoạt động" / "Không hoạt động"
+     * - Tích điểm, Đơn vị cơ bản: "Có" / "Không"
      */
     private Boolean getCellValueAsBoolean(Cell cell) {
         if (cell == null)
@@ -425,7 +432,16 @@ public class ProductExcelService {
                 return cell.getBooleanCellValue();
             case STRING:
                 String value = cell.getStringCellValue().trim().toLowerCase();
-                return "true".equals(value) || "có".equals(value) || "hoạt động".equals(value) || "1".equals(value);
+                // Kiểm tra các giá trị TRUE (tiếng Anh và tiếng Việt)
+                if ("true".equals(value) || "có".equals(value) || "hoạt động".equals(value) || "1".equals(value) || "yes".equals(value)) {
+                    return true;
+                }
+                // Kiểm tra các giá trị FALSE (tiếng Anh và tiếng Việt)
+                if ("false".equals(value) || "không".equals(value) || "không hoạt động".equals(value) || "0".equals(value) || "no".equals(value)) {
+                    return false;
+                }
+                // Mặc định trả về null nếu không nhận diện được
+                return null;
             case NUMERIC:
                 return cell.getNumericCellValue() > 0;
             default:
